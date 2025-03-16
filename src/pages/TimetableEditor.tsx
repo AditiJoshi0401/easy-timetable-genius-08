@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -231,10 +232,12 @@ const TimetableEditor = () => {
                     <SelectValue placeholder="Select Stream" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="CS">Computer Science</SelectItem>
-                    <SelectItem value="IT">Information Technology</SelectItem>
-                    <SelectItem value="EC">Electronics</SelectItem>
-                    <SelectItem value="ME">Mechanical</SelectItem>
+                    <SelectItem value="BTECH_CSE">BTech CSE</SelectItem>
+                    <SelectItem value="BCA">BCA</SelectItem>
+                    <SelectItem value="MTECH_CSE">MTech CSE</SelectItem>
+                    <SelectItem value="MBA">MBA</SelectItem>
+                    <SelectItem value="MCA">MCA</SelectItem>
+                    <SelectItem value="BTECH_BIOENGG">BTech Bioengg</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
