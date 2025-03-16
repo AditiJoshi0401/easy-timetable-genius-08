@@ -39,7 +39,6 @@ const DataInput = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("subjects");
   
-  // Subjects State
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [newSubject, setNewSubject] = useState<Subject>({
     id: "",
@@ -50,7 +49,6 @@ const DataInput = () => {
     year: "1"
   });
   
-  // Teachers State
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [newTeacher, setNewTeacher] = useState<Teacher>({
     id: "",
@@ -61,7 +59,6 @@ const DataInput = () => {
   });
   const [selectedSubject, setSelectedSubject] = useState("");
   
-  // Rooms State
   const [rooms, setRooms] = useState<Room[]>([]);
   const [newRoom, setNewRoom] = useState<Room>({
     id: "",
@@ -70,7 +67,6 @@ const DataInput = () => {
     type: "classroom"
   });
 
-  // Load data from localStorage on mount
   useEffect(() => {
     const loadData = () => {
       try {
@@ -94,7 +90,6 @@ const DataInput = () => {
     loadData();
   }, [toast]);
 
-  // Save data to localStorage whenever it changes
   useEffect(() => {
     try {
       localStorage.setItem('subjects', JSON.stringify(subjects));
@@ -105,7 +100,6 @@ const DataInput = () => {
     }
   }, [subjects, teachers, rooms]);
 
-  // Subject Handlers
   const handleAddSubject = () => {
     if (!newSubject.name || !newSubject.code) {
       toast({
@@ -136,7 +130,6 @@ const DataInput = () => {
   };
 
   const handleDeleteSubject = (id: string) => {
-    // Check if any teachers are assigned to this subject
     const assignedTeachers = teachers.filter(teacher => teacher.subjects.includes(id));
     
     if (assignedTeachers.length > 0) {
@@ -157,7 +150,6 @@ const DataInput = () => {
     });
   };
 
-  // Teacher Handlers
   const handleAddTeacher = () => {
     if (!newTeacher.name || !newTeacher.email) {
       toast({
@@ -169,7 +161,12 @@ const DataInput = () => {
     }
 
     const teacherId = crypto.randomUUID();
-    const updatedTeachers = [...teachers, { ...newTeacher, id: teacherId }];
+    const teacherToAdd = { 
+      ...newTeacher, 
+      id: teacherId 
+    };
+    
+    const updatedTeachers = [...teachers, teacherToAdd];
     setTeachers(updatedTeachers);
     
     setNewTeacher({
@@ -182,7 +179,7 @@ const DataInput = () => {
     
     toast({
       title: "Teacher Added",
-      description: `${newTeacher.name} has been added successfully.`
+      description: `${teacherToAdd.name} has been added successfully.`
     });
   };
 
@@ -197,9 +194,8 @@ const DataInput = () => {
   };
 
   const handleAddSubjectToTeacher = () => {
-    if (!selectedSubject || !newTeacher.id) return;
+    if (!selectedSubject) return;
     
-    // Check if subject is already assigned
     if (newTeacher.subjects.includes(selectedSubject)) {
       toast({
         title: "Subject Already Assigned",
@@ -226,7 +222,6 @@ const DataInput = () => {
     });
   };
 
-  // Room Handlers
   const handleAddRoom = () => {
     if (!newRoom.number) {
       toast({
@@ -288,7 +283,6 @@ const DataInput = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Subjects Tab */}
         <TabsContent value="subjects" className="space-y-6">
           <Card>
             <CardHeader>
@@ -423,7 +417,6 @@ const DataInput = () => {
           </Card>
         </TabsContent>
 
-        {/* Teachers Tab */}
         <TabsContent value="teachers" className="space-y-6">
           <Card>
             <CardHeader>
@@ -585,7 +578,6 @@ const DataInput = () => {
           </Card>
         </TabsContent>
 
-        {/* Rooms Tab */}
         <TabsContent value="rooms" className="space-y-6">
           <Card>
             <CardHeader>
