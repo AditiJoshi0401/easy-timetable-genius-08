@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -33,7 +32,6 @@ const TimetableEditor = () => {
     type: "lecture"
   });
 
-  // Time slots for the timetable
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const timeSlots = [
     "9:30 - 10:30", 
@@ -46,7 +44,6 @@ const TimetableEditor = () => {
     "4:30 - 5:30"
   ];
 
-  // Load data from localStorage
   useEffect(() => {
     try {
       const storedSubjects = localStorage.getItem('subjects');
@@ -61,7 +58,6 @@ const TimetableEditor = () => {
     }
   }, []);
 
-  // Initialize empty timetable
   const initializeTimetable = () => {
     const newTimetable: any = {};
     
@@ -75,7 +71,6 @@ const TimetableEditor = () => {
     return newTimetable;
   };
 
-  // Handle timetable generation
   const handleGenerateTimetable = () => {
     if (!stream || !year || !division) {
       toast({
@@ -95,10 +90,8 @@ const TimetableEditor = () => {
     });
   };
 
-  // Save timetable
   const saveTimetable = () => {
     try {
-      // Create a unique key for this timetable
       const timetableKey = `timetable_${stream}_${year}_${division}`;
       const timetableMetadata = {
         id: timetableKey,
@@ -109,19 +102,16 @@ const TimetableEditor = () => {
         lastModified: new Date().toLocaleDateString()
       };
       
-      // Save the timetable data
       localStorage.setItem(timetableKey, JSON.stringify(timetableData));
       
-      // Update the recent timetables list
       const storedRecentTimetables = localStorage.getItem('recentTimetables');
       let recentTimetables = storedRecentTimetables ? JSON.parse(storedRecentTimetables) : [];
       
-      // Add this timetable to the recent list (or update if exists)
       const existingIndex = recentTimetables.findIndex((t: any) => t.id === timetableKey);
       if (existingIndex >= 0) {
         recentTimetables[existingIndex] = timetableMetadata;
       } else {
-        recentTimetables = [timetableMetadata, ...recentTimetables].slice(0, 5); // Keep only 5 recent items
+        recentTimetables = [timetableMetadata, ...recentTimetables].slice(0, 5);
       }
       
       localStorage.setItem('recentTimetables', JSON.stringify(recentTimetables));
@@ -142,7 +132,6 @@ const TimetableEditor = () => {
     }
   };
 
-  // Drag and drop handlers
   const handleDragStart = (item: any, type: string) => {
     setDraggingItem({ ...item, itemType: type });
   };
@@ -159,7 +148,6 @@ const TimetableEditor = () => {
     e.preventDefault();
     
     if (draggingItem && draggingItem.itemType === 'subject') {
-      // Open the dialog to add subject details
       setSelectedSlot({ day, time });
       setSlotDetails({
         ...slotDetails,
@@ -169,7 +157,6 @@ const TimetableEditor = () => {
     }
   };
 
-  // Add subject to timetable
   const addSubjectToTimetable = () => {
     if (!selectedSlot || !slotDetails.subject || !slotDetails.teacher || !slotDetails.room) {
       toast({
@@ -182,7 +169,6 @@ const TimetableEditor = () => {
     
     const { day, time } = selectedSlot;
     
-    // Get subject, teacher, and room details
     const subject = subjects.find(s => s.id === slotDetails.subject);
     const teacher = teachers.find(t => t.id === slotDetails.teacher);
     const room = rooms.find(r => r.id === slotDetails.room);
@@ -204,7 +190,6 @@ const TimetableEditor = () => {
     });
   };
 
-  // Remove subject from timetable
   const removeSubjectFromTimetable = (day: string, time: string) => {
     const newTimetableData = { ...timetableData };
     newTimetableData[day][time] = null;
@@ -216,7 +201,6 @@ const TimetableEditor = () => {
     });
   };
 
-  // Filter subjects based on selected stream and year
   const filteredSubjects = subjects.filter((subject) => {
     if (!stream || !year) return true;
     return subject.stream === stream && subject.year === year;
@@ -375,7 +359,7 @@ const TimetableEditor = () => {
                               </div>
                               <div className="mt-1 space-y-1">
                                 <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <User className="h-3 w-3" />
+                                  <Users className="h-3 w-3" />
                                   <span>{cellData.teacher.name}</span>
                                 </div>
                                 <div className="text-xs text-muted-foreground flex items-center gap-1">
@@ -507,7 +491,6 @@ const TimetableEditor = () => {
         </div>
       )}
       
-      {/* Dialog for adding subject details */}
       <Dialog open={slotDetailsOpen} onOpenChange={setSlotDetailsOpen}>
         <DialogContent>
           <DialogHeader>
