@@ -1,259 +1,297 @@
 
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Calendar, Database, LayoutGrid, Plus, Clock, Book, Compass } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  Clock, 
+  BookOpen, 
+  Users, 
+  Building, 
+  PlusCircle, 
+  ListFilter,
+  Presentation,
+  BarChart3
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { FeatureCard } from "@/components/ui/feature-card";
-import { useToast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { FeatureCard } from "@/components/ui/feature-card";
 
 const Dashboard = () => {
-  const { toast } = useToast();
+  const [subjectCount, setSubjectCount] = useState(0);
+  const [teacherCount, setTeacherCount] = useState(0);
+  const [roomCount, setRoomCount] = useState(0);
+  const [timetableCount, setTimetableCount] = useState(0);
   const [recentTimetables, setRecentTimetables] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading data from localStorage
-    const loadData = async () => {
-      try {
-        const storedTimetables = localStorage.getItem('recentTimetables');
-        if (storedTimetables) {
-          setRecentTimetables(JSON.parse(storedTimetables));
-        }
-      } catch (error) {
-        console.error('Error loading timetables:', error);
-      } finally {
-        // Simulate loading delay for animation
-        setTimeout(() => setIsLoading(false), 800);
+    // Load counts from localStorage
+    try {
+      const subjects = localStorage.getItem('subjects');
+      const teachers = localStorage.getItem('teachers');
+      const rooms = localStorage.getItem('rooms');
+      const recentTimetablesData = localStorage.getItem('recentTimetables');
+      
+      if (subjects) setSubjectCount(JSON.parse(subjects).length);
+      if (teachers) setTeacherCount(JSON.parse(teachers).length);
+      if (rooms) setRoomCount(JSON.parse(rooms).length);
+      
+      if (recentTimetablesData) {
+        const parsedTimetables = JSON.parse(recentTimetablesData);
+        setRecentTimetables(parsedTimetables);
+        setTimetableCount(parsedTimetables.length);
       }
-    };
-
-    loadData();
+    } catch (error) {
+      console.error('Error loading data from localStorage:', error);
+    }
   }, []);
 
-  const handleNewTimetable = () => {
-    toast({
-      title: "Create New Timetable",
-      description: "Starting a new timetable creation process.",
-    });
+  // Calculate setup progress
+  const calculateSetupProgress = () => {
+    let progress = 0;
+    if (subjectCount > 0) progress += 33;
+    if (teacherCount > 0) progress += 33;
+    if (roomCount > 0) progress += 34;
+    return progress;
   };
 
   return (
-    <div className="space-y-8">
-      <div className="animate-slide-down">
-        <SectionHeading
-          title="Welcome to Timetable Genius"
-          description="AI-powered college timetable generator for effortless scheduling"
-          action={
-            <Link to="/editor">
-              <Button className="gap-2" onClick={handleNewTimetable}>
-                <Plus className="h-4 w-4" /> New Timetable
+    <div className="space-y-6">
+      <SectionHeading
+        title="Dashboard"
+        description="Welcome to your timetable management dashboard"
+        icon={<LayoutDashboard className="h-6 w-6" />}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Subjects</CardTitle>
+            <CardDescription>Total subjects added</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{subjectCount}</div>
+          </CardContent>
+          <CardFooter>
+            <Link to="/data">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Add Subjects
               </Button>
             </Link>
-          }
-        />
-      </div>
+          </CardFooter>
+        </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link to="/editor" className="block">
-          <FeatureCard
-            icon={<Calendar className="h-12 w-12" />}
-            title="Timetable Editor"
-            description="Create and modify timetables with an intuitive drag-and-drop interface"
-          />
-        </Link>
-        
-        <Link to="/data" className="block">
-          <FeatureCard
-            icon={<Database className="h-12 w-12" />}
-            title="Data Management"
-            description="Add and edit subjects, teachers, rooms, and constraints"
-          />
-        </Link>
-        
-        <Link to="/view" className="block">
-          <FeatureCard
-            icon={<LayoutGrid className="h-12 w-12" />}
-            title="View Timetables"
-            description="Browse created timetables and check for overlaps"
-          />
-        </Link>
-      </div>
-
-      <div className="animate-slide-in" style={{ animationDelay: "200ms" }}>
         <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Teachers</CardTitle>
+            <CardDescription>Total teachers added</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{teacherCount}</div>
+          </CardContent>
+          <CardFooter>
+            <Link to="/data">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Add Teachers
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Rooms</CardTitle>
+            <CardDescription>Total rooms added</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{roomCount}</div>
+          </CardContent>
+          <CardFooter>
+            <Link to="/data">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Add Rooms
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Timetables</CardTitle>
+            <CardDescription>Created timetables</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{timetableCount}</div>
+          </CardContent>
+          <CardFooter>
+            <Link to="/editor">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Create New
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              <span>Recent Timetables</span>
-            </CardTitle>
+            <CardTitle>Recent Timetables</CardTitle>
             <CardDescription>
               Your recently created or modified timetables
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-md bg-muted animate-pulse"></div>
-                    <div className="space-y-2 flex-1">
-                      <div className="h-4 w-1/3 bg-muted rounded animate-pulse"></div>
-                      <div className="h-3 w-1/2 bg-muted rounded animate-pulse"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : recentTimetables.length > 0 ? (
+            {recentTimetables.length > 0 ? (
               <div className="space-y-4">
-                {recentTimetables.map((timetable, index) => (
-                  <div key={index} className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center text-primary">
-                      <Book className="h-5 w-5" />
+                {recentTimetables.map((timetable) => (
+                  <div key={timetable.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <Calendar className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="font-medium">{timetable.name}</div>
+                        <div className="text-sm text-muted-foreground">Last modified: {timetable.lastModified}</div>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-medium">{timetable.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {timetable.stream} • {timetable.year} • {timetable.lastModified}
-                      </p>
+                    <div className="flex gap-2">
+                      <Link to="/view">
+                        <Button variant="outline" size="sm">View</Button>
+                      </Link>
+                      <Link to="/editor">
+                        <Button variant="outline" size="sm">Edit</Button>
+                      </Link>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <div className="mx-auto w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-3">
-                  <Compass className="h-6 w-6 text-muted-foreground" />
+              <div className="text-center py-12">
+                <div className="h-12 w-12 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-3">
+                  <Calendar className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-medium">No timetables yet</h3>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Create your first timetable to get started
+                <p className="text-muted-foreground mt-1">
+                  Start by creating your first timetable
                 </p>
-                <Link to="/editor">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" /> Create Timetable
-                  </Button>
+                <Link to="/editor" className="mt-4 inline-block">
+                  <Button>Create New Timetable</Button>
                 </Link>
               </div>
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Setup Progress</CardTitle>
+            <CardDescription>
+              Complete these steps to start creating timetables
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Overall Progress</span>
+                <span>{calculateSetupProgress()}%</span>
+              </div>
+              <Progress value={calculateSetupProgress()} />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-1.5 rounded-full ${subjectCount > 0 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                  <BookOpen className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium">Add Subjects</div>
+                  <div className="text-xs text-muted-foreground">
+                    {subjectCount > 0 ? `${subjectCount} subjects added` : 'No subjects added yet'}
+                  </div>
+                </div>
+                {subjectCount === 0 && (
+                  <Link to="/data">
+                    <Button variant="ghost" size="sm">
+                      Add
+                    </Button>
+                  </Link>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className={`p-1.5 rounded-full ${teacherCount > 0 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                  <Users className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium">Add Teachers</div>
+                  <div className="text-xs text-muted-foreground">
+                    {teacherCount > 0 ? `${teacherCount} teachers added` : 'No teachers added yet'}
+                  </div>
+                </div>
+                {teacherCount === 0 && (
+                  <Link to="/data">
+                    <Button variant="ghost" size="sm">
+                      Add
+                    </Button>
+                  </Link>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className={`p-1.5 rounded-full ${roomCount > 0 ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                  <Building className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium">Add Rooms</div>
+                  <div className="text-xs text-muted-foreground">
+                    {roomCount > 0 ? `${roomCount} rooms added` : 'No rooms added yet'}
+                  </div>
+                </div>
+                {roomCount === 0 && (
+                  <Link to="/data">
+                    <Button variant="ghost" size="sm">
+                      Add
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-slide-in" style={{ animationDelay: "400ms" }}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Getting Started</CardTitle>
-            <CardDescription>
-              Follow these steps to create your first timetable
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <div className="text-sm font-medium">1. Add data</div>
-                  <div className="text-sm text-muted-foreground">Step 1 of 3</div>
-                </div>
-                <Progress value={0} className="h-2" />
-                <p className="text-sm text-muted-foreground">
-                  Add subjects, teachers, and rooms in the Data Management section
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <div className="text-sm font-medium">2. Create timetable</div>
-                  <div className="text-sm text-muted-foreground">Step 2 of 3</div>
-                </div>
-                <Progress value={0} className="h-2" />
-                <p className="text-sm text-muted-foreground">
-                  Use the Timetable Editor to design your schedule
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <div className="text-sm font-medium">3. Check conflicts</div>
-                  <div className="text-sm text-muted-foreground">Step 3 of 3</div>
-                </div>
-                <Progress value={0} className="h-2" />
-                <p className="text-sm text-muted-foreground">
-                  Verify there are no overlaps in teacher or room scheduling
-                </p>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Link to="/data" className="w-full">
-              <Button variant="outline" className="w-full">
-                Start Now
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Tips & Features</CardTitle>
-            <CardDescription>
-              Helpful tips to get the most out of Timetable Genius
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-primary font-medium">1</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium">Drag & Drop</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Easily assign subjects by dragging them to time slots
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-primary font-medium">2</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium">Conflict Detection</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically detects scheduling conflicts in real-time
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-primary font-medium">3</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium">Color Coding</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Assign colors to subjects for better visual organization
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-primary font-medium">4</span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium">Export Options</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Export timetables as PDF, CSV, or printable view
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <FeatureCard
+          title="Create Timetables"
+          description="Design new timetables for different streams and divisions"
+          icon={<Calendar className="h-8 w-8" />}
+          link="/editor"
+        />
+        <FeatureCard
+          title="View & Export"
+          description="View, filter and export created timetables"
+          icon={<Presentation className="h-8 w-8" />}
+          link="/view"
+        />
+        <FeatureCard
+          title="Data Management"
+          description="Manage subjects, teachers, and rooms"
+          icon={<ListFilter className="h-8 w-8" />}
+          link="/data"
+        />
+        <FeatureCard
+          title="App Settings"
+          description="Configure application behavior and preferences"
+          icon={<BarChart3 className="h-8 w-8" />}
+          link="/settings"
+        />
       </div>
     </div>
   );

@@ -1,46 +1,30 @@
 
-import { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface FeatureCardProps {
   title: string;
-  description?: string;
-  icon?: ReactNode;
-  className?: string;
-  children?: ReactNode;
-  onClick?: () => void;
+  description: string;
+  icon: React.ReactNode;
+  link?: string;
 }
 
-export function FeatureCard({
-  title,
-  description,
-  icon,
-  className,
-  children,
-  onClick,
-}: FeatureCardProps) {
-  return (
-    <div 
-      className={cn(
-        "relative overflow-hidden rounded-xl border border-border/40 bg-card p-6 shadow-card",
-        "hover-scale card-hover",
-        onClick && "cursor-pointer",
-        className
-      )}
-      onClick={onClick}
-    >
-      {icon && (
-        <div className="absolute right-4 top-4 text-muted-foreground/20 opacity-80">
+export function FeatureCard({ title, description, icon, link }: FeatureCardProps) {
+  const content = (
+    <Card className={`overflow-hidden transition-all ${link ? 'hover:shadow-md hover:border-primary/20' : ''}`}>
+      <CardContent className="p-6">
+        <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
           {icon}
         </div>
-      )}
-      <h3 className="text-lg font-medium tracking-tight">{title}</h3>
-      {description && (
-        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-          {description}
-        </p>
-      )}
-      {children && <div className="mt-4">{children}</div>}
-    </div>
+        <h3 className="text-lg font-medium">{title}</h3>
+        <p className="text-muted-foreground mt-1">{description}</p>
+      </CardContent>
+    </Card>
   );
+
+  if (link) {
+    return <Link to={link}>{content}</Link>;
+  }
+
+  return content;
 }
