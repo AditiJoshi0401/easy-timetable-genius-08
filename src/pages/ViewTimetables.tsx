@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { LayoutGrid, Filter, Download, Book, User } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -18,9 +17,9 @@ const ViewTimetables = () => {
 
   // Mock data for recent timetables
   const recentTimetables = [
-    { id: "tt1", name: "CS Year 2 Division A Timetable", stream: "CS", year: "2", division: "A", lastModified: "05/10/2023" },
-    { id: "tt2", name: "IT Year 3 Division B Timetable", stream: "IT", year: "3", division: "B", lastModified: "04/28/2023" },
-    { id: "tt3", name: "CS Year 1 Division C Timetable", stream: "CS", year: "1", division: "C", lastModified: "04/25/2023" },
+    { id: "tt1", name: "BTech CSE Year 2 Division A Timetable", stream: "BTECH_CSE", year: "2", division: "A", lastModified: "05/10/2023" },
+    { id: "tt2", name: "MCA Year 3 Division B Timetable", stream: "MCA", year: "3", division: "B", lastModified: "04/28/2023" },
+    { id: "tt3", name: "BCA Year 1 Division C Timetable", stream: "BCA", year: "1", division: "C", lastModified: "04/25/2023" },
   ];
 
   // Handler to load timetable
@@ -56,10 +55,12 @@ const ViewTimetables = () => {
                     <SelectValue placeholder="Select Stream" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="CS">Computer Science</SelectItem>
-                    <SelectItem value="IT">Information Technology</SelectItem>
-                    <SelectItem value="EC">Electronics</SelectItem>
-                    <SelectItem value="ME">Mechanical</SelectItem>
+                    <SelectItem value="BTECH_CSE">BTech CSE</SelectItem>
+                    <SelectItem value="BCA">BCA</SelectItem>
+                    <SelectItem value="MTECH_CSE">MTech CSE</SelectItem>
+                    <SelectItem value="MBA">MBA</SelectItem>
+                    <SelectItem value="MCA">MCA</SelectItem>
+                    <SelectItem value="BTECH_BIOENGG">BTech Bioengg</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

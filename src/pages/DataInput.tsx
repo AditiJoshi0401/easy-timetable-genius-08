@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { DatabaseIcon, BookIcon, UsersIcon, BuildingIcon, PlusIcon, TrashIcon, SaveIcon } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -47,7 +46,7 @@ const DataInput = () => {
     name: "",
     code: "",
     credits: 3,
-    stream: "CS",
+    stream: "BTECH_CSE",
     year: "1"
   });
   
@@ -126,7 +125,7 @@ const DataInput = () => {
       name: "",
       code: "",
       credits: 3,
-      stream: "CS",
+      stream: "BTECH_CSE",
       year: "1"
     });
     
@@ -349,10 +348,12 @@ const DataInput = () => {
                       <SelectValue placeholder="Select stream" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="CS">Computer Science</SelectItem>
-                      <SelectItem value="IT">Information Technology</SelectItem>
-                      <SelectItem value="EC">Electronics</SelectItem>
-                      <SelectItem value="ME">Mechanical</SelectItem>
+                      <SelectItem value="BTECH_CSE">BTech CSE</SelectItem>
+                      <SelectItem value="BCA">BCA</SelectItem>
+                      <SelectItem value="MTECH_CSE">MTech CSE</SelectItem>
+                      <SelectItem value="MBA">MBA</SelectItem>
+                      <SelectItem value="MCA">MCA</SelectItem>
+                      <SelectItem value="BTECH_BIOENGG">BTech Bioengg</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
