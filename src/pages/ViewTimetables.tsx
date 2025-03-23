@@ -190,7 +190,7 @@ const ViewTimetables = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>
+                      <SelectItem value="no-streams" disabled>
                         No streams available
                       </SelectItem>
                     )}
@@ -212,7 +212,7 @@ const ViewTimetables = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>
+                      <SelectItem value="no-years" disabled>
                         {stream ? "No years available for this stream" : "Select a stream first"}
                       </SelectItem>
                     )}
@@ -234,7 +234,7 @@ const ViewTimetables = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>
+                      <SelectItem value="no-divisions" disabled>
                         {year ? "No divisions available for this year" : "Select a year first"}
                       </SelectItem>
                     )}
