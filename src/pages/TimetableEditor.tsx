@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -60,7 +59,6 @@ const TimetableEditor = () => {
     }
   }, []);
 
-  // Create a mapping of subjects to teachers
   useEffect(() => {
     const subjectTeacherMap: Record<string, string[]> = {};
     teachers.forEach(teacher => {
@@ -166,7 +164,6 @@ const TimetableEditor = () => {
     if (draggingItem && draggingItem.itemType === 'subject') {
       setSelectedSlot({ day, time });
       
-      // Find teachers assigned to this subject
       const subjectTeachers = assignedTeachers[draggingItem.id] || [];
       const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
       
@@ -180,39 +177,32 @@ const TimetableEditor = () => {
     }
   };
 
-  // Check if a room is available for a given type, day and time slots
   const isRoomAvailable = (roomId: string, day: string, startTime: string, type: string) => {
-    // For labs, check if the room is free for 3 consecutive slots
     if (type === "lab") {
       const startIndex = timeSlots.indexOf(startTime);
-      if (startIndex === -1 || startIndex > timeSlots.length - 3) {
-        return false; // Can't fit a 3-hour lab at the end of day
+      if (startIndex === -1 || startIndex > timeSlots.length - 2) {
+        return false;
       }
       
-      // Check all 3 slots
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         const timeSlot = timeSlots[startIndex + i];
         const slot = timetableData[day]?.[timeSlot];
         if (slot && slot.room.id === roomId) {
-          return false; // Room is occupied
+          return false;
         }
       }
       return true;
     } else {
-      // For lectures, just check the single slot
       const slot = timetableData[day]?.[startTime];
       return !slot || slot.room.id !== roomId;
     }
   };
 
-  // Get available rooms for a specific type, day and time
   const getAvailableRooms = (day: string, time: string, type: string) => {
     return rooms.filter(room => {
-      // Filter by room type
       if (type === "lab" && room.type !== "lab") return false;
       if (type === "lecture" && room.type !== "classroom") return false;
       
-      // Check availability
       return isRoomAvailable(room.id, day, time, type);
     });
   };
@@ -235,27 +225,25 @@ const TimetableEditor = () => {
     
     const newTimetableData = { ...timetableData };
     
-    // If it's a lab, occupy 3 consecutive slots
     if (slotDetails.type === "lab") {
       const startIndex = timeSlots.indexOf(time);
-      if (startIndex === -1 || startIndex > timeSlots.length - 3) {
+      if (startIndex === -1 || startIndex > timeSlots.length - 2) {
         toast({
           title: "Can't Add Lab",
-          description: "Labs need 3 consecutive hours. There aren't enough time slots remaining in the day.",
+          description: "Labs need 2 consecutive hours. There aren't enough time slots remaining in the day.",
           variant: "destructive"
         });
         return;
       }
       
-      // Occupy all 3 slots
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         const timeSlot = timeSlots[startIndex + i];
         newTimetableData[day][timeSlot] = {
           subject: subject,
           teacher: teacher,
           room: room,
           type: slotDetails.type,
-          isPartOfLab: i > 0 // Mark slots 2 and 3 as part of a lab
+          isPartOfLab: i > 0
         };
       }
       
@@ -264,7 +252,6 @@ const TimetableEditor = () => {
         description: `Added ${subject.name} lab to ${day} starting at ${time}`
       });
     } else {
-      // Regular lecture, just occupy one slot
       newTimetableData[day][time] = {
         subject: subject,
         teacher: teacher,
@@ -286,40 +273,33 @@ const TimetableEditor = () => {
     const newTimetableData = { ...timetableData };
     const currentSlot = newTimetableData[day][time];
     
-    // If it's part of a lab, we need to remove all 3 slots
     if (currentSlot && currentSlot.type === "lab") {
       const startIndex = timeSlots.indexOf(time);
       
-      // Find first slot of the lab (in case we clicked on the middle or last slot)
       let labStartIndex = startIndex;
       while (labStartIndex > 0 && newTimetableData[day][timeSlots[labStartIndex - 1]]?.isPartOfLab) {
         labStartIndex--;
       }
       
-      // Remove all 3 slots
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         if (labStartIndex + i < timeSlots.length) {
           newTimetableData[day][timeSlots[labStartIndex + i]] = null;
         }
       }
     } else if (currentSlot && currentSlot.isPartOfLab) {
-      // If it's part of a lab but not the first slot, find the lab start
       const index = timeSlots.indexOf(time);
       let labStartIndex = index;
       
-      // Go backwards to find first slot
       while (labStartIndex > 0 && newTimetableData[day][timeSlots[labStartIndex - 1]]?.isPartOfLab) {
         labStartIndex--;
       }
       
-      // Remove all slots of this lab
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         if (labStartIndex + i < timeSlots.length) {
           newTimetableData[day][timeSlots[labStartIndex + i]] = null;
         }
       }
     } else {
-      // Regular lecture slot, just remove it
       newTimetableData[day][time] = null;
     }
     
@@ -331,13 +311,11 @@ const TimetableEditor = () => {
     });
   };
 
-  // Filter subjects for the selected stream and year
   const filteredSubjects = subjects.filter((subject) => {
     if (!stream || !year) return true;
     return subject.stream === stream && subject.year === year;
   });
 
-  // Get teachers for a specific subject
   const getTeachersForSubject = (subjectId: string) => {
     return teachers.filter(teacher => teacher.subjects.includes(subjectId));
   };
@@ -653,7 +631,6 @@ const TimetableEditor = () => {
               <Select 
                 value={slotDetails.subject} 
                 onValueChange={(value) => {
-                  // Find teachers assigned to this subject
                   const subjectTeachers = assignedTeachers[value] || [];
                   const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
                   
@@ -684,7 +661,6 @@ const TimetableEditor = () => {
                   <SelectValue placeholder="Select Teacher" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Show teachers assigned to this subject first */}
                   {slotDetails.subject && assignedTeachers[slotDetails.subject] && assignedTeachers[slotDetails.subject].length > 0 ? (
                     <>
                       <SelectItem value="" disabled>Assigned Teachers</SelectItem>
@@ -700,7 +676,6 @@ const TimetableEditor = () => {
                     </>
                   ) : null}
                   
-                  {/* Show all other teachers */}
                   {teachers
                     .filter(teacher => !slotDetails.subject || !assignedTeachers[slotDetails.subject] || !assignedTeachers[slotDetails.subject].includes(teacher.id))
                     .map((teacher) => (
@@ -721,7 +696,7 @@ const TimetableEditor = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="lecture">Lecture</SelectItem>
-                  <SelectItem value="lab">Lab (3 hours)</SelectItem>
+                  <SelectItem value="lab">Lab (2 hours)</SelectItem>
                   <SelectItem value="tutorial">Tutorial</SelectItem>
                 </SelectContent>
               </Select>
