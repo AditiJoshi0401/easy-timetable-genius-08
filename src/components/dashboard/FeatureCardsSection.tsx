@@ -1,5 +1,5 @@
 
-import { Calendar, Presentation, ListFilter, BookOpen } from "lucide-react";
+import { Calendar, Presentation, ListFilter, BookOpen, Database } from "lucide-react";
 import { FeatureCard } from "@/components/ui/feature-card";
 
 export const FeatureCardsSection = () => {

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -10,9 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 const TimetableEditor = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [stream, setStream] = useState("");
   const [year, setYear] = useState("");
   const [division, setDivision] = useState("");
@@ -32,6 +35,10 @@ const TimetableEditor = () => {
     type: "lecture"
   });
   const [assignedTeachers, setAssignedTeachers] = useState<any>({});
+  const [streams, setStreams] = useState<any[]>([]);
+  const [years, setYears] = useState<any[]>([]);
+  const [divisions, setDivisions] = useState<any[]>([]);
+  const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const timeSlots = [
@@ -50,14 +57,63 @@ const TimetableEditor = () => {
       const storedSubjects = localStorage.getItem('subjects');
       const storedTeachers = localStorage.getItem('teachers');
       const storedRooms = localStorage.getItem('rooms');
+      const storedStreams = localStorage.getItem('streams');
       
       if (storedSubjects) setSubjects(JSON.parse(storedSubjects));
       if (storedTeachers) setTeachers(JSON.parse(storedTeachers));
       if (storedRooms) setRooms(JSON.parse(storedRooms));
+      
+      // Load streams data
+      if (storedStreams) {
+        const parsedStreams = JSON.parse(storedStreams);
+        setStreams(parsedStreams);
+        
+        // Check if streams data exists
+        if (!parsedStreams || parsedStreams.length === 0) {
+          setNoStreamsDataExists(true);
+        }
+      } else {
+        setNoStreamsDataExists(true);
+      }
     } catch (error) {
       console.error('Error loading data from localStorage:', error);
+      setNoStreamsDataExists(true);
     }
   }, []);
+
+  useEffect(() => {
+    // Filter years based on selected stream
+    if (stream) {
+      const selectedStreamData = streams.find(s => s.id === stream);
+      if (selectedStreamData && selectedStreamData.years) {
+        setYears(selectedStreamData.years);
+        setYear("");
+        setDivision("");
+      } else {
+        setYears([]);
+      }
+    } else {
+      setYears([]);
+    }
+  }, [stream, streams]);
+
+  useEffect(() => {
+    // Filter divisions based on selected stream and year
+    if (stream && year) {
+      const selectedStreamData = streams.find(s => s.id === stream);
+      if (selectedStreamData && selectedStreamData.years) {
+        const selectedYear = selectedStreamData.years.find((y: any) => y.id === year);
+        if (selectedYear && selectedYear.divisions) {
+          setDivisions(selectedYear.divisions);
+          setDivision("");
+        } else {
+          setDivisions([]);
+        }
+      }
+    } else {
+      setDivisions([]);
+    }
+  }, [stream, year, streams]);
 
   useEffect(() => {
     const subjectTeacherMap: Record<string, string[]> = {};
@@ -71,6 +127,10 @@ const TimetableEditor = () => {
     });
     setAssignedTeachers(subjectTeacherMap);
   }, [teachers]);
+
+  const handleNavigateToStreamsManager = () => {
+    navigate("/streams-manager");
+  };
 
   const initializeTimetable = () => {
     const newTimetable: any = {};
@@ -320,6 +380,62 @@ const TimetableEditor = () => {
     return teachers.filter(teacher => teacher.subjects.includes(subjectId));
   };
 
+  const getStreamName = (streamId: string) => {
+    const stream = streams.find(s => s.id === streamId);
+    return stream ? stream.name : streamId;
+  };
+
+  const getYearName = (yearId: string) => {
+    if (!stream) return yearId;
+    const streamData = streams.find(s => s.id === stream);
+    if (!streamData) return yearId;
+    
+    const year = streamData.years.find((y: any) => y.id === yearId);
+    return year ? year.name : yearId;
+  };
+
+  const getDivisionName = (divisionId: string) => {
+    if (!stream || !year) return divisionId;
+    const streamData = streams.find(s => s.id === stream);
+    if (!streamData) return divisionId;
+    
+    const yearData = streamData.years.find((y: any) => y.id === year);
+    if (!yearData) return divisionId;
+    
+    const division = yearData.divisions.find((d: any) => d.id === divisionId);
+    return division ? division.name : divisionId;
+  };
+
+  if (noStreamsDataExists) {
+    return (
+      <div className="space-y-6">
+        <SectionHeading
+          title="Timetable Editor"
+          description="Create and customize college timetables"
+          icon={<Calendar className="h-6 w-6" />}
+        />
+
+        <Card className="animate-scale-in">
+          <CardHeader>
+            <CardTitle>No Streams and Divisions Found</CardTitle>
+            <CardDescription>
+              You need to set up streams and divisions before creating timetables
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Before creating timetables, you need to set up your academic structure by defining
+              streams, years, and divisions.
+            </p>
+            <Button onClick={handleNavigateToStreamsManager}>
+              Set Up Streams & Divisions
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -345,48 +461,71 @@ const TimetableEditor = () => {
                     <SelectValue placeholder="Select Stream" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="BTECH_CSE">BTech CSE</SelectItem>
-                    <SelectItem value="BCA">BCA</SelectItem>
-                    <SelectItem value="MTECH_CSE">MTech CSE</SelectItem>
-                    <SelectItem value="MBA">MBA</SelectItem>
-                    <SelectItem value="MCA">MCA</SelectItem>
-                    <SelectItem value="BTECH_BIOENGG">BTech Bioengg</SelectItem>
+                    {streams.length > 0 ? (
+                      streams.map(stream => (
+                        <SelectItem key={stream.id} value={stream.id}>
+                          {stream.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>
+                        No streams available
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="space-y-2">
                 <Label>Year</Label>
-                <Select value={year} onValueChange={setYear}>
+                <Select value={year} onValueChange={setYear} disabled={!stream || years.length === 0}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Year" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">First Year</SelectItem>
-                    <SelectItem value="2">Second Year</SelectItem>
-                    <SelectItem value="3">Third Year</SelectItem>
-                    <SelectItem value="4">Fourth Year</SelectItem>
+                    {years.length > 0 ? (
+                      years.map((year: any) => (
+                        <SelectItem key={year.id} value={year.id}>
+                          {year.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>
+                        {stream ? "No years available for this stream" : "Select a stream first"}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="space-y-2">
                 <Label>Division</Label>
-                <Select value={division} onValueChange={setDivision}>
+                <Select value={division} onValueChange={setDivision} disabled={!year || divisions.length === 0}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Division" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="A">Division A</SelectItem>
-                    <SelectItem value="B">Division B</SelectItem>
-                    <SelectItem value="C">Division C</SelectItem>
+                    {divisions.length > 0 ? (
+                      divisions.map((division: any) => (
+                        <SelectItem key={division.id} value={division.id}>
+                          {division.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>
+                        {year ? "No divisions available for this year" : "Select a year first"}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             
-            <div className="flex justify-end mt-6">
-              <Button onClick={handleGenerateTimetable} className="gap-2">
+            <div className="flex justify-between mt-6">
+              <Button variant="outline" onClick={handleNavigateToStreamsManager}>
+                Manage Streams & Divisions
+              </Button>
+              <Button onClick={handleGenerateTimetable} className="gap-2" disabled={!stream || !year || !division}>
                 <Plus className="h-4 w-4" /> 
                 Create Timetable
               </Button>
@@ -398,7 +537,7 @@ const TimetableEditor = () => {
           <div className="flex justify-between">
             <div>
               <h2 className="text-xl font-medium">
-                {stream} Year {year} Division {division} Timetable
+                {getStreamName(stream)} {getYearName(year)} {getDivisionName(division)} Timetable
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {isEditing ? 'Editing mode' : 'View mode'} • Drag subjects to add them to the timetable
