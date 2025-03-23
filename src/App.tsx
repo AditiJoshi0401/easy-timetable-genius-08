@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
-import AppLayout from './components/layout/AppLayout';
+import { AppLayout } from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import TimetableEditor from './pages/TimetableEditor';
 import ViewTimetables from './pages/ViewTimetables';
