@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -63,12 +62,10 @@ const TimetableEditor = () => {
       if (storedTeachers) setTeachers(JSON.parse(storedTeachers));
       if (storedRooms) setRooms(JSON.parse(storedRooms));
       
-      // Load streams data
       if (storedStreams) {
         const parsedStreams = JSON.parse(storedStreams);
         setStreams(parsedStreams);
         
-        // Check if streams data exists
         if (!parsedStreams || parsedStreams.length === 0) {
           setNoStreamsDataExists(true);
         }
@@ -82,7 +79,6 @@ const TimetableEditor = () => {
   }, []);
 
   useEffect(() => {
-    // Filter years based on selected stream
     if (stream) {
       const selectedStreamData = streams.find(s => s.id === stream);
       if (selectedStreamData && selectedStreamData.years) {
@@ -98,7 +94,6 @@ const TimetableEditor = () => {
   }, [stream, streams]);
 
   useEffect(() => {
-    // Filter divisions based on selected stream and year
     if (stream && year) {
       const selectedStreamData = streams.find(s => s.id === stream);
       if (selectedStreamData && selectedStreamData.years) {
@@ -468,7 +463,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>
+                      <SelectItem value="no-streams" disabled>
                         No streams available
                       </SelectItem>
                     )}
@@ -490,7 +485,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>
+                      <SelectItem value="no-years" disabled>
                         {stream ? "No years available for this stream" : "Select a stream first"}
                       </SelectItem>
                     )}
@@ -512,7 +507,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>
+                      <SelectItem value="no-divisions" disabled>
                         {year ? "No divisions available for this year" : "Select a year first"}
                       </SelectItem>
                     )}
@@ -802,7 +797,7 @@ const TimetableEditor = () => {
                 <SelectContent>
                   {slotDetails.subject && assignedTeachers[slotDetails.subject] && assignedTeachers[slotDetails.subject].length > 0 ? (
                     <>
-                      <SelectItem value="" disabled>Assigned Teachers</SelectItem>
+                      <SelectItem value="assigned-teachers-header" disabled>Assigned Teachers</SelectItem>
                       {assignedTeachers[slotDetails.subject].map((teacherId: string) => {
                         const teacher = teachers.find(t => t.id === teacherId);
                         return teacher ? (
@@ -811,7 +806,7 @@ const TimetableEditor = () => {
                           </SelectItem>
                         ) : null;
                       })}
-                      <SelectItem value="" disabled>Other Teachers</SelectItem>
+                      <SelectItem value="other-teachers-header" disabled>Other Teachers</SelectItem>
                     </>
                   ) : null}
                   
