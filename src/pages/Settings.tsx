@@ -1,12 +1,40 @@
 
+import { useEffect, useState } from "react";
 import { Settings as SettingsIcon } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
 
 const Settings = () => {
+  const { toast } = useToast();
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Initialize dark mode state
+  useEffect(() => {
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    setDarkMode(isDarkMode);
+  }, []);
+
+  // Function to toggle dark mode
+  const toggleDarkMode = (enabled: boolean) => {
+    if (enabled) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+    setDarkMode(enabled);
+    
+    toast({
+      title: enabled ? "Dark Mode Enabled" : "Light Mode Enabled",
+      description: `Theme preference has been saved.`
+    });
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -34,7 +62,11 @@ const Settings = () => {
                   Enable dark mode for the application
                 </p>
               </div>
-              <Switch id="dark-mode" />
+              <Switch 
+                id="dark-mode" 
+                checked={darkMode}
+                onCheckedChange={toggleDarkMode}
+              />
             </div>
             
             <div className="flex items-center justify-between">

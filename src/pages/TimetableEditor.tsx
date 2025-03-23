@@ -32,6 +32,7 @@ const TimetableEditor = () => {
     room: "",
     type: "lecture"
   });
+  const [assignedTeachers, setAssignedTeachers] = useState<any>({});
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const timeSlots = [
@@ -58,6 +59,20 @@ const TimetableEditor = () => {
       console.error('Error loading data from localStorage:', error);
     }
   }, []);
+
+  // Create a mapping of subjects to teachers
+  useEffect(() => {
+    const subjectTeacherMap: Record<string, string[]> = {};
+    teachers.forEach(teacher => {
+      teacher.subjects.forEach((subjectId: string) => {
+        if (!subjectTeacherMap[subjectId]) {
+          subjectTeacherMap[subjectId] = [];
+        }
+        subjectTeacherMap[subjectId].push(teacher.id);
+      });
+    });
+    setAssignedTeachers(subjectTeacherMap);
+  }, [teachers]);
 
   const initializeTimetable = () => {
     const newTimetable: any = {};
@@ -150,12 +165,56 @@ const TimetableEditor = () => {
     
     if (draggingItem && draggingItem.itemType === 'subject') {
       setSelectedSlot({ day, time });
+      
+      // Find teachers assigned to this subject
+      const subjectTeachers = assignedTeachers[draggingItem.id] || [];
+      const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
+      
       setSlotDetails({
-        ...slotDetails,
-        subject: draggingItem.id
+        subject: draggingItem.id,
+        teacher: defaultTeacher,
+        room: "",
+        type: "lecture"
       });
       setSlotDetailsOpen(true);
     }
+  };
+
+  // Check if a room is available for a given type, day and time slots
+  const isRoomAvailable = (roomId: string, day: string, startTime: string, type: string) => {
+    // For labs, check if the room is free for 3 consecutive slots
+    if (type === "lab") {
+      const startIndex = timeSlots.indexOf(startTime);
+      if (startIndex === -1 || startIndex > timeSlots.length - 3) {
+        return false; // Can't fit a 3-hour lab at the end of day
+      }
+      
+      // Check all 3 slots
+      for (let i = 0; i < 3; i++) {
+        const timeSlot = timeSlots[startIndex + i];
+        const slot = timetableData[day]?.[timeSlot];
+        if (slot && slot.room.id === roomId) {
+          return false; // Room is occupied
+        }
+      }
+      return true;
+    } else {
+      // For lectures, just check the single slot
+      const slot = timetableData[day]?.[startTime];
+      return !slot || slot.room.id !== roomId;
+    }
+  };
+
+  // Get available rooms for a specific type, day and time
+  const getAvailableRooms = (day: string, time: string, type: string) => {
+    return rooms.filter(room => {
+      // Filter by room type
+      if (type === "lab" && room.type !== "lab") return false;
+      if (type === "lecture" && room.type !== "classroom") return false;
+      
+      // Check availability
+      return isRoomAvailable(room.id, day, time, type);
+    });
   };
 
   const addSubjectToTimetable = () => {
@@ -175,25 +234,95 @@ const TimetableEditor = () => {
     const room = rooms.find(r => r.id === slotDetails.room);
     
     const newTimetableData = { ...timetableData };
-    newTimetableData[day][time] = {
-      subject: subject,
-      teacher: teacher,
-      room: room,
-      type: slotDetails.type
-    };
+    
+    // If it's a lab, occupy 3 consecutive slots
+    if (slotDetails.type === "lab") {
+      const startIndex = timeSlots.indexOf(time);
+      if (startIndex === -1 || startIndex > timeSlots.length - 3) {
+        toast({
+          title: "Can't Add Lab",
+          description: "Labs need 3 consecutive hours. There aren't enough time slots remaining in the day.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Occupy all 3 slots
+      for (let i = 0; i < 3; i++) {
+        const timeSlot = timeSlots[startIndex + i];
+        newTimetableData[day][timeSlot] = {
+          subject: subject,
+          teacher: teacher,
+          room: room,
+          type: slotDetails.type,
+          isPartOfLab: i > 0 // Mark slots 2 and 3 as part of a lab
+        };
+      }
+      
+      toast({
+        title: "Lab Added",
+        description: `Added ${subject.name} lab to ${day} starting at ${time}`
+      });
+    } else {
+      // Regular lecture, just occupy one slot
+      newTimetableData[day][time] = {
+        subject: subject,
+        teacher: teacher,
+        room: room,
+        type: slotDetails.type
+      };
+      
+      toast({
+        title: "Subject Added",
+        description: `Added ${subject.name} to ${day} ${time}`
+      });
+    }
     
     setTimetableData(newTimetableData);
     setSlotDetailsOpen(false);
-    
-    toast({
-      title: "Subject Added",
-      description: `Added ${subject.name} to ${day} ${time}`
-    });
   };
 
   const removeSubjectFromTimetable = (day: string, time: string) => {
     const newTimetableData = { ...timetableData };
-    newTimetableData[day][time] = null;
+    const currentSlot = newTimetableData[day][time];
+    
+    // If it's part of a lab, we need to remove all 3 slots
+    if (currentSlot && currentSlot.type === "lab") {
+      const startIndex = timeSlots.indexOf(time);
+      
+      // Find first slot of the lab (in case we clicked on the middle or last slot)
+      let labStartIndex = startIndex;
+      while (labStartIndex > 0 && newTimetableData[day][timeSlots[labStartIndex - 1]]?.isPartOfLab) {
+        labStartIndex--;
+      }
+      
+      // Remove all 3 slots
+      for (let i = 0; i < 3; i++) {
+        if (labStartIndex + i < timeSlots.length) {
+          newTimetableData[day][timeSlots[labStartIndex + i]] = null;
+        }
+      }
+    } else if (currentSlot && currentSlot.isPartOfLab) {
+      // If it's part of a lab but not the first slot, find the lab start
+      const index = timeSlots.indexOf(time);
+      let labStartIndex = index;
+      
+      // Go backwards to find first slot
+      while (labStartIndex > 0 && newTimetableData[day][timeSlots[labStartIndex - 1]]?.isPartOfLab) {
+        labStartIndex--;
+      }
+      
+      // Remove all slots of this lab
+      for (let i = 0; i < 3; i++) {
+        if (labStartIndex + i < timeSlots.length) {
+          newTimetableData[day][timeSlots[labStartIndex + i]] = null;
+        }
+      }
+    } else {
+      // Regular lecture slot, just remove it
+      newTimetableData[day][time] = null;
+    }
+    
     setTimetableData(newTimetableData);
     
     toast({
@@ -202,10 +331,16 @@ const TimetableEditor = () => {
     });
   };
 
+  // Filter subjects for the selected stream and year
   const filteredSubjects = subjects.filter((subject) => {
     if (!stream || !year) return true;
     return subject.stream === stream && subject.year === year;
   });
+
+  // Get teachers for a specific subject
+  const getTeachersForSubject = (subjectId: string) => {
+    return teachers.filter(teacher => teacher.subjects.includes(subjectId));
+  };
 
   return (
     <div className="space-y-6">
@@ -330,7 +465,7 @@ const TimetableEditor = () => {
                         <div
                           key={`${day}-${time}`}
                           className={`p-2 border-r last:border-r-0 min-h-[80px] ${
-                            cellData ? 'timetable-cell-occupied' : 'timetable-cell'
+                            cellData ? (cellData.isPartOfLab ? 'timetable-cell-occupied bg-primary/20' : 'timetable-cell-occupied') : 'timetable-cell'
                           }`}
                           onDragOver={isEditing ? handleDragOver : undefined}
                           onDrop={isEditing ? (e) => handleDrop(e, day, time) : undefined}
@@ -347,32 +482,41 @@ const TimetableEditor = () => {
                         >
                           {cellData ? (
                             <div className="h-full flex flex-col">
-                              <div className="flex justify-between items-start">
-                                <span className="text-xs font-medium">
-                                  {cellData.subject.name}
-                                </span>
-                                {isEditing && (
-                                  <button 
-                                    onClick={() => removeSubjectFromTimetable(day, time)}
-                                    className="text-muted-foreground hover:text-destructive"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                )}
-                              </div>
-                              <div className="mt-1 space-y-1">
-                                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Users className="h-3 w-3" />
-                                  <span>{cellData.teacher.name}</span>
+                              {!cellData.isPartOfLab && (
+                                <>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-xs font-medium">
+                                      {cellData.subject.name}
+                                    </span>
+                                    {isEditing && (
+                                      <button 
+                                        onClick={() => removeSubjectFromTimetable(day, time)}
+                                        className="text-muted-foreground hover:text-destructive"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 space-y-1">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Users className="h-3 w-3" />
+                                      <span>{cellData.teacher.isTA ? "TA " : ""}{cellData.teacher.name}</span>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Building className="h-3 w-3" />
+                                      <span>{cellData.room.number}</span>
+                                    </div>
+                                    <div className="chip chip-primary text-[10px] py-0.5 px-1.5 mt-1">
+                                      {cellData.type}
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                              {cellData.isPartOfLab && (
+                                <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                                  - Part of the lab above -
                                 </div>
-                                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Building className="h-3 w-3" />
-                                  <span>{cellData.room.number}</span>
-                                </div>
-                                <div className="chip chip-primary text-[10px] py-0.5 px-1.5 mt-1">
-                                  {cellData.type}
-                                </div>
-                              </div>
+                              )}
                             </div>
                           ) : (
                             isEditing && (
@@ -445,7 +589,7 @@ const TimetableEditor = () => {
                                 onDragStart={() => handleDragStart(teacher, 'teacher')}
                                 onDragEnd={handleDragEnd}
                               >
-                                <div className="font-medium text-sm">{teacher.name}</div>
+                                <div className="font-medium text-sm">{teacher.isTA ? "TA " : ""}{teacher.name}</div>
                                 <div className="text-xs text-muted-foreground">{teacher.specialization}</div>
                               </div>
                             ))
@@ -506,7 +650,20 @@ const TimetableEditor = () => {
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label>Subject</Label>
-              <Select value={slotDetails.subject} onValueChange={(value) => setSlotDetails({...slotDetails, subject: value})}>
+              <Select 
+                value={slotDetails.subject} 
+                onValueChange={(value) => {
+                  // Find teachers assigned to this subject
+                  const subjectTeachers = assignedTeachers[value] || [];
+                  const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
+                  
+                  setSlotDetails({
+                    ...slotDetails, 
+                    subject: value,
+                    teacher: defaultTeacher
+                  });
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select Subject" />
                 </SelectTrigger>
@@ -527,11 +684,45 @@ const TimetableEditor = () => {
                   <SelectValue placeholder="Select Teacher" />
                 </SelectTrigger>
                 <SelectContent>
-                  {teachers.map((teacher) => (
-                    <SelectItem key={teacher.id} value={teacher.id}>
-                      {teacher.name}
-                    </SelectItem>
-                  ))}
+                  {/* Show teachers assigned to this subject first */}
+                  {slotDetails.subject && assignedTeachers[slotDetails.subject] && assignedTeachers[slotDetails.subject].length > 0 ? (
+                    <>
+                      <SelectItem value="" disabled>Assigned Teachers</SelectItem>
+                      {assignedTeachers[slotDetails.subject].map((teacherId: string) => {
+                        const teacher = teachers.find(t => t.id === teacherId);
+                        return teacher ? (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.isTA ? "TA " : ""}{teacher.name}
+                          </SelectItem>
+                        ) : null;
+                      })}
+                      <SelectItem value="" disabled>Other Teachers</SelectItem>
+                    </>
+                  ) : null}
+                  
+                  {/* Show all other teachers */}
+                  {teachers
+                    .filter(teacher => !slotDetails.subject || !assignedTeachers[slotDetails.subject] || !assignedTeachers[slotDetails.subject].includes(teacher.id))
+                    .map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.isTA ? "TA " : ""}{teacher.name}
+                      </SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={slotDetails.type} onValueChange={(value) => setSlotDetails({...slotDetails, type: value, room: ""})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lecture">Lecture</SelectItem>
+                  <SelectItem value="lab">Lab (3 hours)</SelectItem>
+                  <SelectItem value="tutorial">Tutorial</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -543,27 +734,18 @@ const TimetableEditor = () => {
                   <SelectValue placeholder="Select Room" />
                 </SelectTrigger>
                 <SelectContent>
-                  {rooms.map((room) => (
+                  {selectedSlot && getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).map((room) => (
                     <SelectItem key={room.id} value={room.id}>
                       {room.number} ({room.type})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={slotDetails.type} onValueChange={(value) => setSlotDetails({...slotDetails, type: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lecture">Lecture</SelectItem>
-                  <SelectItem value="lab">Lab</SelectItem>
-                  <SelectItem value="tutorial">Tutorial</SelectItem>
-                </SelectContent>
-              </Select>
+              {selectedSlot && getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).length === 0 && (
+                <p className="text-xs text-destructive mt-1">
+                  No suitable {slotDetails.type === "lab" ? "labs" : "classrooms"} available for this time slot
+                </p>
+              )}
             </div>
           </div>
           

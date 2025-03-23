@@ -1,39 +1,50 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import './App.css';
+import AppLayout from './components/layout/AppLayout';
+import Dashboard from './pages/Dashboard';
+import TimetableEditor from './pages/TimetableEditor';
+import ViewTimetables from './pages/ViewTimetables';
+import DataInput from './pages/DataInput';
+import Settings from './pages/Settings';
+import Index from './pages/Index';
+import NotFound from './pages/NotFound';
+import { Toaster } from './components/ui/toaster';
 
-import { AppLayout } from "./components/layout/AppLayout";
-import Dashboard from "./pages/Dashboard";
-import TimetableEditor from "./pages/TimetableEditor";
-import Settings from "./pages/Settings";
-import DataInput from "./pages/DataInput";
-import ViewTimetables from "./pages/ViewTimetables";
-import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="editor" element={<TimetableEditor />} />
-            <Route path="data" element={<DataInput />} />
-            <Route path="view" element={<ViewTimetables />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
+function App() {
+  // Initialize theme on app startup
+  useEffect(() => {
+    // Check if user has a theme preference
+    const storedTheme = localStorage.getItem('theme');
+    const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    
+    // Apply theme based on preference or system default
+    const theme = storedTheme || systemPreference;
+    
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+  
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<Index />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="timetable-editor" element={<TimetableEditor />} />
+          <Route path="view-timetables" element={<ViewTimetables />} />
+          <Route path="data-input" element={<DataInput />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+        </Route>
+      </Routes>
+      <Toaster />
+    </Router>
+  );
+}
 
 export default App;

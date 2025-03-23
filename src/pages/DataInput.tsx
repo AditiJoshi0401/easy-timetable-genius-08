@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { DatabaseIcon, BookIcon, UsersIcon, BuildingIcon, PlusIcon, TrashIcon, SaveIcon } from "lucide-react";
+import { DatabaseIcon, BookIcon, UsersIcon, BuildingIcon, PlusIcon, TrashIcon, SaveIcon, AlertTriangle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 interface Subject {
   id: string;
@@ -26,14 +29,70 @@ interface Teacher {
   email: string;
   specialization: string;
   subjects: string[];
+  isTA: boolean;
 }
 
 interface Room {
   id: string;
   number: string;
   capacity: number;
-  type: "classroom" | "lab" | "tutorial";
+  type: "classroom" | "lab";
 }
+
+interface DuplicateWarningDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  duplicates: {
+    stream: string;
+    year: string;
+    subjects: Subject[];
+  }[];
+}
+
+const DuplicateWarningDialog = ({ open, onClose, onConfirm, duplicates }: DuplicateWarningDialogProps) => {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <span>Duplicate Subject Assignment</span>
+          </DialogTitle>
+          <DialogDescription>
+            This teacher is already assigned to multiple subjects in the same stream and year:
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          {duplicates.map((duplicate, index) => (
+            <div key={index} className="space-y-2">
+              <p className="font-medium text-sm">
+                {duplicate.stream.replace('_', ' ')} - Year {duplicate.year}:
+              </p>
+              <ul className="text-sm list-disc pl-5 space-y-1">
+                {duplicate.subjects.map((subject) => (
+                  <li key={subject.id}>{subject.name} ({subject.code})</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          
+          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
+            <p className="text-sm text-amber-800 dark:text-amber-300">
+              Having the same teacher for multiple subjects in the same stream and year may cause scheduling conflicts. Continue only if this is intentional.
+            </p>
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={onConfirm}>I Understand, Continue</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const DataInput = () => {
   const { toast } = useToast();
@@ -55,7 +114,8 @@ const DataInput = () => {
     name: "",
     email: "",
     specialization: "",
-    subjects: []
+    subjects: [],
+    isTA: false
   });
   const [selectedSubject, setSelectedSubject] = useState("");
   
@@ -66,6 +126,13 @@ const DataInput = () => {
     capacity: 30,
     type: "classroom"
   });
+
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateSubjects, setDuplicateSubjects] = useState<{
+    stream: string;
+    year: string;
+    subjects: Subject[];
+  }[]>([]);
 
   useEffect(() => {
     const loadData = () => {
@@ -150,6 +217,47 @@ const DataInput = () => {
     });
   };
 
+  const checkForDuplicateAssignments = () => {
+    // Group the teacher's subjects by stream and year
+    const subjectsByStreamAndYear: Record<string, Subject[]> = {};
+    
+    // Add existing subjects
+    for (const subjectId of newTeacher.subjects) {
+      const subject = subjects.find(s => s.id === subjectId);
+      if (subject) {
+        const key = `${subject.stream}_${subject.year}`;
+        if (!subjectsByStreamAndYear[key]) {
+          subjectsByStreamAndYear[key] = [];
+        }
+        subjectsByStreamAndYear[key].push(subject);
+      }
+    }
+    
+    // Add newly selected subject
+    if (selectedSubject) {
+      const subject = subjects.find(s => s.id === selectedSubject);
+      if (subject) {
+        const key = `${subject.stream}_${subject.year}`;
+        if (!subjectsByStreamAndYear[key]) {
+          subjectsByStreamAndYear[key] = [];
+        }
+        if (!subjectsByStreamAndYear[key].some(s => s.id === subject.id)) {
+          subjectsByStreamAndYear[key].push(subject);
+        }
+      }
+    }
+    
+    // Find duplicate assignments (more than 1 subject in the same stream and year)
+    const duplicates = Object.entries(subjectsByStreamAndYear)
+      .filter(([_, subjectsInGroup]) => subjectsInGroup.length > 1)
+      .map(([key, subjectsInGroup]) => {
+        const [stream, year] = key.split('_');
+        return { stream, year, subjects: subjectsInGroup };
+      });
+    
+    return duplicates;
+  };
+
   const handleAddTeacher = () => {
     if (!newTeacher.name || !newTeacher.email) {
       toast({
@@ -174,7 +282,8 @@ const DataInput = () => {
       name: "",
       email: "",
       specialization: "",
-      subjects: []
+      subjects: [],
+      isTA: false
     });
     
     toast({
@@ -205,6 +314,20 @@ const DataInput = () => {
       return;
     }
     
+    // Check for duplicate assignments first
+    const duplicates = checkForDuplicateAssignments();
+    
+    if (duplicates.length > 0) {
+      setDuplicateSubjects(duplicates);
+      setShowDuplicateWarning(true);
+      return;
+    }
+    
+    // If no duplicates, add the subject
+    addSubjectToTeacherConfirmed();
+  };
+
+  const addSubjectToTeacherConfirmed = () => {
     const updatedSubjects = [...newTeacher.subjects, selectedSubject];
     setNewTeacher({
       ...newTeacher,
@@ -212,6 +335,7 @@ const DataInput = () => {
     });
     
     setSelectedSubject("");
+    setShowDuplicateWarning(false);
   };
 
   const handleRemoveSubjectFromTeacher = (subjectId: string) => {
@@ -457,6 +581,20 @@ const DataInput = () => {
                     placeholder="e.g. Algorithms"
                   />
                 </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="teacher-ta">Teaching Assistant (TA)</Label>
+                    <Switch 
+                      id="teacher-ta" 
+                      checked={newTeacher.isTA}
+                      onCheckedChange={(checked) => setNewTeacher({ ...newTeacher, isTA: checked })}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Mark this teacher as a teaching assistant
+                  </p>
+                </div>
               </div>
               
               <Separator className="my-4" />
@@ -534,7 +672,14 @@ const DataInput = () => {
                     <div key={teacher.id} className="p-3 border rounded-md">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-medium">{teacher.name}</div>
+                          <div className="font-medium">
+                            {teacher.isTA && (
+                              <Badge variant="outline" className="mr-2 bg-primary/10">
+                                TA
+                              </Badge>
+                            )}
+                            {teacher.name}
+                          </div>
                           <div className="text-sm text-muted-foreground">
                             {teacher.email} • {teacher.specialization}
                           </div>
@@ -614,7 +759,7 @@ const DataInput = () => {
                   <Label htmlFor="room-type">Type</Label>
                   <Select
                     value={newRoom.type}
-                    onValueChange={(value: "classroom" | "lab" | "tutorial") => setNewRoom({ ...newRoom, type: value })}
+                    onValueChange={(value: "classroom" | "lab") => setNewRoom({ ...newRoom, type: value })}
                   >
                     <SelectTrigger id="room-type">
                       <SelectValue placeholder="Select type" />
@@ -622,7 +767,6 @@ const DataInput = () => {
                     <SelectContent>
                       <SelectItem value="classroom">Classroom</SelectItem>
                       <SelectItem value="lab">Laboratory</SelectItem>
-                      <SelectItem value="tutorial">Tutorial Room</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -697,6 +841,13 @@ const DataInput = () => {
           </div>
         </CardContent>
       </Card>
+      
+      <DuplicateWarningDialog
+        open={showDuplicateWarning}
+        onClose={() => setShowDuplicateWarning(false)}
+        onConfirm={addSubjectToTeacherConfirmed}
+        duplicates={duplicateSubjects}
+      />
     </div>
   );
 };
