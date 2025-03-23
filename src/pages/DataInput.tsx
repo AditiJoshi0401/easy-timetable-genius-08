@@ -186,10 +186,20 @@ const DataInput = () => {
     
     if (nameExists) {
       setSubjectNameError("A subject with this name already exists");
+      toast({
+        title: "Duplicate Subject Name",
+        description: "A subject with this name already exists. Please use a different name.",
+        variant: "destructive"
+      });
     }
     
     if (codeExists) {
       setSubjectCodeError("A subject with this code already exists");
+      toast({
+        title: "Duplicate Subject Code",
+        description: "A subject with this code already exists. Please use a different code.",
+        variant: "destructive"
+      });
     }
     
     return nameExists || codeExists;
@@ -209,10 +219,20 @@ const DataInput = () => {
     
     if (nameExists) {
       setTeacherNameError("A teacher with this name already exists");
+      toast({
+        title: "Duplicate Teacher Name",
+        description: "A teacher with this name already exists. Please use a different name.",
+        variant: "destructive"
+      });
     }
     
     if (emailExists) {
       setTeacherEmailError("A teacher with this email already exists");
+      toast({
+        title: "Duplicate Teacher Email",
+        description: "A teacher with this email already exists. Please use a different email.",
+        variant: "destructive"
+      });
     }
     
     return nameExists || emailExists;
@@ -227,6 +247,11 @@ const DataInput = () => {
     
     if (numberExists) {
       setRoomNumberError("A room with this number already exists");
+      toast({
+        title: "Duplicate Room Number",
+        description: "A room with this number already exists. Please use a different number.",
+        variant: "destructive"
+      });
     }
     
     return numberExists;
@@ -601,7 +626,7 @@ const DataInput = () => {
                       <div>
                         <div className="font-medium">{subject.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {subject.code} • {subject.credits} Credits • {subject.stream} Year {subject.year}
+                          {subject.code} • {subject.credits} Credits • {subject.stream.replace('_', ' ')} Year {subject.year}
                         </div>
                       </div>
                       <Button
@@ -954,4 +979,3 @@ const DataInput = () => {
 };
 
 export default DataInput;
-

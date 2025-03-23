@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Database, PlusCircle, Edit, Trash2, CheckCircle2, XCircle, BookOpen, Users, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -110,10 +111,20 @@ const StreamsManager = () => {
     
     if (nameExists) {
       setStreamNameError("A stream with this name already exists");
+      toast({
+        title: "Duplicate Stream Name",
+        description: "A stream with this name already exists. Please use a different name.",
+        variant: "destructive"
+      });
     }
     
     if (codeExists) {
       setStreamCodeError("A stream with this code already exists");
+      toast({
+        title: "Duplicate Stream Code",
+        description: "A stream with this code already exists. Please use a different code.",
+        variant: "destructive"
+      });
     }
     
     return nameExists || codeExists;
@@ -132,6 +143,11 @@ const StreamsManager = () => {
     
     if (nameExists) {
       setDivisionNameError("A division with this name already exists for this stream and year");
+      toast({
+        title: "Duplicate Division",
+        description: "A division with this name already exists for this stream and year. Please use a different name.",
+        variant: "destructive"
+      });
     }
     
     return nameExists;
@@ -245,6 +261,26 @@ const StreamsManager = () => {
     setIsDivisionDialogOpen(true);
   };
 
+  // Get maximum year from all streams
+  const getMaxYears = () => {
+    if (streams.length === 0) return 1;
+    return Math.max(...streams.map(s => s.years));
+  };
+
+  // Handle tab change and default year selection
+  const handleTabChange = (value: string) => {
+    if (value === "divisions" && getMaxYears() >= 1) {
+      setSelectedYear(1);  // Set to first year by default when switching to divisions
+    }
+  };
+
+  // Get available years for the selected stream when adding a division
+  const getAvailableYearsForStream = (streamId: string) => {
+    const stream = streams.find(s => s.id === streamId);
+    if (!stream) return [];
+    return Array.from({ length: stream.years }, (_, i) => i + 1);
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -253,7 +289,7 @@ const StreamsManager = () => {
         icon={<Database className="h-6 w-6" />}
       />
 
-      <Tabs defaultValue="streams" className="space-y-4">
+      <Tabs defaultValue="streams" className="space-y-4" onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="streams">Streams</TabsTrigger>
           <TabsTrigger value="divisions">Divisions</TabsTrigger>
@@ -325,14 +361,17 @@ const StreamsManager = () => {
             <h2 className="text-xl font-medium">Divisions</h2>
             <Button 
               onClick={() => {
-                divisionForm.reset({
-                  streamId: streams.length > 0 ? streams[0].id : "",
-                  name: "",
-                  strength: 60,
-                  year: 1
-                });
-                setIsEditing(false);
-                setIsDivisionDialogOpen(true);
+                if (streams.length > 0) {
+                  const defaultStreamId = streams[0].id || "";
+                  divisionForm.reset({
+                    streamId: defaultStreamId,
+                    name: "",
+                    strength: 60,
+                    year: 1
+                  });
+                  setIsEditing(false);
+                  setIsDivisionDialogOpen(true);
+                }
               }} 
               className="gap-2"
               disabled={streams.length === 0}
@@ -369,8 +408,9 @@ const StreamsManager = () => {
                   Start by adding your first division
                 </p>
                 <Button onClick={() => {
+                  const defaultStreamId = streams[0].id || "";
                   divisionForm.reset({
-                    streamId: streams[0].id,
+                    streamId: defaultStreamId,
                     name: "",
                     strength: 60,
                     year: 1
@@ -387,7 +427,7 @@ const StreamsManager = () => {
             <>
               <div className="flex gap-2 mb-4">
                 <Label className="flex items-center mr-2">Filter by Year:</Label>
-                {Array.from({ length: Math.max(...streams.map(s => s.years)) }, (_, i) => (
+                {Array.from({ length: getMaxYears() }, (_, i) => (
                   <Button 
                     key={i} 
                     variant={selectedYear === i + 1 ? "default" : "outline"} 
@@ -547,6 +587,11 @@ const StreamsManager = () => {
                       <select
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          // Reset year to 1 when changing stream
+                          divisionForm.setValue('year', 1);
+                        }}
                       >
                         {streams.map(stream => (
                           <option key={stream.id} value={stream.id}>
@@ -589,18 +634,34 @@ const StreamsManager = () => {
               <FormField
                 control={divisionForm.control}
                 name="year"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Year</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} max={6} {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The year this division belongs to
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const streamId = divisionForm.watch('streamId');
+                  const availableYears = getAvailableYearsForStream(streamId);
+                  
+                  return (
+                    <FormItem>
+                      <FormLabel>Year</FormLabel>
+                      <FormControl>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          {...field}
+                          value={field.value.toString()}
+                          onChange={(e) => field.onChange(parseInt(e.target.value))}
+                        >
+                          {availableYears.map(year => (
+                            <option key={year} value={year}>
+                              Year {year}
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormDescription>
+                        The year this division belongs to
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               
               <FormField
