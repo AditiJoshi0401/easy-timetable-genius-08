@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { Database, PlusCircle, Edit, Trash2, CheckCircle2, XCircle, BookOpen, Users } from "lucide-react";
+import { Database, PlusCircle, Edit, Trash2, CheckCircle2, XCircle, BookOpen, Users, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +42,9 @@ const StreamsManager = () => {
   const [isDivisionDialogOpen, setIsDivisionDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(1);
+  const [streamNameError, setStreamNameError] = useState("");
+  const [streamCodeError, setStreamCodeError] = useState("");
+  const [divisionNameError, setDivisionNameError] = useState("");
 
   // Stream form
   const streamForm = useForm<Stream>({
@@ -91,8 +93,57 @@ const StreamsManager = () => {
     }
   }, [divisions]);
 
+  // Check for duplicate stream name or code
+  const checkDuplicateStream = (data: Stream): boolean => {
+    setStreamNameError("");
+    setStreamCodeError("");
+    
+    const nameExists = streams.some(stream => 
+      stream.name.toLowerCase() === data.name.toLowerCase() && 
+      (!data.id || stream.id !== data.id)
+    );
+    
+    const codeExists = streams.some(stream => 
+      stream.code.toLowerCase() === data.code.toLowerCase() && 
+      (!data.id || stream.id !== data.id)
+    );
+    
+    if (nameExists) {
+      setStreamNameError("A stream with this name already exists");
+    }
+    
+    if (codeExists) {
+      setStreamCodeError("A stream with this code already exists");
+    }
+    
+    return nameExists || codeExists;
+  };
+
+  // Check for duplicate division name within same stream and year
+  const checkDuplicateDivision = (data: Division): boolean => {
+    setDivisionNameError("");
+    
+    const nameExists = divisions.some(division => 
+      division.name.toLowerCase() === data.name.toLowerCase() && 
+      division.streamId === data.streamId &&
+      division.year === data.year &&
+      (!data.id || division.id !== data.id)
+    );
+    
+    if (nameExists) {
+      setDivisionNameError("A division with this name already exists for this stream and year");
+    }
+    
+    return nameExists;
+  };
+
   // Handle stream form submission
   const onStreamSubmit = (data: Stream) => {
+    // Check for duplicates
+    if (checkDuplicateStream(data)) {
+      return;
+    }
+    
     if (isEditing && data.id) {
       // Update existing stream
       setStreams(prev => prev.map(stream => stream.id === data.id ? data : stream));
@@ -120,6 +171,11 @@ const StreamsManager = () => {
 
   // Handle division form submission
   const onDivisionSubmit = (data: Division) => {
+    // Check for duplicates
+    if (checkDuplicateDivision(data)) {
+      return;
+    }
+    
     if (isEditing && data.id) {
       // Update existing division
       setDivisions(prev => prev.map(division => division.id === data.id ? data : division));
@@ -399,6 +455,12 @@ const StreamsManager = () => {
                     <FormDescription>
                       A short code to identify the stream (e.g., CSE for Computer Science)
                     </FormDescription>
+                    {streamCodeError && (
+                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>{streamCodeError}</span>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -416,6 +478,12 @@ const StreamsManager = () => {
                     <FormDescription>
                       The full name of the academic stream
                     </FormDescription>
+                    {streamNameError && (
+                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>{streamNameError}</span>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -443,6 +511,8 @@ const StreamsManager = () => {
                   streamForm.reset();
                   setIsStreamDialogOpen(false);
                   setIsEditing(false);
+                  setStreamNameError("");
+                  setStreamCodeError("");
                 }}>
                   Cancel
                 </Button>
@@ -505,6 +575,12 @@ const StreamsManager = () => {
                     <FormDescription>
                       A name to identify the division (e.g., A, B, C)
                     </FormDescription>
+                    {divisionNameError && (
+                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>{divisionNameError}</span>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -549,6 +625,7 @@ const StreamsManager = () => {
                   divisionForm.reset();
                   setIsDivisionDialogOpen(false);
                   setIsEditing(false);
+                  setDivisionNameError("");
                 }}>
                   Cancel
                 </Button>

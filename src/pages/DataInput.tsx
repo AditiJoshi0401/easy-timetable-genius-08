@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { DatabaseIcon, BookIcon, UsersIcon, BuildingIcon, PlusIcon, TrashIcon, SaveIcon, AlertTriangle } from "lucide-react";
+import { DatabaseIcon, BookIcon, UsersIcon, BuildingIcon, PlusIcon, TrashIcon, SaveIcon, AlertTriangle, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Subject {
   id: string;
@@ -107,6 +107,8 @@ const DataInput = () => {
     stream: "BTECH_CSE",
     year: "1"
   });
+  const [subjectNameError, setSubjectNameError] = useState("");
+  const [subjectCodeError, setSubjectCodeError] = useState("");
   
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [newTeacher, setNewTeacher] = useState<Teacher>({
@@ -118,6 +120,8 @@ const DataInput = () => {
     isTA: false
   });
   const [selectedSubject, setSelectedSubject] = useState("");
+  const [teacherNameError, setTeacherNameError] = useState("");
+  const [teacherEmailError, setTeacherEmailError] = useState("");
   
   const [rooms, setRooms] = useState<Room[]>([]);
   const [newRoom, setNewRoom] = useState<Room>({
@@ -126,6 +130,7 @@ const DataInput = () => {
     capacity: 30,
     type: "classroom"
   });
+  const [roomNumberError, setRoomNumberError] = useState("");
 
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [duplicateSubjects, setDuplicateSubjects] = useState<{
@@ -167,6 +172,66 @@ const DataInput = () => {
     }
   }, [subjects, teachers, rooms]);
 
+  const checkDuplicateSubject = () => {
+    setSubjectNameError("");
+    setSubjectCodeError("");
+    
+    const nameExists = subjects.some(subject => 
+      subject.name.toLowerCase() === newSubject.name.toLowerCase()
+    );
+    
+    const codeExists = subjects.some(subject => 
+      subject.code.toLowerCase() === newSubject.code.toLowerCase()
+    );
+    
+    if (nameExists) {
+      setSubjectNameError("A subject with this name already exists");
+    }
+    
+    if (codeExists) {
+      setSubjectCodeError("A subject with this code already exists");
+    }
+    
+    return nameExists || codeExists;
+  };
+
+  const checkDuplicateTeacher = () => {
+    setTeacherNameError("");
+    setTeacherEmailError("");
+    
+    const nameExists = teachers.some(teacher => 
+      teacher.name.toLowerCase() === newTeacher.name.toLowerCase()
+    );
+    
+    const emailExists = teachers.some(teacher => 
+      teacher.email.toLowerCase() === newTeacher.email.toLowerCase()
+    );
+    
+    if (nameExists) {
+      setTeacherNameError("A teacher with this name already exists");
+    }
+    
+    if (emailExists) {
+      setTeacherEmailError("A teacher with this email already exists");
+    }
+    
+    return nameExists || emailExists;
+  };
+
+  const checkDuplicateRoom = () => {
+    setRoomNumberError("");
+    
+    const numberExists = rooms.some(room => 
+      room.number.toLowerCase() === newRoom.number.toLowerCase()
+    );
+    
+    if (numberExists) {
+      setRoomNumberError("A room with this number already exists");
+    }
+    
+    return numberExists;
+  };
+
   const handleAddSubject = () => {
     if (!newSubject.name || !newSubject.code) {
       toast({
@@ -174,6 +239,10 @@ const DataInput = () => {
         description: "Please fill in all required fields for the subject.",
         variant: "destructive"
       });
+      return;
+    }
+
+    if (checkDuplicateSubject()) {
       return;
     }
 
@@ -218,10 +287,8 @@ const DataInput = () => {
   };
 
   const checkForDuplicateAssignments = () => {
-    // Group the teacher's subjects by stream and year
     const subjectsByStreamAndYear: Record<string, Subject[]> = {};
     
-    // Add existing subjects
     for (const subjectId of newTeacher.subjects) {
       const subject = subjects.find(s => s.id === subjectId);
       if (subject) {
@@ -233,7 +300,6 @@ const DataInput = () => {
       }
     }
     
-    // Add newly selected subject
     if (selectedSubject) {
       const subject = subjects.find(s => s.id === selectedSubject);
       if (subject) {
@@ -247,7 +313,6 @@ const DataInput = () => {
       }
     }
     
-    // Find duplicate assignments (more than 1 subject in the same stream and year)
     const duplicates = Object.entries(subjectsByStreamAndYear)
       .filter(([_, subjectsInGroup]) => subjectsInGroup.length > 1)
       .map(([key, subjectsInGroup]) => {
@@ -265,6 +330,10 @@ const DataInput = () => {
         description: "Please fill in all required fields for the teacher.",
         variant: "destructive"
       });
+      return;
+    }
+
+    if (checkDuplicateTeacher()) {
       return;
     }
 
@@ -314,7 +383,6 @@ const DataInput = () => {
       return;
     }
     
-    // Check for duplicate assignments first
     const duplicates = checkForDuplicateAssignments();
     
     if (duplicates.length > 0) {
@@ -323,7 +391,6 @@ const DataInput = () => {
       return;
     }
     
-    // If no duplicates, add the subject
     addSubjectToTeacherConfirmed();
   };
 
@@ -353,6 +420,10 @@ const DataInput = () => {
         description: "Please fill in all required fields for the room.",
         variant: "destructive"
       });
+      return;
+    }
+
+    if (checkDuplicateRoom()) {
       return;
     }
 
@@ -425,6 +496,12 @@ const DataInput = () => {
                     onChange={(e) => setNewSubject({ ...newSubject, name: e.target.value })}
                     placeholder="e.g. Data Structures"
                   />
+                  {subjectNameError && (
+                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>{subjectNameError}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -435,6 +512,12 @@ const DataInput = () => {
                     onChange={(e) => setNewSubject({ ...newSubject, code: e.target.value })}
                     placeholder="e.g. CS201"
                   />
+                  {subjectCodeError && (
+                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>{subjectCodeError}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -559,6 +642,12 @@ const DataInput = () => {
                     onChange={(e) => setNewTeacher({ ...newTeacher, name: e.target.value })}
                     placeholder="e.g. Dr. John Smith"
                   />
+                  {teacherNameError && (
+                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>{teacherNameError}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -570,6 +659,12 @@ const DataInput = () => {
                     onChange={(e) => setNewTeacher({ ...newTeacher, email: e.target.value })}
                     placeholder="e.g. john.smith@example.com"
                   />
+                  {teacherEmailError && (
+                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>{teacherEmailError}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -741,6 +836,12 @@ const DataInput = () => {
                     onChange={(e) => setNewRoom({ ...newRoom, number: e.target.value })}
                     placeholder="e.g. A101"
                   />
+                  {roomNumberError && (
+                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>{roomNumberError}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -853,3 +954,4 @@ const DataInput = () => {
 };
 
 export default DataInput;
+
