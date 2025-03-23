@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
-  { to: "/editor", icon: Calendar, label: "Timetable Editor" },
-  { to: "/data", icon: Database, label: "Data Management" },
-  { to: "/view", icon: LayoutGrid, label: "View Timetables" },
+  { to: "/timetable-editor", icon: Calendar, label: "Timetable Editor" },
+  { to: "/data-input", icon: Database, label: "Data Management" },
+  { to: "/view-timetables", icon: LayoutGrid, label: "View Timetables" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
