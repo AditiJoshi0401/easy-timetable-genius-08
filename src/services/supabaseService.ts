@@ -17,7 +17,7 @@ export interface Teacher {
   email: string;
   specialization: string;
   subjects: string[];
-  isTA: boolean;
+  isTA: boolean;  // Interface uses isTA, but database uses ista
 }
 
 export interface Room {
@@ -36,7 +36,7 @@ export interface Stream {
 
 export interface Division {
   id: string;
-  streamId: string;
+  streamId: string;  // Interface uses camelCase, but database uses lowercase streamid
   name: string;
   strength: number;
   year: number;
@@ -85,26 +85,57 @@ export const fetchTeachers = async () => {
     .from('teachers')
     .select('*');
   if (error) throw error;
-  return data as Teacher[];
+  
+  // Map ista to isTA to match our interface
+  return data.map(teacher => ({
+    ...teacher,
+    isTA: teacher.ista,
+  })) as Teacher[];
 };
 
 export const addTeacher = async (teacher: Omit<Teacher, 'id'>) => {
+  // Convert isTA to ista for database
+  const dbTeacher = {
+    name: teacher.name,
+    email: teacher.email,
+    specialization: teacher.specialization,
+    subjects: teacher.subjects,
+    ista: teacher.isTA,
+  };
+  
   const { data, error } = await supabase
     .from('teachers')
-    .insert([teacher])
+    .insert([dbTeacher])
     .select();
   if (error) throw error;
-  return data[0] as Teacher;
+  
+  // Map back to our interface
+  return {
+    ...data[0],
+    isTA: data[0].ista,
+  } as Teacher;
 };
 
 export const updateTeacher = async (id: string, teacher: Partial<Teacher>) => {
+  // Convert isTA to ista for database if it exists
+  const dbTeacher: any = { ...teacher };
+  if ('isTA' in teacher) {
+    dbTeacher.ista = teacher.isTA;
+    delete dbTeacher.isTA;
+  }
+  
   const { data, error } = await supabase
     .from('teachers')
-    .update(teacher)
+    .update(dbTeacher)
     .eq('id', id)
     .select();
   if (error) throw error;
-  return data[0] as Teacher;
+  
+  // Map back to our interface
+  return {
+    ...data[0],
+    isTA: data[0].ista,
+  } as Teacher;
 };
 
 export const deleteTeacher = async (id: string) => {
@@ -196,26 +227,56 @@ export const fetchDivisions = async () => {
     .from('divisions')
     .select('*');
   if (error) throw error;
-  return data as Division[];
+  
+  // Map streamid to streamId to match our interface
+  return data.map(division => ({
+    ...division,
+    streamId: division.streamid,
+  })) as Division[];
 };
 
 export const addDivision = async (division: Omit<Division, 'id'>) => {
+  // Convert streamId to streamid for database
+  const dbDivision = {
+    name: division.name,
+    streamid: division.streamId,
+    strength: division.strength,
+    year: division.year,
+  };
+  
   const { data, error } = await supabase
     .from('divisions')
-    .insert([division])
+    .insert([dbDivision])
     .select();
   if (error) throw error;
-  return data[0] as Division;
+  
+  // Map back to our interface
+  return {
+    ...data[0],
+    streamId: data[0].streamid,
+  } as Division;
 };
 
 export const updateDivision = async (id: string, division: Partial<Division>) => {
+  // Convert streamId to streamid for database if it exists
+  const dbDivision: any = { ...division };
+  if ('streamId' in division) {
+    dbDivision.streamid = division.streamId;
+    delete dbDivision.streamId;
+  }
+  
   const { data, error } = await supabase
     .from('divisions')
-    .update(division)
+    .update(dbDivision)
     .eq('id', id)
     .select();
   if (error) throw error;
-  return data[0] as Division;
+  
+  // Map back to our interface
+  return {
+    ...data[0],
+    streamId: data[0].streamid,
+  } as Division;
 };
 
 export const deleteDivision = async (id: string) => {
