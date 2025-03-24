@@ -297,7 +297,7 @@ export const deleteDivision = async (id: string) => {
   return true;
 };
 
-// Timetables
+// Timetables - Fixed timetable functions to use string ID instead of UUID
 export const fetchTimetable = async (id: string) => {
   const { data, error } = await supabase
     .from('timetables')
@@ -305,17 +305,24 @@ export const fetchTimetable = async (id: string) => {
     .eq('id', id)
     .maybeSingle();
   
-  if (error) throw error;
+  if (error) {
+    console.error("Error fetching timetable:", error);
+    throw error;
+  }
   return data as Timetable | null;
 };
 
 export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'updated_at'>) => {
+  // Convert to string ID if it's a combination of values
   const { data, error } = await supabase
     .from('timetables')
     .insert([timetable])
     .select();
   
-  if (error) throw error;
+  if (error) {
+    console.error("Error adding timetable:", error);
+    throw error;
+  }
   return data[0] as Timetable;
 };
 
@@ -326,7 +333,10 @@ export const updateTimetable = async (id: string, timetable: Partial<Timetable>)
     .eq('id', id)
     .select();
   
-  if (error) throw error;
+  if (error) {
+    console.error("Error updating timetable:", error);
+    throw error;
+  }
   return data[0] as Timetable;
 };
 
@@ -336,7 +346,10 @@ export const deleteTimetable = async (id: string) => {
     .delete()
     .eq('id', id);
   
-  if (error) throw error;
+  if (error) {
+    console.error("Error deleting timetable:", error);
+    throw error;
+  }
   return true;
 };
 

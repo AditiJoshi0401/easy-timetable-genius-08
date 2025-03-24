@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle, Download, Upload } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -70,21 +69,32 @@ const TimetableEditor = () => {
     queryFn: fetchRooms
   });
 
-  // Fetch streams from Supabase
+  // Fetch streams from Supabase - fixed the React Query options
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
     queryFn: fetchStreams,
-    onSuccess: (data) => {
-      if (!data || data.length === 0) {
+    meta: {
+      onSuccess: (data) => {
+        if (!data || data.length === 0) {
+          setNoStreamsDataExists(true);
+        } else {
+          setNoStreamsDataExists(false);
+        }
+      },
+      onError: () => {
         setNoStreamsDataExists(true);
-      } else {
-        setNoStreamsDataExists(false);
       }
-    },
-    onError: () => {
-      setNoStreamsDataExists(true);
     }
   });
+
+  // Initialize noStreamsDataExists state based on streams data
+  useEffect(() => {
+    if (streams && streams.length > 0) {
+      setNoStreamsDataExists(false);
+    } else {
+      setNoStreamsDataExists(true);
+    }
+  }, [streams]);
 
   // Fetch divisions from Supabase
   const { data: allDivisions = [] } = useQuery({
@@ -167,7 +177,7 @@ const TimetableEditor = () => {
     }
     
     // Check if a timetable already exists for this division
-    const timetableKey = `${stream}_${year}_${division}`;
+    const timetableKey = `${stream}:${year}:${division}`;
     
     fetchTimetable(timetableKey)
       .then(existingTimetable => {
@@ -197,7 +207,16 @@ const TimetableEditor = () => {
 
   const saveTimetable = async () => {
     try {
-      const timetableKey = `${stream}_${year}_${division}`;
+      if (!stream || !year || !division) {
+        toast({
+          title: "Missing Information",
+          description: "Stream, year, and division information is missing.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const timetableKey = `${stream}:${year}:${division}`;
       const timetableMetadata = {
         id: timetableKey,
         name: `${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)} Timetable`,
@@ -211,17 +230,20 @@ const TimetableEditor = () => {
       if (existingTimetable) {
         // Update existing timetable
         await updateTimetable(timetableKey, { data: timetableData });
+        toast({
+          title: "Timetable Updated",
+          description: "Your timetable has been updated successfully."
+        });
       } else {
         // Add new timetable
         await addTimetable(timetableMetadata);
+        toast({
+          title: "Timetable Saved",
+          description: "Your timetable has been saved successfully."
+        });
       }
       
       setIsEditing(false);
-      
-      toast({
-        title: "Timetable Saved",
-        description: "Your timetable has been saved successfully."
-      });
     } catch (error) {
       console.error('Error saving timetable:', error);
       toast({
@@ -335,7 +357,7 @@ const TimetableEditor = () => {
       
       toast({
         title: "Lab Added",
-        description: `Added ${subject.name} lab to ${day} starting at ${time}`
+        description: `Added ${subject?.name} lab to ${day} starting at ${time}`
       });
     } else {
       newTimetableData[day][time] = {
@@ -347,7 +369,7 @@ const TimetableEditor = () => {
       
       toast({
         title: "Subject Added",
-        description: `Added ${subject.name} to ${day} ${time}`
+        description: `Added ${subject?.name} to ${day} ${time}`
       });
     }
     
@@ -890,165 +912,3 @@ const TimetableEditor = () => {
                   </CardContent>
                 </Card>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-      
-      <Dialog open={slotDetailsOpen} onOpenChange={setSlotDetailsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Class Details</DialogTitle>
-            <DialogDescription>
-              {selectedSlot && `Adding to ${selectedSlot.day} at ${selectedSlot.time}`}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Subject</Label>
-              <Select 
-                value={slotDetails.subject} 
-                onValueChange={(value) => {
-                  const subjectTeachers = assignedTeachers[value] || [];
-                  const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
-                  
-                  setSlotDetails({
-                    ...slotDetails, 
-                    subject: value,
-                    teacher: defaultTeacher
-                  });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Subject" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredSubjects.map((subject) => (
-                    <SelectItem key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Teacher</Label>
-              <Select value={slotDetails.teacher} onValueChange={(value) => setSlotDetails({...slotDetails, teacher: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Teacher" />
-                </SelectTrigger>
-                <SelectContent>
-                  {slotDetails.subject && assignedTeachers[slotDetails.subject] && assignedTeachers[slotDetails.subject].length > 0 ? (
-                    <>
-                      <SelectItem value="assigned-teachers-header" disabled>Assigned Teachers</SelectItem>
-                      {assignedTeachers[slotDetails.subject].map((teacherId: string) => {
-                        const teacher = teachers.find(t => t.id === teacherId);
-                        return teacher ? (
-                          <SelectItem key={teacher.id} value={teacher.id}>
-                            {teacher.isTA ? "TA " : ""}{teacher.name}
-                          </SelectItem>
-                        ) : null;
-                      })}
-                      <SelectItem value="other-teachers-header" disabled>Other Teachers</SelectItem>
-                    </>
-                  ) : null}
-                  
-                  {teachers
-                    .filter(teacher => !slotDetails.subject || !assignedTeachers[slotDetails.subject] || !assignedTeachers[slotDetails.subject].includes(teacher.id))
-                    .map((teacher) => (
-                      <SelectItem key={teacher.id} value={teacher.id}>
-                        {teacher.isTA ? "TA " : ""}{teacher.name}
-                      </SelectItem>
-                    ))
-                  }
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={slotDetails.type} onValueChange={(value) => setSlotDetails({...slotDetails, type: value, room: ""})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lecture">Lecture</SelectItem>
-                  <SelectItem value="lab">Lab (2 hours)</SelectItem>
-                  <SelectItem value="tutorial">Tutorial</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Room</Label>
-              <Select value={slotDetails.room} onValueChange={(value) => setSlotDetails({...slotDetails, room: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Room" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedSlot && getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).map((room) => (
-                    <SelectItem key={room.id} value={room.id}>
-                      {room.number} ({room.type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedSlot && getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).length === 0 && (
-                <p className="text-xs text-destructive mt-1">
-                  No suitable {slotDetails.type === "lab" ? "labs" : "classrooms"} available for this time slot
-                </p>
-              )}
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSlotDetailsOpen(false)}>Cancel</Button>
-            <Button onClick={addSubjectToTimetable}>Add to Timetable</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Import Timetable</DialogTitle>
-            <DialogDescription>
-              Import a previously exported timetable JSON file
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="file-upload">Upload File</Label>
-              <Input 
-                id="file-upload"
-                type="file"
-                accept=".json"
-                onChange={handleFileImport}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="json-data">Or Paste JSON Data</Label>
-              <textarea
-                id="json-data"
-                className="w-full min-h-[200px] p-2 border rounded-md"
-                placeholder="Paste JSON data here..."
-                value={importData}
-                onChange={(e) => setImportData(e.target.value)}
-              ></textarea>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
-            <Button onClick={processImport}>Import</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-export default TimetableEditor;

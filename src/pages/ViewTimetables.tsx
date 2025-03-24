@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { LayoutGrid, Filter, Download, Book, User, Calendar } from "lucide-react";
+import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,53 +9,71 @@ import { Label } from "@/components/ui/label";
 import { FeatureCard } from "@/components/ui/feature-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { fetchStreams, fetchDivisions, fetchTimetable } from "@/services/supabaseService";
+import { useToast } from "@/components/ui/use-toast";
 
 const ViewTimetables = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [stream, setStream] = useState("");
   const [year, setYear] = useState("");
   const [division, setDivision] = useState("");
   const [selectedTimetable, setSelectedTimetable] = useState<any>(null);
   const [viewMode, setViewMode] = useState("division");
-  const [streams, setStreams] = useState<any[]>([]);
   const [years, setYears] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [recentTimetables, setRecentTimetables] = useState<any[]>([]);
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
 
-  useEffect(() => {
-    try {
-      // Load streams data
-      const storedStreams = localStorage.getItem('streams');
-      if (storedStreams) {
-        const parsedStreams = JSON.parse(storedStreams);
-        setStreams(parsedStreams);
-        
-        // Check if streams data exists
-        if (!parsedStreams || parsedStreams.length === 0) {
-          setNoStreamsDataExists(true);
-        }
-      } else {
-        setNoStreamsDataExists(true);
-      }
+  // Fetch streams from Supabase
+  const { data: streams = [], isLoading: streamsLoading } = useQuery({
+    queryKey: ['streams'],
+    queryFn: fetchStreams
+  });
 
-      // Load recent timetables
-      const storedRecentTimetables = localStorage.getItem('recentTimetables');
-      if (storedRecentTimetables) {
-        setRecentTimetables(JSON.parse(storedRecentTimetables));
-      }
-    } catch (error) {
-      console.error('Error loading data from localStorage:', error);
+  // Fetch divisions from Supabase
+  const { data: allDivisions = [] } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: fetchDivisions
+  });
+
+  // Initialize noStreamsDataExists state based on streams data
+  useEffect(() => {
+    if (streams && streams.length > 0) {
+      setNoStreamsDataExists(false);
+    } else {
       setNoStreamsDataExists(true);
     }
+  }, [streams]);
+
+  useEffect(() => {
+    // Load recent timetables (can be implemented with local storage or Supabase)
+    const loadRecentTimetables = () => {
+      try {
+        const storedRecentTimetables = localStorage.getItem('recentTimetables');
+        if (storedRecentTimetables) {
+          setRecentTimetables(JSON.parse(storedRecentTimetables));
+        }
+      } catch (error) {
+        console.error('Error loading recent timetables:', error);
+      }
+    };
+
+    loadRecentTimetables();
   }, []);
 
   useEffect(() => {
-    // Filter years based on selected stream
     if (stream) {
       const selectedStreamData = streams.find(s => s.id === stream);
-      if (selectedStreamData && selectedStreamData.years) {
-        setYears(selectedStreamData.years);
+      if (selectedStreamData) {
+        // Create years array from the stream's year count
+        const yearCount = selectedStreamData.years;
+        const yearsArray = Array.from({ length: yearCount }, (_, i) => ({
+          id: (i + 1).toString(),
+          name: `Year ${i + 1}`
+        }));
+        setYears(yearsArray);
         setYear("");
         setDivision("");
       } else {
@@ -67,66 +85,145 @@ const ViewTimetables = () => {
   }, [stream, streams]);
 
   useEffect(() => {
-    // Filter divisions based on selected stream and year
     if (stream && year) {
-      const selectedStreamData = streams.find(s => s.id === stream);
-      if (selectedStreamData && selectedStreamData.years) {
-        const selectedYear = selectedStreamData.years.find((y: any) => y.id === year);
-        if (selectedYear && selectedYear.divisions) {
-          setDivisions(selectedYear.divisions);
-          setDivision("");
-        } else {
-          setDivisions([]);
-        }
-      }
+      // Filter divisions based on stream and year
+      const filteredDivisions = allDivisions.filter(d => 
+        d.streamId === stream && d.year.toString() === year
+      );
+      setDivisions(filteredDivisions);
+      setDivision("");
     } else {
       setDivisions([]);
     }
-  }, [stream, year, streams]);
+  }, [stream, year, allDivisions]);
 
   const handleNavigateToStreamsManager = () => {
     navigate("/streams-manager");
   };
 
-  // Handler to load timetable
-  const handleLoadTimetable = (timetable: any) => {
-    setSelectedTimetable(timetable);
-    setStream(timetable.stream);
-    setYear(timetable.year);
-    setDivision(timetable.division);
+  const handleLoadTimetable = async (timetableData?: any) => {
+    try {
+      if (timetableData) {
+        // If timetable data is provided directly, use it
+        setSelectedTimetable(timetableData);
+        setStream(timetableData.stream);
+        setYear(timetableData.year);
+        setDivision(timetableData.division);
+        return;
+      }
+
+      if (!stream || !year || !division) {
+        toast({
+          title: "Missing Information",
+          description: "Please select stream, year, and division to load a timetable.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Load timetable from database
+      const timetableKey = `${stream}:${year}:${division}`;
+      const timetable = await fetchTimetable(timetableKey);
+      
+      if (timetable) {
+        setSelectedTimetable({
+          id: timetableKey,
+          stream,
+          year,
+          division,
+          data: timetable.data,
+          lastModified: new Date(timetable.updated_at || timetable.created_at).toLocaleDateString()
+        });
+        
+        toast({
+          title: "Timetable Loaded",
+          description: `Loaded timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}`
+        });
+      } else {
+        toast({
+          title: "Timetable Not Found",
+          description: "No timetable exists for the selected criteria.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error loading timetable:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load timetable.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStreamName = (streamId: string) => {
-    const stream = streams.find(s => s.id === streamId);
-    return stream ? stream.name : streamId;
+    const streamObj = streams.find(s => s.id === streamId);
+    return streamObj ? streamObj.name : streamId;
   };
 
   const getYearName = (yearId: string) => {
-    if (!stream) return yearId;
-    const streamData = streams.find(s => s.id === stream);
-    if (!streamData) return yearId;
-    
-    const year = streamData.years.find((y: any) => y.id === yearId);
-    return year ? year.name : yearId;
+    return `Year ${yearId}`;
   };
 
   const getDivisionName = (divisionId: string) => {
-    if (!stream || !year) return divisionId;
-    const streamData = streams.find(s => s.id === stream);
-    if (!streamData) return divisionId;
-    
-    const yearData = streamData.years.find((y: any) => y.id === year);
-    if (!yearData) return divisionId;
-    
-    const division = yearData.divisions.find((d: any) => d.id === divisionId);
-    return division ? division.name : divisionId;
+    const divisionObj = allDivisions.find(d => d.id === divisionId);
+    return divisionObj ? divisionObj.name : divisionId;
   };
 
   const handleApplyFilters = () => {
-    // Filter timetables based on selected criteria
-    // For now, just show a toast message
-    console.log("Applied filters:", { stream, year, division });
+    handleLoadTimetable();
   };
+
+  const exportTimetable = () => {
+    if (!selectedTimetable || !selectedTimetable.data) {
+      toast({
+        title: "Nothing to Export",
+        description: "There is no timetable data to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const exportData = {
+      stream: selectedTimetable.stream,
+      year: selectedTimetable.year,
+      division: selectedTimetable.division,
+      streamName: getStreamName(selectedTimetable.stream),
+      yearName: getYearName(selectedTimetable.year),
+      divisionName: getDivisionName(selectedTimetable.division),
+      timetableData: selectedTimetable.data
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `timetable_${getStreamName(selectedTimetable.stream)}_${getYearName(selectedTimetable.year)}_${getDivisionName(selectedTimetable.division)}.json`;
+    
+    const linkElement = document.createElement("a");
+    linkElement.setAttribute("href", dataUri);
+    linkElement.setAttribute("download", exportFileDefaultName);
+    linkElement.click();
+    
+    toast({
+      title: "Timetable Exported",
+      description: "Your timetable has been exported successfully."
+    });
+  };
+
+  if (streamsLoading) {
+    return (
+      <div className="space-y-6">
+        <SectionHeading
+          title="View Timetables"
+          description="Browse and export your created timetables"
+          icon={<LayoutGrid className="h-6 w-6" />}
+        />
+        <div className="flex items-center justify-center h-64">
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (noStreamsDataExists) {
     return (
@@ -309,7 +406,7 @@ const ViewTimetables = () => {
                   </CardDescription>
                 </div>
                 {selectedTimetable && (
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button variant="outline" size="sm" className="gap-2" onClick={exportTimetable}>
                     <Download className="h-4 w-4" />
                     Export
                   </Button>
@@ -332,9 +429,15 @@ const ViewTimetables = () => {
                         <p className="text-muted-foreground">
                           Division timetable view for {getStreamName(selectedTimetable.stream)} {getYearName(selectedTimetable.year)} {getDivisionName(selectedTimetable.division)}
                         </p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          (This is a placeholder - timetable data would be loaded and displayed here)
-                        </p>
+                        {selectedTimetable.data && Object.keys(selectedTimetable.data).length > 0 ? (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Timetable loaded successfully.
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            This timetable is empty or contains no scheduled classes.
+                          </p>
+                        )}
                       </div>
                     </TabsContent>
                     
