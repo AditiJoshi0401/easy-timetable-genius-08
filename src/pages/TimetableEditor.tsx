@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle, Download, Upload } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -177,7 +178,7 @@ const TimetableEditor = () => {
     }
     
     // Check if a timetable already exists for this division
-    const timetableKey = `${stream}:${year}:${division}`;
+    const timetableKey = `${stream}_${year}_${division}`;
     
     fetchTimetable(timetableKey)
       .then(existingTimetable => {
@@ -216,7 +217,7 @@ const TimetableEditor = () => {
         return;
       }
 
-      const timetableKey = `${stream}:${year}:${division}`;
+      const timetableKey = `${stream}_${year}_${division}`;
       const timetableMetadata = {
         id: timetableKey,
         name: `${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)} Timetable`,
@@ -912,3 +913,162 @@ const TimetableEditor = () => {
                   </CardContent>
                 </Card>
               </div>
+            )}
+          </div>
+          
+          <Dialog open={slotDetailsOpen} onOpenChange={setSlotDetailsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Subject to Timetable</DialogTitle>
+                <DialogDescription>
+                  {selectedSlot && `Adding to ${selectedSlot.day} at ${selectedSlot.time}`}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Subject</Label>
+                  <Select 
+                    value={slotDetails.subject} 
+                    onValueChange={value => setSlotDetails({ ...slotDetails, subject: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Subject" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredSubjects.map(subject => (
+                        <SelectItem key={subject.id} value={subject.id}>
+                          {subject.name} ({subject.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Teacher</Label>
+                  <Select 
+                    value={slotDetails.teacher} 
+                    onValueChange={value => setSlotDetails({ ...slotDetails, teacher: value })}
+                    disabled={!slotDetails.subject}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Teacher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {slotDetails.subject ? (
+                        getTeachersForSubject(slotDetails.subject).length > 0 ? (
+                          getTeachersForSubject(slotDetails.subject).map(teacher => (
+                            <SelectItem key={teacher.id} value={teacher.id}>
+                              {teacher.isTA ? "TA " : ""}{teacher.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-teachers" disabled>
+                            No teachers assigned to this subject
+                          </SelectItem>
+                        )
+                      ) : (
+                        <SelectItem value="select-subject" disabled>
+                          Select a subject first
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Session Type</Label>
+                  <Select 
+                    value={slotDetails.type} 
+                    onValueChange={value => setSlotDetails({ ...slotDetails, type: value, room: "" })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lecture">Lecture</SelectItem>
+                      <SelectItem value="lab">Lab (2 hours)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Room</Label>
+                  <Select 
+                    value={slotDetails.room} 
+                    onValueChange={value => setSlotDetails({ ...slotDetails, room: value })}
+                    disabled={!selectedSlot}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Room" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedSlot ? (
+                        getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).length > 0 ? (
+                          getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).map(room => (
+                            <SelectItem key={room.id} value={room.id}>
+                              {room.number} (Capacity: {room.capacity})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-rooms" disabled>
+                            No available rooms for this time and type
+                          </SelectItem>
+                        )
+                      ) : (
+                        <SelectItem value="no-slot" disabled>
+                          No time slot selected
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSlotDetailsOpen(false)}>Cancel</Button>
+                <Button onClick={addSubjectToTimetable}>Add to Timetable</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Import Timetable</DialogTitle>
+                <DialogDescription>
+                  Import an existing timetable from JSON file or paste JSON data
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Upload JSON File</Label>
+                  <Input type="file" accept=".json" onChange={handleFileImport} />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Or Paste JSON Data</Label>
+                  <textarea 
+                    className="w-full min-h-[150px] p-2 border rounded-md"
+                    value={importData}
+                    onChange={(e) => setImportData(e.target.value)}
+                    placeholder="Paste your timetable JSON data here..."
+                  />
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+                <Button onClick={processImport}>Import Timetable</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default TimetableEditor;

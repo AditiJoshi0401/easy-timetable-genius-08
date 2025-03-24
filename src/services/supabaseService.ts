@@ -297,60 +297,95 @@ export const deleteDivision = async (id: string) => {
   return true;
 };
 
-// Timetables - Fixed timetable functions to use string ID instead of UUID
+// Timetables - Using string ID instead of UUID for timetable operations
 export const fetchTimetable = async (id: string) => {
-  const { data, error } = await supabase
-    .from('timetables')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-  
-  if (error) {
-    console.error("Error fetching timetable:", error);
+  try {
+    console.log("Fetching timetable with ID:", id);
+    
+    const { data, error } = await supabase
+      .from('timetables')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Error fetching timetable:", error);
+      throw error;
+    }
+    
+    console.log("Timetable fetch result:", data);
+    return data as Timetable | null;
+  } catch (error) {
+    console.error("Exception in fetchTimetable:", error);
     throw error;
   }
-  return data as Timetable | null;
 };
 
 export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'updated_at'>) => {
-  // Convert to string ID if it's a combination of values
-  const { data, error } = await supabase
-    .from('timetables')
-    .insert([timetable])
-    .select();
-  
-  if (error) {
-    console.error("Error adding timetable:", error);
+  try {
+    console.log("Adding timetable:", timetable);
+    
+    const { data, error } = await supabase
+      .from('timetables')
+      .insert([timetable])
+      .select();
+    
+    if (error) {
+      console.error("Error adding timetable:", error);
+      throw error;
+    }
+    
+    console.log("Added timetable result:", data[0]);
+    return data[0] as Timetable;
+  } catch (error) {
+    console.error("Exception in addTimetable:", error);
     throw error;
   }
-  return data[0] as Timetable;
 };
 
 export const updateTimetable = async (id: string, timetable: Partial<Timetable>) => {
-  const { data, error } = await supabase
-    .from('timetables')
-    .update({ ...timetable, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select();
-  
-  if (error) {
-    console.error("Error updating timetable:", error);
+  try {
+    console.log("Updating timetable with ID:", id, "Data:", timetable);
+    
+    const { data, error } = await supabase
+      .from('timetables')
+      .update({ ...timetable, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select();
+    
+    if (error) {
+      console.error("Error updating timetable:", error);
+      throw error;
+    }
+    
+    console.log("Updated timetable result:", data[0]);
+    return data[0] as Timetable;
+  } catch (error) {
+    console.error("Exception in updateTimetable:", error);
     throw error;
   }
-  return data[0] as Timetable;
 };
 
 export const deleteTimetable = async (id: string) => {
-  const { error } = await supabase
-    .from('timetables')
-    .delete()
-    .eq('id', id);
-  
-  if (error) {
-    console.error("Error deleting timetable:", error);
+  try {
+    console.log("Deleting timetable with ID:", id);
+    
+    const { error } = await supabase
+      .from('timetables')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error("Error deleting timetable:", error);
+      throw error;
+    }
+    
+    console.log("Timetable deleted successfully");
+    return true;
+  } catch (error) {
+    console.error("Exception in deleteTimetable:", error);
     throw error;
   }
-  return true;
 };
 
 export default supabase;

@@ -65,18 +65,22 @@ const ViewTimetables = () => {
 
   useEffect(() => {
     if (stream) {
+      console.log("Selected stream:", stream);
       const selectedStreamData = streams.find(s => s.id === stream);
       if (selectedStreamData) {
+        console.log("Stream data found:", selectedStreamData);
         // Create years array from the stream's year count
         const yearCount = selectedStreamData.years;
         const yearsArray = Array.from({ length: yearCount }, (_, i) => ({
           id: (i + 1).toString(),
           name: `Year ${i + 1}`
         }));
+        console.log("Generated years array:", yearsArray);
         setYears(yearsArray);
         setYear("");
         setDivision("");
       } else {
+        console.log("No stream data found for ID:", stream);
         setYears([]);
       }
     } else {
@@ -86,10 +90,12 @@ const ViewTimetables = () => {
 
   useEffect(() => {
     if (stream && year) {
+      console.log("Filtering divisions for stream:", stream, "year:", year);
       // Filter divisions based on stream and year
       const filteredDivisions = allDivisions.filter(d => 
         d.streamId === stream && d.year.toString() === year
       );
+      console.log("Filtered divisions:", filteredDivisions);
       setDivisions(filteredDivisions);
       setDivision("");
     } else {
@@ -121,11 +127,14 @@ const ViewTimetables = () => {
         return;
       }
 
-      // Load timetable from database
-      const timetableKey = `${stream}:${year}:${division}`;
+      // Load timetable from database using the correct key format
+      const timetableKey = `${stream}_${year}_${division}`;
+      console.log("Trying to load timetable with key:", timetableKey);
+      
       const timetable = await fetchTimetable(timetableKey);
       
       if (timetable) {
+        console.log("Timetable loaded:", timetable);
         setSelectedTimetable({
           id: timetableKey,
           stream,
@@ -140,6 +149,7 @@ const ViewTimetables = () => {
           description: `Loaded timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}`
         });
       } else {
+        console.log("No timetable found for key:", timetableKey);
         toast({
           title: "Timetable Not Found",
           description: "No timetable exists for the selected criteria.",
