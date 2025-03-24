@@ -14,6 +14,8 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, For
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { fetchStreams, fetchDivisions, addStream, updateStream, deleteStream, addDivision, updateDivision, deleteDivision, Stream, Division } from "@/services/supabaseService";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Define schema for stream form
 const streamFormSchema = z.object({
@@ -32,13 +34,12 @@ const divisionFormSchema = z.object({
   year: z.coerce.number().min(1, "Year is required")
 });
 
-type Stream = z.infer<typeof streamFormSchema>;
-type Division = z.infer<typeof divisionFormSchema>;
+type FormStream = z.infer<typeof streamFormSchema>;
+type FormDivision = z.infer<typeof divisionFormSchema>;
 
 const StreamsManager = () => {
   const { toast } = useToast();
-  const [streams, setStreams] = useState<Stream[]>([]);
-  const [divisions, setDivisions] = useState<Division[]>([]);
+  const queryClient = useQueryClient();
   const [isStreamDialogOpen, setIsStreamDialogOpen] = useState(false);
   const [isDivisionDialogOpen, setIsDivisionDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -48,7 +49,7 @@ const StreamsManager = () => {
   const [divisionNameError, setDivisionNameError] = useState("");
 
   // Stream form
-  const streamForm = useForm<Stream>({
+  const streamForm = useForm<FormStream>({
     resolver: zodResolver(streamFormSchema),
     defaultValues: {
       code: "",
@@ -58,7 +59,7 @@ const StreamsManager = () => {
   });
 
   // Division form
-  const divisionForm = useForm<Division>({
+  const divisionForm = useForm<FormDivision>({
     resolver: zodResolver(divisionFormSchema),
     defaultValues: {
       streamId: "",
@@ -68,34 +69,165 @@ const StreamsManager = () => {
     },
   });
 
-  // Load data from localStorage
-  useEffect(() => {
-    try {
-      const storedStreams = localStorage.getItem('streams');
-      const storedDivisions = localStorage.getItem('divisions');
-      
-      if (storedStreams) setStreams(JSON.parse(storedStreams));
-      if (storedDivisions) setDivisions(JSON.parse(storedDivisions));
-    } catch (error) {
-      console.error('Error loading data from localStorage:', error);
-    }
-  }, []);
+  // Fetch streams
+  const { 
+    data: streams = [], 
+    isLoading: isLoadingStreams,
+    isError: isStreamsError
+  } = useQuery({
+    queryKey: ['streams'],
+    queryFn: fetchStreams
+  });
 
-  // Save data to localStorage whenever it changes
-  useEffect(() => {
-    if (streams.length > 0) {
-      localStorage.setItem('streams', JSON.stringify(streams));
-    }
-  }, [streams]);
+  // Fetch divisions
+  const { 
+    data: divisions = [], 
+    isLoading: isLoadingDivisions,
+    isError: isDivisionsError
+  } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: fetchDivisions
+  });
 
-  useEffect(() => {
-    if (divisions.length > 0) {
-      localStorage.setItem('divisions', JSON.stringify(divisions));
+  // Add stream mutation
+  const addStreamMutation = useMutation({
+    mutationFn: (stream: Omit<Stream, 'id'>) => addStream(stream),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      toast({
+        title: "Stream Added",
+        description: "The stream has been added successfully."
+      });
+      streamForm.reset();
+      setIsStreamDialogOpen(false);
+    },
+    onError: (error) => {
+      console.error('Error adding stream:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add stream. Please try again.",
+        variant: "destructive"
+      });
     }
-  }, [divisions]);
+  });
+
+  // Update stream mutation
+  const updateStreamMutation = useMutation({
+    mutationFn: ({ id, stream }: { id: string, stream: Partial<Stream> }) => updateStream(id, stream),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      toast({
+        title: "Stream Updated",
+        description: "The stream has been updated successfully."
+      });
+      streamForm.reset();
+      setIsStreamDialogOpen(false);
+      setIsEditing(false);
+    },
+    onError: (error) => {
+      console.error('Error updating stream:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update stream. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete stream mutation
+  const deleteStreamMutation = useMutation({
+    mutationFn: (id: string) => deleteStream(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      toast({
+        title: "Stream Deleted",
+        description: "The stream has been deleted successfully."
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting stream:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete stream. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Add division mutation
+  const addDivisionMutation = useMutation({
+    mutationFn: (division: Omit<Division, 'id'>) => addDivision(division),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['divisions'] });
+      toast({
+        title: "Division Added",
+        description: "The division has been added successfully."
+      });
+      divisionForm.reset();
+      setIsDivisionDialogOpen(false);
+    },
+    onError: (error) => {
+      console.error('Error adding division:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add division. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Update division mutation
+  const updateDivisionMutation = useMutation({
+    mutationFn: ({ id, division }: { id: string, division: Partial<Division> }) => updateDivision(id, division),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['divisions'] });
+      toast({
+        title: "Division Updated",
+        description: "The division has been updated successfully."
+      });
+      divisionForm.reset();
+      setIsDivisionDialogOpen(false);
+      setIsEditing(false);
+    },
+    onError: (error) => {
+      console.error('Error updating division:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update division. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete division mutation
+  const deleteDivisionMutation = useMutation({
+    mutationFn: (id: string) => deleteDivision(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['divisions'] });
+      toast({
+        title: "Division Deleted",
+        description: "The division has been deleted successfully."
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting division:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete division. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Set default streamId for division form when streams are loaded
+  useEffect(() => {
+    if (streams.length > 0 && !divisionForm.getValues('streamId')) {
+      divisionForm.setValue('streamId', streams[0].id || "");
+    }
+  }, [streams, divisionForm]);
 
   // Check for duplicate stream name or code
-  const checkDuplicateStream = (data: Stream): boolean => {
+  const checkDuplicateStream = (data: FormStream): boolean => {
     setStreamNameError("");
     setStreamCodeError("");
     
@@ -131,7 +263,7 @@ const StreamsManager = () => {
   };
 
   // Check for duplicate division name within same stream and year
-  const checkDuplicateDivision = (data: Division): boolean => {
+  const checkDuplicateDivision = (data: FormDivision): boolean => {
     setDivisionNameError("");
     
     const nameExists = divisions.some(division => 
@@ -154,7 +286,7 @@ const StreamsManager = () => {
   };
 
   // Handle stream form submission
-  const onStreamSubmit = (data: Stream) => {
+  const onStreamSubmit = (data: FormStream) => {
     // Check for duplicates
     if (checkDuplicateStream(data)) {
       return;
@@ -162,31 +294,15 @@ const StreamsManager = () => {
     
     if (isEditing && data.id) {
       // Update existing stream
-      setStreams(prev => prev.map(stream => stream.id === data.id ? data : stream));
-      toast({
-        title: "Stream Updated",
-        description: `${data.name} has been updated successfully.`
-      });
+      updateStreamMutation.mutate({ id: data.id, stream: data });
     } else {
       // Add new stream
-      const newStream = {
-        ...data,
-        id: crypto.randomUUID(),
-      };
-      setStreams(prev => [...prev, newStream]);
-      toast({
-        title: "Stream Added",
-        description: `${data.name} has been added successfully.`
-      });
+      addStreamMutation.mutate(data);
     }
-    
-    streamForm.reset();
-    setIsStreamDialogOpen(false);
-    setIsEditing(false);
   };
 
   // Handle division form submission
-  const onDivisionSubmit = (data: Division) => {
+  const onDivisionSubmit = (data: FormDivision) => {
     // Check for duplicates
     if (checkDuplicateDivision(data)) {
       return;
@@ -194,31 +310,15 @@ const StreamsManager = () => {
     
     if (isEditing && data.id) {
       // Update existing division
-      setDivisions(prev => prev.map(division => division.id === data.id ? data : division));
-      toast({
-        title: "Division Updated",
-        description: `Division ${data.name} has been updated successfully.`
-      });
+      updateDivisionMutation.mutate({ id: data.id, division: data });
     } else {
       // Add new division
-      const newDivision = {
-        ...data,
-        id: crypto.randomUUID(),
-      };
-      setDivisions(prev => [...prev, newDivision]);
-      toast({
-        title: "Division Added",
-        description: `Division ${data.name} has been added successfully.`
-      });
+      addDivisionMutation.mutate(data);
     }
-    
-    divisionForm.reset();
-    setIsDivisionDialogOpen(false);
-    setIsEditing(false);
   };
 
   // Delete a stream
-  const deleteStream = (id: string) => {
+  const handleDeleteStream = (id: string) => {
     // Check if there are divisions associated with this stream
     const associatedDivisions = divisions.filter(div => div.streamId === id);
     
@@ -231,20 +331,12 @@ const StreamsManager = () => {
       return;
     }
     
-    setStreams(prev => prev.filter(stream => stream.id !== id));
-    toast({
-      title: "Stream Deleted",
-      description: "The stream has been deleted successfully."
-    });
+    deleteStreamMutation.mutate(id);
   };
 
   // Delete a division
-  const deleteDivision = (id: string) => {
-    setDivisions(prev => prev.filter(division => division.id !== id));
-    toast({
-      title: "Division Deleted",
-      description: "The division has been deleted successfully."
-    });
+  const handleDeleteDivision = (id: string) => {
+    deleteDivisionMutation.mutate(id);
   };
 
   // Edit a stream
@@ -312,7 +404,19 @@ const StreamsManager = () => {
             </Button>
           </div>
 
-          {streams.length === 0 ? (
+          {isLoadingStreams ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <p>Loading streams...</p>
+              </CardContent>
+            </Card>
+          ) : isStreamsError ? (
+            <Card>
+              <CardContent className="py-10 text-center text-destructive">
+                <p>Error loading streams. Please try again.</p>
+              </CardContent>
+            </Card>
+          ) : streams.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center">
                 <BookOpen className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -345,7 +449,7 @@ const StreamsManager = () => {
                       <Button variant="outline" size="sm" onClick={() => editStream(stream)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => deleteStream(stream.id!)}>
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteStream(stream.id!)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -381,7 +485,19 @@ const StreamsManager = () => {
             </Button>
           </div>
 
-          {streams.length === 0 ? (
+          {isLoadingStreams || isLoadingDivisions ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <p>Loading...</p>
+              </CardContent>
+            </Card>
+          ) : isStreamsError || isDivisionsError ? (
+            <Card>
+              <CardContent className="py-10 text-center text-destructive">
+                <p>Error loading data. Please try again.</p>
+              </CardContent>
+            </Card>
+          ) : streams.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center">
                 <BookOpen className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -457,7 +573,7 @@ const StreamsManager = () => {
                             <Button variant="outline" size="sm" onClick={() => editDivision(division)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => deleteDivision(division.id!)}>
+                            <Button variant="outline" size="sm" onClick={() => handleDeleteDivision(division.id!)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
@@ -589,8 +705,12 @@ const StreamsManager = () => {
                         {...field}
                         onChange={(e) => {
                           field.onChange(e);
-                          // Reset year to 1 when changing stream
-                          divisionForm.setValue('year', 1);
+                          // Reset year selection when changing stream
+                          const streamId = e.target.value;
+                          const stream = streams.find(s => s.id === streamId);
+                          if (stream && stream.years > 0) {
+                            divisionForm.setValue('year', 1);
+                          }
                         }}
                       >
                         {streams.map(stream => (
