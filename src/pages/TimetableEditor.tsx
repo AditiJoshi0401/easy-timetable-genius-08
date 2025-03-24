@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle } from "lucide-react";
+import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle, Download, Upload } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
+import { fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchDivisions, addTimetable, fetchTimetable, updateTimetable } from "@/services/supabaseService";
+import { useQuery } from "@tanstack/react-query";
 
 const TimetableEditor = () => {
   const { toast } = useToast();
@@ -20,9 +23,6 @@ const TimetableEditor = () => {
   const [division, setDivision] = useState("");
   const [showTimetable, setShowTimetable] = useState(false);
   const [timetableData, setTimetableData] = useState<any>({});
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<any[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(true);
   const [draggingItem, setDraggingItem] = useState<any>(null);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
@@ -34,10 +34,11 @@ const TimetableEditor = () => {
     type: "lecture"
   });
   const [assignedTeachers, setAssignedTeachers] = useState<any>({});
-  const [streams, setStreams] = useState<any[]>([]);
   const [years, setYears] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importData, setImportData] = useState("");
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const timeSlots = [
@@ -51,38 +52,57 @@ const TimetableEditor = () => {
     "4:30 - 5:30"
   ];
 
-  useEffect(() => {
-    try {
-      const storedSubjects = localStorage.getItem('subjects');
-      const storedTeachers = localStorage.getItem('teachers');
-      const storedRooms = localStorage.getItem('rooms');
-      const storedStreams = localStorage.getItem('streams');
-      
-      if (storedSubjects) setSubjects(JSON.parse(storedSubjects));
-      if (storedTeachers) setTeachers(JSON.parse(storedTeachers));
-      if (storedRooms) setRooms(JSON.parse(storedRooms));
-      
-      if (storedStreams) {
-        const parsedStreams = JSON.parse(storedStreams);
-        setStreams(parsedStreams);
-        
-        if (!parsedStreams || parsedStreams.length === 0) {
-          setNoStreamsDataExists(true);
-        }
-      } else {
+  // Fetch subjects from Supabase
+  const { data: subjects = [] } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: fetchSubjects
+  });
+
+  // Fetch teachers from Supabase
+  const { data: teachers = [] } = useQuery({
+    queryKey: ['teachers'],
+    queryFn: fetchTeachers
+  });
+
+  // Fetch rooms from Supabase
+  const { data: rooms = [] } = useQuery({
+    queryKey: ['rooms'],
+    queryFn: fetchRooms
+  });
+
+  // Fetch streams from Supabase
+  const { data: streams = [], isLoading: streamsLoading } = useQuery({
+    queryKey: ['streams'],
+    queryFn: fetchStreams,
+    onSuccess: (data) => {
+      if (!data || data.length === 0) {
         setNoStreamsDataExists(true);
+      } else {
+        setNoStreamsDataExists(false);
       }
-    } catch (error) {
-      console.error('Error loading data from localStorage:', error);
+    },
+    onError: () => {
       setNoStreamsDataExists(true);
     }
-  }, []);
+  });
+
+  // Fetch divisions from Supabase
+  const { data: allDivisions = [] } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: fetchDivisions
+  });
 
   useEffect(() => {
     if (stream) {
       const selectedStreamData = streams.find(s => s.id === stream);
-      if (selectedStreamData && selectedStreamData.years) {
-        setYears(selectedStreamData.years);
+      if (selectedStreamData) {
+        // Create years array from the stream's year count
+        const yearCount = selectedStreamData.years;
+        const yearsArray = Array.from({ length: yearCount }, (_, i) => ({
+          id: (i + 1).toString(),
+          name: `Year ${i + 1}`
+        }));
+        setYears(yearsArray);
         setYear("");
         setDivision("");
       } else {
@@ -95,20 +115,16 @@ const TimetableEditor = () => {
 
   useEffect(() => {
     if (stream && year) {
-      const selectedStreamData = streams.find(s => s.id === stream);
-      if (selectedStreamData && selectedStreamData.years) {
-        const selectedYear = selectedStreamData.years.find((y: any) => y.id === year);
-        if (selectedYear && selectedYear.divisions) {
-          setDivisions(selectedYear.divisions);
-          setDivision("");
-        } else {
-          setDivisions([]);
-        }
-      }
+      // Filter divisions based on stream and year
+      const filteredDivisions = allDivisions.filter(d => 
+        d.streamId === stream && d.year.toString() === year
+      );
+      setDivisions(filteredDivisions);
+      setDivision("");
     } else {
       setDivisions([]);
     }
-  }, [stream, year, streams]);
+  }, [stream, year, allDivisions]);
 
   useEffect(() => {
     const subjectTeacherMap: Record<string, string[]> = {};
@@ -150,40 +166,55 @@ const TimetableEditor = () => {
       return;
     }
     
-    setTimetableData(initializeTimetable());
-    setShowTimetable(true);
+    // Check if a timetable already exists for this division
+    const timetableKey = `${stream}_${year}_${division}`;
     
-    toast({
-      title: "Timetable Ready",
-      description: `Created timetable for ${stream} ${year} ${division}. Start adding subjects!`,
-    });
+    fetchTimetable(timetableKey)
+      .then(existingTimetable => {
+        if (existingTimetable) {
+          setTimetableData(existingTimetable.data);
+        } else {
+          setTimetableData(initializeTimetable());
+        }
+        setShowTimetable(true);
+        
+        toast({
+          title: "Timetable Ready",
+          description: `Created timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}. Start adding subjects!`,
+        });
+      })
+      .catch(error => {
+        console.error("Error fetching timetable:", error);
+        setTimetableData(initializeTimetable());
+        setShowTimetable(true);
+        
+        toast({
+          title: "New Timetable Created",
+          description: `Created a new timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}. Start adding subjects!`,
+        });
+      });
   };
 
-  const saveTimetable = () => {
+  const saveTimetable = async () => {
     try {
-      const timetableKey = `timetable_${stream}_${year}_${division}`;
+      const timetableKey = `${stream}_${year}_${division}`;
       const timetableMetadata = {
         id: timetableKey,
-        name: `${stream} ${year} ${division} Timetable`,
-        stream: stream,
-        year: year,
-        division: division,
-        lastModified: new Date().toLocaleDateString()
+        name: `${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)} Timetable`,
+        division_id: division,
+        data: timetableData,
       };
       
-      localStorage.setItem(timetableKey, JSON.stringify(timetableData));
+      // First try to fetch if timetable exists
+      const existingTimetable = await fetchTimetable(timetableKey);
       
-      const storedRecentTimetables = localStorage.getItem('recentTimetables');
-      let recentTimetables = storedRecentTimetables ? JSON.parse(storedRecentTimetables) : [];
-      
-      const existingIndex = recentTimetables.findIndex((t: any) => t.id === timetableKey);
-      if (existingIndex >= 0) {
-        recentTimetables[existingIndex] = timetableMetadata;
+      if (existingTimetable) {
+        // Update existing timetable
+        await updateTimetable(timetableKey, { data: timetableData });
       } else {
-        recentTimetables = [timetableMetadata, ...recentTimetables].slice(0, 5);
+        // Add new timetable
+        await addTimetable(timetableMetadata);
       }
-      
-      localStorage.setItem('recentTimetables', JSON.stringify(recentTimetables));
       
       setIsEditing(false);
       
@@ -376,30 +407,134 @@ const TimetableEditor = () => {
   };
 
   const getStreamName = (streamId: string) => {
-    const stream = streams.find(s => s.id === streamId);
-    return stream ? stream.name : streamId;
+    const streamObj = streams.find(s => s.id === streamId);
+    return streamObj ? streamObj.name : streamId;
   };
 
   const getYearName = (yearId: string) => {
-    if (!stream) return yearId;
-    const streamData = streams.find(s => s.id === stream);
-    if (!streamData) return yearId;
-    
-    const year = streamData.years.find((y: any) => y.id === yearId);
-    return year ? year.name : yearId;
+    return `Year ${yearId}`;
   };
 
   const getDivisionName = (divisionId: string) => {
-    if (!stream || !year) return divisionId;
-    const streamData = streams.find(s => s.id === stream);
-    if (!streamData) return divisionId;
-    
-    const yearData = streamData.years.find((y: any) => y.id === year);
-    if (!yearData) return divisionId;
-    
-    const division = yearData.divisions.find((d: any) => d.id === divisionId);
-    return division ? division.name : divisionId;
+    const divisionObj = allDivisions.find(d => d.id === divisionId);
+    return divisionObj ? divisionObj.name : divisionId;
   };
+
+  // Export timetable data as JSON
+  const exportTimetable = () => {
+    if (!timetableData || Object.keys(timetableData).length === 0) {
+      toast({
+        title: "Nothing to Export",
+        description: "There is no timetable data to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const exportData = {
+      stream,
+      year,
+      division,
+      streamName: getStreamName(stream),
+      yearName: getYearName(year),
+      divisionName: getDivisionName(division),
+      timetableData
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `timetable_${getStreamName(stream)}_${getYearName(year)}_${getDivisionName(division)}.json`;
+    
+    const linkElement = document.createElement("a");
+    linkElement.setAttribute("href", dataUri);
+    linkElement.setAttribute("download", exportFileDefaultName);
+    linkElement.click();
+    
+    toast({
+      title: "Timetable Exported",
+      description: "Your timetable has been exported successfully."
+    });
+  };
+
+  // Import timetable data from JSON
+  const handleImport = () => {
+    setImportDialogOpen(true);
+  };
+
+  const processImport = () => {
+    try {
+      if (!importData) {
+        toast({
+          title: "No Data",
+          description: "Please paste timetable JSON data.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const parsed = JSON.parse(importData);
+      
+      if (!parsed.timetableData || !parsed.stream || !parsed.year || !parsed.division) {
+        toast({
+          title: "Invalid Format",
+          description: "The imported data is not in the correct format.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Set the form values
+      setStream(parsed.stream);
+      setYear(parsed.year);
+      setDivision(parsed.division);
+      setTimetableData(parsed.timetableData);
+      setShowTimetable(true);
+      setImportDialogOpen(false);
+      setImportData("");
+      
+      toast({
+        title: "Timetable Imported",
+        description: "Your timetable has been imported successfully."
+      });
+    } catch (error) {
+      console.error("Import error:", error);
+      toast({
+        title: "Import Failed",
+        description: "Failed to import the timetable. Please check the JSON format.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === 'string') {
+        setImportData(result);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  if (streamsLoading) {
+    return (
+      <div className="space-y-6">
+        <SectionHeading
+          title="Timetable Editor"
+          description="Create and customize college timetables"
+          icon={<Calendar className="h-6 w-6" />}
+        />
+        <div className="flex items-center justify-center h-64">
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (noStreamsDataExists) {
     return (
@@ -517,9 +652,15 @@ const TimetableEditor = () => {
             </div>
             
             <div className="flex justify-between mt-6">
-              <Button variant="outline" onClick={handleNavigateToStreamsManager}>
-                Manage Streams & Divisions
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleNavigateToStreamsManager}>
+                  Manage Streams & Divisions
+                </Button>
+                <Button variant="outline" onClick={handleImport} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Import
+                </Button>
+              </div>
               <Button onClick={handleGenerateTimetable} className="gap-2" disabled={!stream || !year || !division}>
                 <Plus className="h-4 w-4" /> 
                 Create Timetable
@@ -539,6 +680,10 @@ const TimetableEditor = () => {
               </p>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" onClick={exportTimetable} className="gap-2">
+                <Download className="h-4 w-4" />
+                Export
+              </Button>
               {isEditing ? (
                 <Button onClick={saveTimetable} className="gap-2">
                   <Save className="h-4 w-4" />
@@ -861,6 +1006,44 @@ const TimetableEditor = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSlotDetailsOpen(false)}>Cancel</Button>
             <Button onClick={addSubjectToTimetable}>Add to Timetable</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import Timetable</DialogTitle>
+            <DialogDescription>
+              Import a previously exported timetable JSON file
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="file-upload">Upload File</Label>
+              <Input 
+                id="file-upload"
+                type="file"
+                accept=".json"
+                onChange={handleFileImport}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="json-data">Or Paste JSON Data</Label>
+              <textarea
+                id="json-data"
+                className="w-full min-h-[200px] p-2 border rounded-md"
+                placeholder="Paste JSON data here..."
+                value={importData}
+                onChange={(e) => setImportData(e.target.value)}
+              ></textarea>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+            <Button onClick={processImport}>Import</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -42,6 +42,15 @@ export interface Division {
   year: number;
 }
 
+export interface Timetable {
+  id: string;
+  name: string;
+  division_id?: string;
+  data: any;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Subjects
 export const fetchSubjects = async () => {
   const { data, error } = await supabase
@@ -284,6 +293,49 @@ export const deleteDivision = async (id: string) => {
     .from('divisions')
     .delete()
     .eq('id', id);
+  if (error) throw error;
+  return true;
+};
+
+// Timetables
+export const fetchTimetable = async (id: string) => {
+  const { data, error } = await supabase
+    .from('timetables')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  
+  if (error) throw error;
+  return data as Timetable | null;
+};
+
+export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'updated_at'>) => {
+  const { data, error } = await supabase
+    .from('timetables')
+    .insert([timetable])
+    .select();
+  
+  if (error) throw error;
+  return data[0] as Timetable;
+};
+
+export const updateTimetable = async (id: string, timetable: Partial<Timetable>) => {
+  const { data, error } = await supabase
+    .from('timetables')
+    .update({ ...timetable, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select();
+  
+  if (error) throw error;
+  return data[0] as Timetable;
+};
+
+export const deleteTimetable = async (id: string) => {
+  const { error } = await supabase
+    .from('timetables')
+    .delete()
+    .eq('id', id);
+  
   if (error) throw error;
   return true;
 };
