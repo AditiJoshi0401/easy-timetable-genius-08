@@ -294,10 +294,20 @@ const StreamsManager = () => {
     
     if (isEditing && data.id) {
       // Update existing stream
-      updateStreamMutation.mutate({ id: data.id, stream: data });
+      const streamData: Partial<Stream> = {
+        code: data.code,
+        name: data.name,
+        years: data.years
+      };
+      updateStreamMutation.mutate({ id: data.id, stream: streamData });
     } else {
       // Add new stream
-      addStreamMutation.mutate(data);
+      const newStream: Omit<Stream, 'id'> = {
+        code: data.code,
+        name: data.name,
+        years: data.years
+      };
+      addStreamMutation.mutate(newStream);
     }
   };
 
@@ -310,10 +320,22 @@ const StreamsManager = () => {
     
     if (isEditing && data.id) {
       // Update existing division
-      updateDivisionMutation.mutate({ id: data.id, division: data });
+      const divisionData: Partial<Division> = {
+        name: data.name,
+        streamId: data.streamId,
+        strength: data.strength,
+        year: data.year
+      };
+      updateDivisionMutation.mutate({ id: data.id, division: divisionData });
     } else {
       // Add new division
-      addDivisionMutation.mutate(data);
+      const newDivision: Omit<Division, 'id'> = {
+        name: data.name,
+        streamId: data.streamId,
+        strength: data.strength,
+        year: data.year
+      };
+      addDivisionMutation.mutate(newDivision);
     }
   };
 
@@ -369,7 +391,7 @@ const StreamsManager = () => {
   // Get available years for the selected stream when adding a division
   const getAvailableYearsForStream = (streamId: string) => {
     const stream = streams.find(s => s.id === streamId);
-    if (!stream) return [];
+    if (!stream) return [1]; // Default to at least year 1
     return Array.from({ length: stream.years }, (_, i) => i + 1);
   };
 

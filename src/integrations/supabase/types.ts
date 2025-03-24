@@ -9,7 +9,184 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      divisions: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          streamid: string
+          strength: number
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          streamid: string
+          strength: number
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          streamid?: string
+          strength?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "divisions_streamid_fkey"
+            columns: ["streamid"]
+            isOneToOne: false
+            referencedRelation: "streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rooms: {
+        Row: {
+          capacity: number
+          created_at: string | null
+          id: string
+          number: string
+          type: string
+        }
+        Insert: {
+          capacity: number
+          created_at?: string | null
+          id?: string
+          number: string
+          type: string
+        }
+        Update: {
+          capacity?: number
+          created_at?: string | null
+          id?: string
+          number?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      streams: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          name: string
+          years: number
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          name: string
+          years: number
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          years?: number
+        }
+        Relationships: []
+      }
+      subjects: {
+        Row: {
+          code: string
+          created_at: string | null
+          credits: number
+          id: string
+          name: string
+          stream: string
+          year: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          credits: number
+          id?: string
+          name: string
+          stream: string
+          year: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          credits?: number
+          id?: string
+          name?: string
+          stream?: string
+          year?: string
+        }
+        Relationships: []
+      }
+      teachers: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          ista: boolean
+          name: string
+          specialization: string
+          subjects: string[]
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          ista?: boolean
+          name: string
+          specialization: string
+          subjects: string[]
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          ista?: boolean
+          name?: string
+          specialization?: string
+          subjects?: string[]
+        }
+        Relationships: []
+      }
+      timetables: {
+        Row: {
+          created_at: string | null
+          data: Json
+          division_id: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data: Json
+          division_id?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json
+          division_id?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timetables_division_id_fkey"
+            columns: ["division_id"]
+            isOneToOne: false
+            referencedRelation: "divisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
