@@ -11,11 +11,29 @@ import { useToast } from "@/components/ui/use-toast";
 const Settings = () => {
   const { toast } = useToast();
   const [darkMode, setDarkMode] = useState(false);
+  const [animations, setAnimations] = useState(true);
+  const [conflictDetection, setConflictDetection] = useState(true);
+  const [colorCoding, setColorCoding] = useState(true);
+  const [autoSave, setAutoSave] = useState(true);
+  const [pdfExport, setPdfExport] = useState(false);
 
   // Initialize dark mode state
   useEffect(() => {
     const isDarkMode = document.documentElement.classList.contains('dark');
     setDarkMode(isDarkMode);
+    
+    // Initialize other settings from localStorage if available
+    const storedAnimations = localStorage.getItem('animations');
+    const storedConflictDetection = localStorage.getItem('conflictDetection');
+    const storedColorCoding = localStorage.getItem('colorCoding');
+    const storedAutoSave = localStorage.getItem('autoSave');
+    const storedPdfExport = localStorage.getItem('pdfExport');
+    
+    if (storedAnimations !== null) setAnimations(storedAnimations === 'true');
+    if (storedConflictDetection !== null) setConflictDetection(storedConflictDetection === 'true');
+    if (storedColorCoding !== null) setColorCoding(storedColorCoding === 'true');
+    if (storedAutoSave !== null) setAutoSave(storedAutoSave === 'true');
+    if (storedPdfExport !== null) setPdfExport(storedPdfExport === 'true');
   }, []);
 
   // Function to toggle dark mode
@@ -32,6 +50,17 @@ const Settings = () => {
     toast({
       title: enabled ? "Dark Mode Enabled" : "Light Mode Enabled",
       description: `Theme preference has been saved.`
+    });
+  };
+
+  // Generic function to handle setting changes
+  const updateSetting = (setting: string, value: boolean, stateSetter: (value: boolean) => void) => {
+    localStorage.setItem(setting, value.toString());
+    stateSetter(value);
+    
+    toast({
+      title: `Setting Updated`,
+      description: `${setting.charAt(0).toUpperCase() + setting.slice(1)} has been ${value ? 'enabled' : 'disabled'}.`
     });
   };
 
@@ -76,7 +105,11 @@ const Settings = () => {
                   Enable animations throughout the interface
                 </p>
               </div>
-              <Switch id="animations" defaultChecked />
+              <Switch 
+                id="animations" 
+                checked={animations}
+                onCheckedChange={(value) => updateSetting('animations', value, setAnimations)}
+              />
             </div>
           </div>
 
@@ -91,7 +124,11 @@ const Settings = () => {
                   Automatically check for timetable conflicts
                 </p>
               </div>
-              <Switch id="conflict-detection" defaultChecked />
+              <Switch 
+                id="conflict-detection" 
+                checked={conflictDetection}
+                onCheckedChange={(value) => updateSetting('conflictDetection', value, setConflictDetection)}
+              />
             </div>
             
             <div className="flex items-center justify-between">
@@ -101,7 +138,11 @@ const Settings = () => {
                   Automatically assign colors to subjects
                 </p>
               </div>
-              <Switch id="color-coding" defaultChecked />
+              <Switch 
+                id="color-coding" 
+                checked={colorCoding}
+                onCheckedChange={(value) => updateSetting('colorCoding', value, setColorCoding)}
+              />
             </div>
           </div>
 
@@ -116,7 +157,11 @@ const Settings = () => {
                   Automatically save changes to timetables
                 </p>
               </div>
-              <Switch id="save-auto" defaultChecked />
+              <Switch 
+                id="save-auto" 
+                checked={autoSave}
+                onCheckedChange={(value) => updateSetting('autoSave', value, setAutoSave)}
+              />
             </div>
 
             <div className="flex items-center justify-between">
@@ -126,7 +171,11 @@ const Settings = () => {
                   Use PDF as the default export format
                 </p>
               </div>
-              <Switch id="export-format" />
+              <Switch 
+                id="export-format" 
+                checked={pdfExport}
+                onCheckedChange={(value) => updateSetting('pdfExport', value, setPdfExport)}
+              />
             </div>
           </div>
         </CardContent>

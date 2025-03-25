@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { fetchStreams } from "@/services/supabaseService";
+import { useQuery } from "@tanstack/react-query";
 
 interface Subject {
   id: string;
@@ -104,7 +106,7 @@ const DataInput = () => {
     name: "",
     code: "",
     credits: 3,
-    stream: "BTECH_CSE",
+    stream: "",
     year: "1"
   });
   const [subjectNameError, setSubjectNameError] = useState("");
@@ -138,6 +140,11 @@ const DataInput = () => {
     year: string;
     subjects: Subject[];
   }[]>([]);
+
+  const { data: streams = [], isLoading: isLoadingStreams } = useQuery({
+    queryKey: ['streams'],
+    queryFn: fetchStreams
+  });
 
   useEffect(() => {
     const loadData = () => {
@@ -280,7 +287,7 @@ const DataInput = () => {
       name: "",
       code: "",
       credits: 3,
-      stream: "BTECH_CSE",
+      stream: "",
       year: "1"
     });
     
@@ -574,12 +581,17 @@ const DataInput = () => {
                       <SelectValue placeholder="Select stream" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="BTECH_CSE">BTech CSE</SelectItem>
-                      <SelectItem value="BCA">BCA</SelectItem>
-                      <SelectItem value="MTECH_CSE">MTech CSE</SelectItem>
-                      <SelectItem value="MBA">MBA</SelectItem>
-                      <SelectItem value="MCA">MCA</SelectItem>
-                      <SelectItem value="BTECH_BIOENGG">BTech Bioengg</SelectItem>
+                      {isLoadingStreams ? (
+                        <SelectItem value="" disabled>Loading streams...</SelectItem>
+                      ) : streams.length > 0 ? (
+                        streams.map((stream) => (
+                          <SelectItem key={stream.id} value={stream.code}>
+                            {stream.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>No streams available</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -594,10 +606,19 @@ const DataInput = () => {
                       <SelectValue placeholder="Select year" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">First Year</SelectItem>
-                      <SelectItem value="2">Second Year</SelectItem>
-                      <SelectItem value="3">Third Year</SelectItem>
-                      <SelectItem value="4">Fourth Year</SelectItem>
+                      {streams.find(s => s.code === newSubject.stream)?.years ? 
+                        Array.from({ length: streams.find(s => s.code === newSubject.stream)?.years || 4 }, (_, i) => i + 1).map(year => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year === 1 ? "First" : year === 2 ? "Second" : year === 3 ? "Third" : "Fourth"} Year
+                          </SelectItem>
+                        )) :
+                        <>
+                          <SelectItem value="1">First Year</SelectItem>
+                          <SelectItem value="2">Second Year</SelectItem>
+                          <SelectItem value="3">Third Year</SelectItem>
+                          <SelectItem value="4">Fourth Year</SelectItem>
+                        </>
+                      }
                     </SelectContent>
                   </Select>
                 </div>
@@ -956,11 +977,92 @@ const DataInput = () => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" className="gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={() => {
+                try {
+                  const data = {
+                    subjects,
+                    teachers,
+                    rooms
+                  };
+                  const jsonString = JSON.stringify(data, null, 2);
+                  const blob = new Blob([jsonString], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'timetable_data.json';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                  
+                  toast({
+                    title: "Data Exported",
+                    description: "Your data has been exported successfully."
+                  });
+                } catch (error) {
+                  console.error("Export error:", error);
+                  toast({
+                    title: "Export Failed",
+                    description: "There was a problem exporting your data.",
+                    variant: "destructive"
+                  });
+                }
+              }}
+            >
               <SaveIcon className="h-4 w-4" />
               Export Data
             </Button>
-            <Button variant="outline" className="gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={() => {
+                try {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.json';
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (!file) return;
+                    
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      try {
+                        const content = event.target?.result as string;
+                        const data = JSON.parse(content);
+                        
+                        if (data.subjects) setSubjects(data.subjects);
+                        if (data.teachers) setTeachers(data.teachers);
+                        if (data.rooms) setRooms(data.rooms);
+                        
+                        toast({
+                          title: "Data Imported",
+                          description: "Your data has been imported successfully."
+                        });
+                      } catch (parseError) {
+                        console.error("Parse error:", parseError);
+                        toast({
+                          title: "Import Failed",
+                          description: "The file format is invalid.",
+                          variant: "destructive"
+                        });
+                      }
+                    };
+                    reader.readAsText(file);
+                  };
+                  input.click();
+                } catch (error) {
+                  console.error("Import error:", error);
+                  toast({
+                    title: "Import Failed",
+                    description: "There was a problem importing your data.",
+                    variant: "destructive"
+                  });
+                }
+              }}
+            >
               <DatabaseIcon className="h-4 w-4" />
               Import Data
             </Button>
@@ -979,3 +1081,4 @@ const DataInput = () => {
 };
 
 export default DataInput;
+
