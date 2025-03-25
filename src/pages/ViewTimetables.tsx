@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -26,19 +25,16 @@ const ViewTimetables = () => {
   const [recentTimetables, setRecentTimetables] = useState<any[]>([]);
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
 
-  // Fetch streams from Supabase
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
     queryFn: fetchStreams
   });
 
-  // Fetch divisions from Supabase
   const { data: allDivisions = [] } = useQuery({
     queryKey: ['divisions'],
     queryFn: fetchDivisions
   });
 
-  // Initialize noStreamsDataExists state based on streams data
   useEffect(() => {
     if (streams && streams.length > 0) {
       setNoStreamsDataExists(false);
@@ -48,7 +44,6 @@ const ViewTimetables = () => {
   }, [streams]);
 
   useEffect(() => {
-    // Load recent timetables (can be implemented with local storage or Supabase)
     const loadRecentTimetables = () => {
       try {
         const storedRecentTimetables = localStorage.getItem('recentTimetables');
@@ -69,7 +64,6 @@ const ViewTimetables = () => {
       const selectedStreamData = streams.find(s => s.id === stream);
       if (selectedStreamData) {
         console.log("Stream data found:", selectedStreamData);
-        // Create years array from the stream's year count
         const yearCount = selectedStreamData.years;
         const yearsArray = Array.from({ length: yearCount }, (_, i) => ({
           id: (i + 1).toString(),
@@ -91,7 +85,6 @@ const ViewTimetables = () => {
   useEffect(() => {
     if (stream && year) {
       console.log("Filtering divisions for stream:", stream, "year:", year);
-      // Filter divisions based on stream and year
       const filteredDivisions = allDivisions.filter(d => 
         d.streamId === stream && d.year.toString() === year
       );
@@ -110,7 +103,6 @@ const ViewTimetables = () => {
   const handleLoadTimetable = async (timetableData?: any) => {
     try {
       if (timetableData) {
-        // If timetable data is provided directly, use it
         setSelectedTimetable(timetableData);
         setStream(timetableData.stream);
         setYear(timetableData.year);
@@ -127,7 +119,6 @@ const ViewTimetables = () => {
         return;
       }
 
-      // Load timetable from database using the correct key format
       const timetableKey = `${stream}_${year}_${division}`;
       console.log("Trying to load timetable with key:", timetableKey);
       
@@ -297,7 +288,7 @@ const ViewTimetables = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-streams" disabled>
+                      <SelectItem value="no-streams-available" disabled>
                         No streams available
                       </SelectItem>
                     )}
@@ -319,7 +310,7 @@ const ViewTimetables = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-years" disabled>
+                      <SelectItem value="no-years-available" disabled>
                         {stream ? "No years available for this stream" : "Select a stream first"}
                       </SelectItem>
                     )}
@@ -341,7 +332,7 @@ const ViewTimetables = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-divisions" disabled>
+                      <SelectItem value="no-divisions-available" disabled>
                         {year ? "No divisions available for this year" : "Select a year first"}
                       </SelectItem>
                     )}

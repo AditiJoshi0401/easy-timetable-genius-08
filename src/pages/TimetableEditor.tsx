@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Trash2, Save, Check, AlertCircle, Download, Upload } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -56,25 +55,21 @@ const TimetableEditor = () => {
     "4:30 - 5:30"
   ];
 
-  // Fetch subjects from Supabase
   const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: fetchSubjects
   });
 
-  // Fetch teachers from Supabase
   const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
     queryKey: ['teachers'],
     queryFn: fetchTeachers
   });
 
-  // Fetch rooms from Supabase
   const { data: rooms = [], isLoading: isLoadingRooms } = useQuery({
     queryKey: ['rooms'],
     queryFn: fetchRooms
   });
 
-  // Fetch streams from Supabase
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
     queryFn: fetchStreams,
@@ -92,13 +87,11 @@ const TimetableEditor = () => {
     }
   });
 
-  // Fetch divisions from Supabase
   const { data: allDivisions = [] } = useQuery({
     queryKey: ['divisions'],
     queryFn: fetchDivisions
   });
 
-  // Initialize noStreamsDataExists state based on streams data
   useEffect(() => {
     if (streams && streams.length > 0) {
       setNoStreamsDataExists(false);
@@ -111,7 +104,6 @@ const TimetableEditor = () => {
     if (stream) {
       const selectedStreamData = streams.find(s => s.id === stream);
       if (selectedStreamData) {
-        // Create years array from the stream's year count
         const yearCount = selectedStreamData.years;
         const yearsArray = Array.from({ length: yearCount }, (_, i) => ({
           id: (i + 1).toString(),
@@ -130,7 +122,6 @@ const TimetableEditor = () => {
 
   useEffect(() => {
     if (stream && year) {
-      // Filter divisions based on stream and year
       const filteredDivisions = allDivisions.filter(d => 
         d.streamId === stream && d.year.toString() === year
       );
@@ -142,7 +133,6 @@ const TimetableEditor = () => {
   }, [stream, year, allDivisions]);
 
   useEffect(() => {
-    // Create a mapping of subjects to teachers who can teach them
     const subjectTeacherMap: Record<string, string[]> = {};
     
     teachers.forEach(teacher => {
@@ -186,7 +176,6 @@ const TimetableEditor = () => {
       return;
     }
     
-    // Check if a timetable already exists for this division
     const timetableKey = `${stream}_${year}_${division}`;
     
     fetchTimetable(timetableKey)
@@ -234,18 +223,15 @@ const TimetableEditor = () => {
         data: timetableData,
       };
       
-      // First try to fetch if timetable exists
       const existingTimetable = await fetchTimetable(timetableKey);
       
       if (existingTimetable) {
-        // Update existing timetable
         await updateTimetable(timetableKey, { data: timetableData });
         toast({
           title: "Timetable Updated",
           description: "Your timetable has been updated successfully."
         });
       } else {
-        // Add new timetable
         await addTimetable(timetableMetadata);
         toast({
           title: "Timetable Saved",
@@ -435,7 +421,6 @@ const TimetableEditor = () => {
   });
 
   const getTeachersForSubject = (subjectId: string) => {
-    // Return teachers who can teach this subject
     return teachers.filter(teacher => 
       teacher.subjects && Array.isArray(teacher.subjects) && teacher.subjects.includes(subjectId)
     );
@@ -455,7 +440,6 @@ const TimetableEditor = () => {
     return divisionObj ? divisionObj.name : divisionId;
   };
 
-  // Export timetable data as JSON
   const exportTimetable = () => {
     if (!timetableData || Object.keys(timetableData).length === 0) {
       toast({
@@ -492,7 +476,6 @@ const TimetableEditor = () => {
     });
   };
 
-  // Import timetable data from JSON
   const handleImport = () => {
     setImportDialogOpen(true);
   };
@@ -519,7 +502,6 @@ const TimetableEditor = () => {
         return;
       }
 
-      // Set the form values
       setStream(parsed.stream);
       setYear(parsed.year);
       setDivision(parsed.division);
@@ -633,7 +615,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-streams" disabled>
+                      <SelectItem value="no-streams-available" disabled>
                         No streams available
                       </SelectItem>
                     )}
@@ -655,7 +637,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-years" disabled>
+                      <SelectItem value="no-years-available" disabled>
                         {stream ? "No years available for this stream" : "Select a stream first"}
                       </SelectItem>
                     )}
@@ -677,7 +659,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-divisions" disabled>
+                      <SelectItem value="no-divisions-available" disabled>
                         {year ? "No divisions available for this year" : "Select a year first"}
                       </SelectItem>
                     )}
@@ -969,7 +951,7 @@ const TimetableEditor = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingSubjects ? (
-                        <SelectItem value="" disabled>Loading subjects...</SelectItem>
+                        <SelectItem value="loading-subjects" disabled>Loading subjects...</SelectItem>
                       ) : filteredSubjects.length > 0 ? (
                         filteredSubjects.map(subject => (
                           <SelectItem key={subject.id} value={subject.id}>
@@ -977,7 +959,7 @@ const TimetableEditor = () => {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="no-subjects-available" disabled>
                           {subjects.length === 0 ? 
                             "No subjects available. Please add subjects in Data Management." :
                             "No subjects available for the selected stream and year."}
@@ -999,11 +981,11 @@ const TimetableEditor = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {!slotDetails.subject ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="select-subject-first" disabled>
                           Select a subject first
                         </SelectItem>
                       ) : isLoadingTeachers ? (
-                        <SelectItem value="" disabled>Loading teachers...</SelectItem>
+                        <SelectItem value="loading-teachers" disabled>Loading teachers...</SelectItem>
                       ) : (
                         (() => {
                           const subjectTeachers = getTeachersForSubject(slotDetails.subject);
@@ -1014,7 +996,7 @@ const TimetableEditor = () => {
                               </SelectItem>
                             ))
                           ) : (
-                            <SelectItem value="" disabled>
+                            <SelectItem value="no-teachers-available" disabled>
                               No teachers assigned to this subject
                             </SelectItem>
                           );
@@ -1052,11 +1034,11 @@ const TimetableEditor = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {!selectedSlot ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="no-slot-selected" disabled>
                           No time slot selected
                         </SelectItem>
                       ) : isLoadingRooms ? (
-                        <SelectItem value="" disabled>Loading rooms...</SelectItem>
+                        <SelectItem value="loading-rooms" disabled>Loading rooms...</SelectItem>
                       ) : (
                         (() => {
                           const availableRooms = getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type);
@@ -1067,7 +1049,7 @@ const TimetableEditor = () => {
                               </SelectItem>
                             ))
                           ) : (
-                            <SelectItem value="" disabled>
+                            <SelectItem value="no-rooms-available" disabled>
                               No available rooms for this time and type
                             </SelectItem>
                           );
