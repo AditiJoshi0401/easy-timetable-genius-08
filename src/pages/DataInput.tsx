@@ -13,8 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchStreams } from "@/services/supabaseService";
-import { useQuery } from "@tanstack/react-query";
+import { 
+  fetchStreams, fetchSubjects, fetchTeachers, fetchRooms,
+  addSubject, updateSubject, deleteSubject,
+  addTeacher, updateTeacher, deleteTeacher,
+  addRoom, updateRoom, deleteRoom
+} from "@/services/supabaseService";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface Subject {
   id: string;
@@ -99,9 +104,10 @@ const DuplicateWarningDialog = ({ open, onClose, onConfirm, duplicates }: Duplic
 const DataInput = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("subjects");
+  const queryClient = useQueryClient();
   
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [newSubject, setNewSubject] = useState<Subject>({
+  // Form state
+  const [newSubject, setNewSubject] = useState({
     id: "",
     name: "",
     code: "",
@@ -112,8 +118,7 @@ const DataInput = () => {
   const [subjectNameError, setSubjectNameError] = useState("");
   const [subjectCodeError, setSubjectCodeError] = useState("");
   
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [newTeacher, setNewTeacher] = useState<Teacher>({
+  const [newTeacher, setNewTeacher] = useState({
     id: "",
     name: "",
     email: "",
@@ -125,8 +130,7 @@ const DataInput = () => {
   const [teacherNameError, setTeacherNameError] = useState("");
   const [teacherEmailError, setTeacherEmailError] = useState("");
   
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [newRoom, setNewRoom] = useState<Room>({
+  const [newRoom, setNewRoom] = useState({
     id: "",
     number: "",
     capacity: 30,
@@ -135,47 +139,176 @@ const DataInput = () => {
   const [roomNumberError, setRoomNumberError] = useState("");
 
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-  const [duplicateSubjects, setDuplicateSubjects] = useState<{
-    stream: string;
-    year: string;
-    subjects: Subject[];
-  }[]>([]);
+  const [duplicateSubjects, setDuplicateSubjects] = useState([]);
 
+  // Data queries
   const { data: streams = [], isLoading: isLoadingStreams } = useQuery({
     queryKey: ['streams'],
     queryFn: fetchStreams
   });
 
-  useEffect(() => {
-    const loadData = () => {
-      try {
-        const storedSubjects = localStorage.getItem('subjects');
-        const storedTeachers = localStorage.getItem('teachers');
-        const storedRooms = localStorage.getItem('rooms');
-        
-        if (storedSubjects) setSubjects(JSON.parse(storedSubjects));
-        if (storedTeachers) setTeachers(JSON.parse(storedTeachers));
-        if (storedRooms) setRooms(JSON.parse(storedRooms));
-      } catch (error) {
-        console.error('Error loading data from localStorage:', error);
-        toast({
-          title: "Error loading data",
-          description: "There was a problem loading your saved data.",
-          variant: "destructive"
-        });
-      }
-    };
-    
-    loadData();
-  }, [toast]);
+  const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: fetchSubjects
+  });
 
+  const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
+    queryKey: ['teachers'],
+    queryFn: fetchTeachers
+  });
+
+  const { data: rooms = [], isLoading: isLoadingRooms } = useQuery({
+    queryKey: ['rooms'],
+    queryFn: fetchRooms
+  });
+
+  // Mutations
+  const subjectMutation = useMutation({
+    mutationFn: (newSubject) => addSubject(newSubject),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      toast({
+        title: "Subject Added",
+        description: `${newSubject.name} has been added successfully.`
+      });
+      setNewSubject({
+        id: "",
+        name: "",
+        code: "",
+        credits: 3,
+        stream: "",
+        year: "1"
+      });
+    },
+    onError: (error) => {
+      console.error('Error adding subject:', error);
+      toast({
+        title: "Error Adding Subject",
+        description: "There was a problem adding the subject.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const deleteSubjectMutation = useMutation({
+    mutationFn: (id) => deleteSubject(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      toast({
+        title: "Subject Deleted",
+        description: "The subject has been removed successfully."
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting subject:', error);
+      toast({
+        title: "Error Deleting Subject",
+        description: "There was a problem deleting the subject.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const teacherMutation = useMutation({
+    mutationFn: (newTeacher) => addTeacher(newTeacher),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      toast({
+        title: "Teacher Added",
+        description: `${newTeacher.name} has been added successfully.`
+      });
+      setNewTeacher({
+        id: "",
+        name: "",
+        email: "",
+        specialization: "",
+        subjects: [],
+        isTA: false
+      });
+    },
+    onError: (error) => {
+      console.error('Error adding teacher:', error);
+      toast({
+        title: "Error Adding Teacher",
+        description: "There was a problem adding the teacher.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const deleteTeacherMutation = useMutation({
+    mutationFn: (id) => deleteTeacher(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      toast({
+        title: "Teacher Deleted",
+        description: "The teacher has been removed successfully."
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting teacher:', error);
+      toast({
+        title: "Error Deleting Teacher",
+        description: "There was a problem deleting the teacher.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const roomMutation = useMutation({
+    mutationFn: (newRoom) => addRoom(newRoom),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast({
+        title: "Room Added",
+        description: `Room ${newRoom.number} has been added successfully.`
+      });
+      setNewRoom({
+        id: "",
+        number: "",
+        capacity: 30,
+        type: "classroom"
+      });
+    },
+    onError: (error) => {
+      console.error('Error adding room:', error);
+      toast({
+        title: "Error Adding Room",
+        description: "There was a problem adding the room.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const deleteRoomMutation = useMutation({
+    mutationFn: (id) => deleteRoom(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      toast({
+        title: "Room Deleted",
+        description: "The room has been removed successfully."
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting room:', error);
+      toast({
+        title: "Error Deleting Room",
+        description: "There was a problem deleting the room.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Local storage sync (for backward compatibility)
   useEffect(() => {
-    try {
+    if (subjects.length > 0) {
       localStorage.setItem('subjects', JSON.stringify(subjects));
+    }
+    if (teachers.length > 0) {
       localStorage.setItem('teachers', JSON.stringify(teachers));
+    }
+    if (rooms.length > 0) {
       localStorage.setItem('rooms', JSON.stringify(rooms));
-    } catch (error) {
-      console.error('Error saving data to localStorage:', error);
     }
   }, [subjects, teachers, rooms]);
 
@@ -278,26 +411,17 @@ const DataInput = () => {
       return;
     }
 
-    const subjectId = crypto.randomUUID();
-    const updatedSubjects = [...subjects, { ...newSubject, id: subjectId }];
-    setSubjects(updatedSubjects);
-    
-    setNewSubject({
-      id: "",
-      name: "",
-      code: "",
-      credits: 3,
-      stream: "",
-      year: "1"
-    });
-    
-    toast({
-      title: "Subject Added",
-      description: `${newSubject.name} has been added successfully.`
+    // Add to Supabase via mutation
+    subjectMutation.mutate({
+      name: newSubject.name,
+      code: newSubject.code,
+      credits: newSubject.credits,
+      stream: newSubject.stream,
+      year: newSubject.year
     });
   };
 
-  const handleDeleteSubject = (id: string) => {
+  const handleDeleteSubject = (id) => {
     const assignedTeachers = teachers.filter(teacher => teacher.subjects.includes(id));
     
     if (assignedTeachers.length > 0) {
@@ -309,17 +433,11 @@ const DataInput = () => {
       return;
     }
     
-    const updatedSubjects = subjects.filter(subject => subject.id !== id);
-    setSubjects(updatedSubjects);
-    
-    toast({
-      title: "Subject Deleted",
-      description: "The subject has been removed successfully."
-    });
+    deleteSubjectMutation.mutate(id);
   };
 
   const checkForDuplicateAssignments = () => {
-    const subjectsByStreamAndYear: Record<string, Subject[]> = {};
+    const subjectsByStreamAndYear = {};
     
     for (const subjectId of newTeacher.subjects) {
       const subject = subjects.find(s => s.id === subjectId);
@@ -369,38 +487,18 @@ const DataInput = () => {
       return;
     }
 
-    const teacherId = crypto.randomUUID();
-    const teacherToAdd = { 
-      ...newTeacher, 
-      id: teacherId 
-    };
-    
-    const updatedTeachers = [...teachers, teacherToAdd];
-    setTeachers(updatedTeachers);
-    
-    setNewTeacher({
-      id: "",
-      name: "",
-      email: "",
-      specialization: "",
-      subjects: [],
-      isTA: false
-    });
-    
-    toast({
-      title: "Teacher Added",
-      description: `${teacherToAdd.name} has been added successfully.`
+    // Add to Supabase via mutation
+    teacherMutation.mutate({
+      name: newTeacher.name,
+      email: newTeacher.email,
+      specialization: newTeacher.specialization,
+      subjects: newTeacher.subjects,
+      isTA: newTeacher.isTA
     });
   };
 
-  const handleDeleteTeacher = (id: string) => {
-    const updatedTeachers = teachers.filter(teacher => teacher.id !== id);
-    setTeachers(updatedTeachers);
-    
-    toast({
-      title: "Teacher Deleted",
-      description: "The teacher has been removed successfully."
-    });
+  const handleDeleteTeacher = (id) => {
+    deleteTeacherMutation.mutate(id);
   };
 
   const handleAddSubjectToTeacher = () => {
@@ -437,7 +535,7 @@ const DataInput = () => {
     setShowDuplicateWarning(false);
   };
 
-  const handleRemoveSubjectFromTeacher = (subjectId: string) => {
+  const handleRemoveSubjectFromTeacher = (subjectId) => {
     const updatedSubjects = newTeacher.subjects.filter(id => id !== subjectId);
     setNewTeacher({
       ...newTeacher,
@@ -459,31 +557,106 @@ const DataInput = () => {
       return;
     }
 
-    const roomId = crypto.randomUUID();
-    const updatedRooms = [...rooms, { ...newRoom, id: roomId }];
-    setRooms(updatedRooms);
-    
-    setNewRoom({
-      id: "",
-      number: "",
-      capacity: 30,
-      type: "classroom"
-    });
-    
-    toast({
-      title: "Room Added",
-      description: `Room ${newRoom.number} has been added successfully.`
+    // Add to Supabase via mutation
+    roomMutation.mutate({
+      number: newRoom.number,
+      capacity: newRoom.capacity,
+      type: newRoom.type
     });
   };
 
-  const handleDeleteRoom = (id: string) => {
-    const updatedRooms = rooms.filter(room => room.id !== id);
-    setRooms(updatedRooms);
-    
-    toast({
-      title: "Room Deleted",
-      description: "The room has been removed successfully."
-    });
+  const handleDeleteRoom = (id) => {
+    deleteRoomMutation.mutate(id);
+  };
+
+  // Handle data export/import
+  const handleExportData = () => {
+    try {
+      const data = {
+        subjects,
+        teachers,
+        rooms
+      };
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'timetable_data.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Data Exported",
+        description: "Your data has been exported successfully."
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export Failed",
+        description: "There was a problem exporting your data.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleImportData = async (importedData) => {
+    try {
+      // Process subjects
+      if (importedData.subjects && importedData.subjects.length > 0) {
+        for (const subject of importedData.subjects) {
+          const { id, ...subjectData } = subject;
+          try {
+            await addSubject(subjectData);
+          } catch (error) {
+            console.error("Error importing subject:", error);
+          }
+        }
+      }
+      
+      // Process teachers
+      if (importedData.teachers && importedData.teachers.length > 0) {
+        for (const teacher of importedData.teachers) {
+          const { id, ...teacherData } = teacher;
+          try {
+            await addTeacher(teacherData);
+          } catch (error) {
+            console.error("Error importing teacher:", error);
+          }
+        }
+      }
+      
+      // Process rooms
+      if (importedData.rooms && importedData.rooms.length > 0) {
+        for (const room of importedData.rooms) {
+          const { id, ...roomData } = room;
+          try {
+            await addRoom(roomData);
+          } catch (error) {
+            console.error("Error importing room:", error);
+          }
+        }
+      }
+      
+      // Refresh data
+      await queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      await queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      await queryClient.invalidateQueries({ queryKey: ['rooms'] });
+      
+      toast({
+        title: "Data Imported",
+        description: "Your data has been imported successfully."
+      });
+    } catch (error) {
+      console.error("Import processing error:", error);
+      toast({
+        title: "Import Failed",
+        description: "There was a problem processing the imported data.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -510,6 +683,7 @@ const DataInput = () => {
           </TabsTrigger>
         </TabsList>
 
+        {/* Subjects Tab */}
         <TabsContent value="subjects" className="space-y-6">
           <Card>
             <CardHeader>
@@ -520,6 +694,7 @@ const DataInput = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Subject Name */}
                 <div className="space-y-2">
                   <Label htmlFor="subject-name">Subject Name</Label>
                   <Input
@@ -536,6 +711,7 @@ const DataInput = () => {
                   )}
                 </div>
                 
+                {/* Subject Code */}
                 <div className="space-y-2">
                   <Label htmlFor="subject-code">Subject Code</Label>
                   <Input
@@ -552,6 +728,7 @@ const DataInput = () => {
                   )}
                 </div>
                 
+                {/* Credits */}
                 <div className="space-y-2">
                   <Label htmlFor="subject-credits">Credits</Label>
                   <Select
@@ -571,6 +748,7 @@ const DataInput = () => {
                   </Select>
                 </div>
                 
+                {/* Stream */}
                 <div className="space-y-2">
                   <Label htmlFor="subject-stream">Stream</Label>
                   <Select
@@ -596,6 +774,7 @@ const DataInput = () => {
                   </Select>
                 </div>
                 
+                {/* Year */}
                 <div className="space-y-2">
                   <Label htmlFor="subject-year">Year</Label>
                   <Select
@@ -625,13 +804,24 @@ const DataInput = () => {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              <Button onClick={handleAddSubject} className="gap-2">
-                <PlusIcon className="h-4 w-4" />
-                Add Subject
+              <Button 
+                onClick={handleAddSubject} 
+                className="gap-2"
+                disabled={subjectMutation.isPending}
+              >
+                {subjectMutation.isPending ? (
+                  <>Adding...</>
+                ) : (
+                  <>
+                    <PlusIcon className="h-4 w-4" />
+                    Add Subject
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>
           
+          {/* Subject List */}
           <Card>
             <CardHeader>
               <CardTitle>Subject List</CardTitle>
@@ -640,14 +830,18 @@ const DataInput = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {subjects.length > 0 ? (
+              {isLoadingSubjects ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  Loading subjects...
+                </div>
+              ) : subjects.length > 0 ? (
                 <div className="space-y-4">
                   {subjects.map((subject) => (
                     <div key={subject.id} className="flex items-center justify-between p-3 border rounded-md">
                       <div>
                         <div className="font-medium">{subject.name}</div>
                         <div className="text-sm text-muted-foreground">
-                          {subject.code} • {subject.credits} Credits • {subject.stream.replace('_', ' ')} Year {subject.year}
+                          {subject.code} • {subject.credits} Credits • {subject.stream?.replace('_', ' ') || 'No Stream'} Year {subject.year}
                         </div>
                       </div>
                       <Button
@@ -655,6 +849,7 @@ const DataInput = () => {
                         size="icon"
                         onClick={() => handleDeleteSubject(subject.id)}
                         className="text-muted-foreground hover:text-destructive"
+                        disabled={deleteSubjectMutation.isPending}
                       >
                         <TrashIcon className="h-4 w-4" />
                       </Button>
@@ -670,6 +865,7 @@ const DataInput = () => {
           </Card>
         </TabsContent>
 
+        {/* Teachers Tab */}
         <TabsContent value="teachers" className="space-y-6">
           <Card>
             <CardHeader>
@@ -680,6 +876,7 @@ const DataInput = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Teacher Name */}
                 <div className="space-y-2">
                   <Label htmlFor="teacher-name">Name</Label>
                   <Input
@@ -696,6 +893,7 @@ const DataInput = () => {
                   )}
                 </div>
                 
+                {/* Teacher Email */}
                 <div className="space-y-2">
                   <Label htmlFor="teacher-email">Email</Label>
                   <Input
@@ -713,6 +911,7 @@ const DataInput = () => {
                   )}
                 </div>
                 
+                {/* Specialization */}
                 <div className="space-y-2">
                   <Label htmlFor="teacher-specialization">Specialization</Label>
                   <Input
@@ -723,6 +922,7 @@ const DataInput = () => {
                   />
                 </div>
                 
+                {/* TA Switch */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="teacher-ta">Teaching Assistant (TA)</Label>
@@ -740,6 +940,7 @@ const DataInput = () => {
               
               <Separator className="my-4" />
               
+              {/* Subject Assignment */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label>Assigned Subjects</Label>
@@ -749,11 +950,17 @@ const DataInput = () => {
                         <SelectValue placeholder="Select a subject" />
                       </SelectTrigger>
                       <SelectContent>
-                        {subjects.map((subject) => (
-                          <SelectItem key={subject.id} value={subject.id}>
-                            {subject.name} ({subject.code})
-                          </SelectItem>
-                        ))}
+                        {isLoadingSubjects ? (
+                          <SelectItem value="" disabled>Loading subjects...</SelectItem>
+                        ) : subjects.length > 0 ? (
+                          subjects.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.id}>
+                              {subject.name} ({subject.code})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>No subjects available</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <Button
@@ -767,6 +974,7 @@ const DataInput = () => {
                   </div>
                 </div>
                 
+                {/* Subject Badges */}
                 <div className="flex flex-wrap gap-2">
                   {newTeacher.subjects.length > 0 ? (
                     newTeacher.subjects.map((subjectId) => {
@@ -792,293 +1000,9 @@ const DataInput = () => {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              <Button onClick={handleAddTeacher} className="gap-2">
-                <PlusIcon className="h-4 w-4" />
-                Add Teacher
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Teacher List</CardTitle>
-              <CardDescription>
-                View and manage all teachers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {teachers.length > 0 ? (
-                <div className="space-y-4">
-                  {teachers.map((teacher) => (
-                    <div key={teacher.id} className="p-3 border rounded-md">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">
-                            {teacher.isTA && (
-                              <Badge variant="outline" className="mr-2 bg-primary/10">
-                                TA
-                              </Badge>
-                            )}
-                            {teacher.name}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {teacher.email} • {teacher.specialization}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteTeacher(teacher.id)}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      
-                      <div className="mt-2">
-                        <div className="text-xs font-medium mb-1">Assigned Subjects:</div>
-                        <div className="flex flex-wrap gap-1">
-                          {teacher.subjects.length > 0 ? (
-                            teacher.subjects.map((subjectId) => {
-                              const subject = subjects.find(s => s.id === subjectId);
-                              return subject ? (
-                                <Badge key={subjectId} variant="secondary" className="text-xs">
-                                  {subject.name}
-                                </Badge>
-                              ) : null;
-                            })
-                          ) : (
-                            <span className="text-xs text-muted-foreground">None</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  No teachers added yet.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="rooms" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Add New Room</CardTitle>
-              <CardDescription>
-                Enter the details of the new room or lab
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="room-number">Room Number</Label>
-                  <Input
-                    id="room-number"
-                    value={newRoom.number}
-                    onChange={(e) => setNewRoom({ ...newRoom, number: e.target.value })}
-                    placeholder="e.g. A101"
-                  />
-                  {roomNumberError && (
-                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                      <AlertCircle className="h-3 w-3" />
-                      <span>{roomNumberError}</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="room-capacity">Capacity</Label>
-                  <Input
-                    id="room-capacity"
-                    type="number"
-                    min="1"
-                    value={newRoom.capacity}
-                    onChange={(e) => setNewRoom({ ...newRoom, capacity: parseInt(e.target.value) })}
-                    placeholder="e.g. 30"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="room-type">Type</Label>
-                  <Select
-                    value={newRoom.type}
-                    onValueChange={(value: "classroom" | "lab") => setNewRoom({ ...newRoom, type: value })}
-                  >
-                    <SelectTrigger id="room-type">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="classroom">Classroom</SelectItem>
-                      <SelectItem value="lab">Laboratory</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button onClick={handleAddRoom} className="gap-2">
-                <PlusIcon className="h-4 w-4" />
-                Add Room
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Room List</CardTitle>
-              <CardDescription>
-                View and manage all rooms and labs
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {rooms.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {rooms.map((room) => (
-                    <div key={room.id} className="p-3 border rounded-md">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{room.number}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {room.type.charAt(0).toUpperCase() + room.type.slice(1)} • Capacity: {room.capacity}
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteRoom(room.id)}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  No rooms added yet.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      <Card className="bg-muted/50">
-        <CardHeader>
-          <CardTitle className="text-base">Data Import/Export</CardTitle>
-          <CardDescription>
-            Save or load your data
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button 
-              variant="outline" 
-              className="gap-2"
-              onClick={() => {
-                try {
-                  const data = {
-                    subjects,
-                    teachers,
-                    rooms
-                  };
-                  const jsonString = JSON.stringify(data, null, 2);
-                  const blob = new Blob([jsonString], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = 'timetable_data.json';
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  URL.revokeObjectURL(url);
-                  
-                  toast({
-                    title: "Data Exported",
-                    description: "Your data has been exported successfully."
-                  });
-                } catch (error) {
-                  console.error("Export error:", error);
-                  toast({
-                    title: "Export Failed",
-                    description: "There was a problem exporting your data.",
-                    variant: "destructive"
-                  });
-                }
-              }}
-            >
-              <SaveIcon className="h-4 w-4" />
-              Export Data
-            </Button>
-            <Button 
-              variant="outline" 
-              className="gap-2"
-              onClick={() => {
-                try {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.accept = '.json';
-                  input.onchange = (e) => {
-                    const file = (e.target as HTMLInputElement).files?.[0];
-                    if (!file) return;
-                    
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                      try {
-                        const content = event.target?.result as string;
-                        const data = JSON.parse(content);
-                        
-                        if (data.subjects) setSubjects(data.subjects);
-                        if (data.teachers) setTeachers(data.teachers);
-                        if (data.rooms) setRooms(data.rooms);
-                        
-                        toast({
-                          title: "Data Imported",
-                          description: "Your data has been imported successfully."
-                        });
-                      } catch (parseError) {
-                        console.error("Parse error:", parseError);
-                        toast({
-                          title: "Import Failed",
-                          description: "The file format is invalid.",
-                          variant: "destructive"
-                        });
-                      }
-                    };
-                    reader.readAsText(file);
-                  };
-                  input.click();
-                } catch (error) {
-                  console.error("Import error:", error);
-                  toast({
-                    title: "Import Failed",
-                    description: "There was a problem importing your data.",
-                    variant: "destructive"
-                  });
-                }
-              }}
-            >
-              <DatabaseIcon className="h-4 w-4" />
-              Import Data
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <DuplicateWarningDialog
-        open={showDuplicateWarning}
-        onClose={() => setShowDuplicateWarning(false)}
-        onConfirm={addSubjectToTeacherConfirmed}
-        duplicates={duplicateSubjects}
-      />
-    </div>
-  );
-};
-
-export default DataInput;
-
+              <Button 
+                onClick={handleAddTeacher} 
+                className="gap-2"
+                disabled={teacherMutation.isPending}
+              >
+                {teacherMutation.isPending

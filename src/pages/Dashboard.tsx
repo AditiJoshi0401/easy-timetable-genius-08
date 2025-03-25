@@ -7,54 +7,72 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { useQuery } from "@tanstack/react-query";
+import { 
+  fetchSubjects, fetchTeachers, fetchRooms, 
+  fetchStreams, fetchDivisions 
+} from "@/services/supabaseService";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [subjectCount, setSubjectCount] = useState(0);
-  const [teacherCount, setTeacherCount] = useState(0);
-  const [roomCount, setRoomCount] = useState(0);
-  const [streamCount, setStreamCount] = useState(0);
-  const [divisionCount, setDivisionCount] = useState(0);
-  const [timetableCount, setTimetableCount] = useState(0);
-  const [recentTimetables, setRecentTimetables] = useState<any[]>([]);
   const [setupProgress, setSetupProgress] = useState(0);
+  const [recentTimetables, setRecentTimetables] = useState([]);
+  const [timetableCount, setTimetableCount] = useState(0);
 
+  // Fetch data from Supabase
+  const { data: subjects = [] } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: fetchSubjects
+  });
+
+  const { data: teachers = [] } = useQuery({
+    queryKey: ['teachers'],
+    queryFn: fetchTeachers
+  });
+
+  const { data: rooms = [] } = useQuery({
+    queryKey: ['rooms'],
+    queryFn: fetchRooms
+  });
+
+  const { data: streams = [] } = useQuery({
+    queryKey: ['streams'],
+    queryFn: fetchStreams
+  });
+
+  const { data: divisions = [] } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: fetchDivisions
+  });
+
+  // For timetables, still use localStorage for now
   useEffect(() => {
-    // Load counts from localStorage
     try {
-      const subjects = localStorage.getItem('subjects');
-      const teachers = localStorage.getItem('teachers');
-      const rooms = localStorage.getItem('rooms');
-      const streams = localStorage.getItem('streams');
-      const divisions = localStorage.getItem('divisions');
       const recentTimetablesData = localStorage.getItem('recentTimetables');
-      
-      if (subjects) setSubjectCount(JSON.parse(subjects).length);
-      if (teachers) setTeacherCount(JSON.parse(teachers).length);
-      if (rooms) setRoomCount(JSON.parse(rooms).length);
-      if (streams) setStreamCount(JSON.parse(streams).length);
-      if (divisions) setDivisionCount(JSON.parse(divisions).length);
-      
       if (recentTimetablesData) {
         const parsedTimetables = JSON.parse(recentTimetablesData);
         setRecentTimetables(parsedTimetables);
         setTimetableCount(parsedTimetables.length);
       }
-      
-      // Calculate setup progress
-      let progress = 0;
-      if (subjects && JSON.parse(subjects).length > 0) progress += 20;
-      if (teachers && JSON.parse(teachers).length > 0) progress += 20;
-      if (rooms && JSON.parse(rooms).length > 0) progress += 20;
-      if (streams && JSON.parse(streams).length > 0) progress += 20;
-      if (divisions && JSON.parse(divisions).length > 0) progress += 20;
-      
-      setSetupProgress(progress);
-      
     } catch (error) {
-      console.error('Error loading data from localStorage:', error);
+      console.error('Error loading timetables from localStorage:', error);
     }
   }, []);
+
+  // Calculate setup progress based on Supabase data
+  useEffect(() => {
+    let progress = 0;
+    if (subjects.length > 0) progress += 20;
+    if (teachers.length > 0) progress += 20;
+    if (rooms.length > 0) progress += 20;
+    if (streams.length > 0) progress += 20;
+    if (divisions.length > 0) progress += 20;
+    
+    setSetupProgress(progress);
+  }, [subjects, teachers, rooms, streams, divisions]);
+
+  // Count teaching assistants
+  const taCount = teachers.filter(teacher => teacher.isTA).length;
 
   // Get current date string
   const getCurrentDate = () => {
@@ -82,23 +100,27 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-1">
               <div className="text-muted-foreground text-sm">Subjects</div>
-              <div className="text-2xl font-bold">{subjectCount}</div>
+              <div className="text-2xl font-bold">{subjects.length}</div>
             </div>
             <div className="space-y-1">
               <div className="text-muted-foreground text-sm">Teachers</div>
-              <div className="text-2xl font-bold">{teacherCount}</div>
+              <div className="text-2xl font-bold">{teachers.length}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-muted-foreground text-sm">Teaching Assistants</div>
+              <div className="text-2xl font-bold">{taCount}</div>
             </div>
             <div className="space-y-1">
               <div className="text-muted-foreground text-sm">Rooms</div>
-              <div className="text-2xl font-bold">{roomCount}</div>
+              <div className="text-2xl font-bold">{rooms.length}</div>
             </div>
             <div className="space-y-1">
               <div className="text-muted-foreground text-sm">Streams</div>
-              <div className="text-2xl font-bold">{streamCount}</div>
+              <div className="text-2xl font-bold">{streams.length}</div>
             </div>
             <div className="space-y-1">
               <div className="text-muted-foreground text-sm">Divisions</div>
-              <div className="text-2xl font-bold">{divisionCount}</div>
+              <div className="text-2xl font-bold">{divisions.length}</div>
             </div>
             <div className="space-y-1">
               <div className="text-muted-foreground text-sm">Timetables</div>
@@ -128,11 +150,11 @@ const Dashboard = () => {
           <div className="grid gap-3">
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2">
-                <BookOpen className={`h-4 w-4 ${subjectCount > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={subjectCount > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Subjects</span>
+                <BookOpen className={`h-4 w-4 ${subjects.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={subjects.length > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Subjects</span>
               </div>
-              {subjectCount > 0 ? (
-                <div className="text-sm text-muted-foreground">{subjectCount} Added</div>
+              {subjects.length > 0 ? (
+                <div className="text-sm text-muted-foreground">{subjects.length} Added</div>
               ) : (
                 <Button size="sm" variant="ghost" onClick={() => navigate('/data-input')}>
                   <ArrowRight className="h-4 w-4" />
@@ -142,11 +164,11 @@ const Dashboard = () => {
             
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2">
-                <Users className={`h-4 w-4 ${teacherCount > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={teacherCount > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Teachers</span>
+                <Users className={`h-4 w-4 ${teachers.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={teachers.length > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Teachers</span>
               </div>
-              {teacherCount > 0 ? (
-                <div className="text-sm text-muted-foreground">{teacherCount} Added</div>
+              {teachers.length > 0 ? (
+                <div className="text-sm text-muted-foreground">{teachers.length} Added</div>
               ) : (
                 <Button size="sm" variant="ghost" onClick={() => navigate('/data-input?tab=teachers')}>
                   <ArrowRight className="h-4 w-4" />
@@ -156,11 +178,11 @@ const Dashboard = () => {
             
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2">
-                <Building className={`h-4 w-4 ${roomCount > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={roomCount > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Rooms</span>
+                <Building className={`h-4 w-4 ${rooms.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={rooms.length > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Rooms</span>
               </div>
-              {roomCount > 0 ? (
-                <div className="text-sm text-muted-foreground">{roomCount} Added</div>
+              {rooms.length > 0 ? (
+                <div className="text-sm text-muted-foreground">{rooms.length} Added</div>
               ) : (
                 <Button size="sm" variant="ghost" onClick={() => navigate('/data-input?tab=rooms')}>
                   <ArrowRight className="h-4 w-4" />
@@ -170,11 +192,11 @@ const Dashboard = () => {
             
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2">
-                <Database className={`h-4 w-4 ${streamCount > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={streamCount > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Streams</span>
+                <Database className={`h-4 w-4 ${streams.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={streams.length > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Streams</span>
               </div>
-              {streamCount > 0 ? (
-                <div className="text-sm text-muted-foreground">{streamCount} Added</div>
+              {streams.length > 0 ? (
+                <div className="text-sm text-muted-foreground">{streams.length} Added</div>
               ) : (
                 <Button size="sm" variant="ghost" onClick={() => navigate('/streams-manager')}>
                   <ArrowRight className="h-4 w-4" />
@@ -184,11 +206,11 @@ const Dashboard = () => {
             
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2">
-                <Grid3X3 className={`h-4 w-4 ${divisionCount > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className={divisionCount > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Divisions</span>
+                <Grid3X3 className={`h-4 w-4 ${divisions.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={divisions.length > 0 ? 'text-foreground' : 'text-muted-foreground'}>Add Divisions</span>
               </div>
-              {divisionCount > 0 ? (
-                <div className="text-sm text-muted-foreground">{divisionCount} Added</div>
+              {divisions.length > 0 ? (
+                <div className="text-sm text-muted-foreground">{divisions.length} Added</div>
               ) : (
                 <Button size="sm" variant="ghost" onClick={() => navigate('/streams-manager?tab=divisions')}>
                   <ArrowRight className="h-4 w-4" />
@@ -215,14 +237,14 @@ const Dashboard = () => {
                 <BookOpen className="h-5 w-5 text-primary" />
                 <span>Subjects</span>
               </div>
-              <span className="text-2xl font-bold">{subjectCount}</span>
+              <span className="text-2xl font-bold">{subjects.length}</span>
             </CardTitle>
             <CardDescription>Manage your course subjects</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-sm text-muted-foreground">
-              {subjectCount > 0 
-                ? `You have ${subjectCount} subjects added to your system.` 
+              {subjects.length > 0 
+                ? `You have ${subjects.length} subjects added to your system.` 
                 : "No subjects added yet. Start by adding your first subject."}
             </p>
           </CardContent>
@@ -245,14 +267,14 @@ const Dashboard = () => {
                 <Users className="h-5 w-5 text-primary" />
                 <span>Teachers</span>
               </div>
-              <span className="text-2xl font-bold">{teacherCount}</span>
+              <span className="text-2xl font-bold">{teachers.length}</span>
             </CardTitle>
             <CardDescription>Manage your faculty members</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-sm text-muted-foreground">
-              {teacherCount > 0 
-                ? `You have ${teacherCount} teachers registered in the system.` 
+              {teachers.length > 0 
+                ? `You have ${teachers.length} teachers registered in the system.` 
                 : "No teachers added yet. Start by adding your faculty."}
             </p>
           </CardContent>
@@ -275,14 +297,14 @@ const Dashboard = () => {
                 <Building className="h-5 w-5 text-primary" />
                 <span>Rooms</span>
               </div>
-              <span className="text-2xl font-bold">{roomCount}</span>
+              <span className="text-2xl font-bold">{rooms.length}</span>
             </CardTitle>
             <CardDescription>Manage your classrooms and labs</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-sm text-muted-foreground">
-              {roomCount > 0 
-                ? `You have ${roomCount} rooms configured for scheduling.` 
+              {rooms.length > 0 
+                ? `You have ${rooms.length} rooms configured for scheduling.` 
                 : "No rooms added yet. Start by adding your facilities."}
             </p>
           </CardContent>
@@ -305,14 +327,14 @@ const Dashboard = () => {
                 <Database className="h-5 w-5 text-primary" />
                 <span>Academic Streams</span>
               </div>
-              <span className="text-2xl font-bold">{streamCount}</span>
+              <span className="text-2xl font-bold">{streams.length}</span>
             </CardTitle>
             <CardDescription>Manage your academic programs</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-sm text-muted-foreground">
-              {streamCount > 0 
-                ? `You have ${streamCount} academic streams configured.` 
+              {streams.length > 0 
+                ? `You have ${streams.length} academic streams configured.` 
                 : "No streams added yet. Configure your academic programs."}
             </p>
           </CardContent>
@@ -335,14 +357,14 @@ const Dashboard = () => {
                 <Grid3X3 className="h-5 w-5 text-primary" />
                 <span>Divisions</span>
               </div>
-              <span className="text-2xl font-bold">{divisionCount}</span>
+              <span className="text-2xl font-bold">{divisions.length}</span>
             </CardTitle>
             <CardDescription>Manage your class divisions</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-sm text-muted-foreground">
-              {divisionCount > 0 
-                ? `You have ${divisionCount} class divisions configured.` 
+              {divisions.length > 0 
+                ? `You have ${divisions.length} class divisions configured.` 
                 : "No divisions added yet. Set up your class structure."}
             </p>
           </CardContent>
