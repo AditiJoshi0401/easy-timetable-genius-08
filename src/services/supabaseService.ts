@@ -51,6 +51,99 @@ export interface Timetable {
   updated_at?: string;
 }
 
+// LocalStorage helpers for timetable drafts
+export const saveTimetableDraft = (key: string, data: any): void => {
+  try {
+    localStorage.setItem(`timetable_draft_${key}`, JSON.stringify({
+      data,
+      lastUpdated: new Date().toISOString()
+    }));
+    console.log('Timetable draft saved to localStorage', key);
+  } catch (error) {
+    console.error('Error saving timetable draft to localStorage:', error);
+  }
+};
+
+export const getTimetableDraft = (key: string): { data: any, lastUpdated: string } | null => {
+  try {
+    const saved = localStorage.getItem(`timetable_draft_${key}`);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting timetable draft from localStorage:', error);
+    return null;
+  }
+};
+
+export const removeTimetableDraft = (key: string): void => {
+  try {
+    localStorage.removeItem(`timetable_draft_${key}`);
+    console.log('Timetable draft removed from localStorage', key);
+  } catch (error) {
+    console.error('Error removing timetable draft from localStorage:', error);
+  }
+};
+
+export const getAllTimetableDrafts = (): Record<string, { data: any, lastUpdated: string }> => {
+  const drafts: Record<string, { data: any, lastUpdated: string }> = {};
+  
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('timetable_draft_')) {
+        const draftKey = key.replace('timetable_draft_', '');
+        const draftData = localStorage.getItem(key);
+        if (draftData) {
+          drafts[draftKey] = JSON.parse(draftData);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error getting all timetable drafts from localStorage:', error);
+  }
+  
+  return drafts;
+};
+
+// Conflict checking functions
+export const isTeacherAvailable = (
+  teacherId: string, 
+  day: string, 
+  time: string, 
+  existingTimetables: Timetable[]
+): boolean => {
+  for (const timetable of existingTimetables) {
+    const timetableData = timetable.data;
+    if (!timetableData || !timetableData[day] || !timetableData[day][time]) continue;
+    
+    const slot = timetableData[day][time];
+    if (slot && slot.teacher && slot.teacher.id === teacherId) {
+      return false;
+    }
+  }
+  return true;
+};
+
+export const isRoomAvailable = (
+  roomId: string, 
+  day: string, 
+  time: string, 
+  existingTimetables: Timetable[]
+): boolean => {
+  for (const timetable of existingTimetables) {
+    const timetableData = timetable.data;
+    if (!timetableData || !timetableData[day] || !timetableData[day][time]) continue;
+    
+    const slot = timetableData[day][time];
+    if (slot && slot.room && slot.room.id === roomId) {
+      return false;
+    }
+  }
+  return true;
+};
+
 // Subjects
 export const fetchSubjects = async (): Promise<Subject[]> => {
   const { data, error } = await supabase
@@ -295,6 +388,27 @@ export const deleteDivision = async (id: string): Promise<boolean> => {
     .eq('id', id);
   if (error) throw error;
   return true;
+};
+
+// Fetch all timetables for conflict checking
+export const fetchAllTimetables = async (): Promise<Timetable[]> => {
+  try {
+    console.log("Fetching all timetables for conflict checking");
+    
+    const { data, error } = await supabase
+      .from('timetables')
+      .select('*');
+    
+    if (error) {
+      console.error("Error fetching all timetables:", error);
+      throw error;
+    }
+    
+    return data as Timetable[];
+  } catch (error) {
+    console.error("Exception in fetchAllTimetables:", error);
+    throw error;
+  }
 };
 
 // Timetables - Using string ID instead of UUID for timetable operations

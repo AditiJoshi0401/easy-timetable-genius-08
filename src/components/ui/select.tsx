@@ -112,9 +112,9 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName
 
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => {
-  // Fix for the error - Ensure value is never an empty string
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & { disabled?: boolean }
+>(({ className, children, disabled, ...props }, ref) => {
+  // Ensure value is never an empty string
   if (props.value === "") {
     console.warn("SelectItem: value prop cannot be an empty string. Using a placeholder value instead.");
     props.value = "placeholder-value";
@@ -125,9 +125,11 @@ const SelectItem = React.forwardRef<
       ref={ref}
       className={cn(
         "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        disabled && "pointer-events-none opacity-50 bg-red-100",
         className
       )}
       {...props}
+      disabled={disabled}
     >
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>

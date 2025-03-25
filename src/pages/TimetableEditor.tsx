@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
-import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Trash2, Save, Check, AlertCircle, Download, Upload } from "lucide-react";
+
+import { useState, useEffect, useCallback } from "react";
+import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Trash2, Save, Check, AlertCircle, Download, Upload, Clock } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +13,10 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { 
-  fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchDivisions, 
-  addTimetable, fetchTimetable, updateTimetable,
-  Subject, Teacher, Room, Stream, Division
+  fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchDivisions, fetchAllTimetables,
+  addTimetable, fetchTimetable, updateTimetable, isTeacherAvailable, isRoomAvailable,
+  saveTimetableDraft, getTimetableDraft, removeTimetableDraft, getAllTimetableDrafts,
+  Subject, Teacher, Room, Stream, Division, Timetable
 } from "@/services/supabaseService";
 import { useQuery } from "@tanstack/react-query";
 
@@ -42,6 +44,10 @@ const TimetableEditor = () => {
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importData, setImportData] = useState("");
+  const [showDraftsDialog, setShowDraftsDialog] = useState(false);
+  const [availableDrafts, setAvailableDrafts] = useState<Record<string, any>>({});
+  const [autoSaveInterval, setAutoSaveInterval] = useState<number | null>(null);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const timeSlots = [
@@ -91,6 +97,59 @@ const TimetableEditor = () => {
     queryKey: ['divisions'],
     queryFn: fetchDivisions
   });
+
+  const { data: existingTimetables = [], refetch: refetchTimetables } = useQuery({
+    queryKey: ['allTimetables'],
+    queryFn: fetchAllTimetables
+  });
+
+  // Function to load drafts from localStorage
+  const loadAvailableDrafts = useCallback(() => {
+    const drafts = getAllTimetableDrafts();
+    setAvailableDrafts(drafts);
+    return drafts;
+  }, []);
+
+  useEffect(() => {
+    loadAvailableDrafts();
+  }, [loadAvailableDrafts]);
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (showTimetable && stream && year && division) {
+      const timetableKey = `${stream}_${year}_${division}`;
+      
+      // Set up auto-save
+      const interval = window.setInterval(() => {
+        if (Object.keys(timetableData).length > 0) {
+          saveTimetableDraft(timetableKey, timetableData);
+          setLastSaved(new Date().toLocaleTimeString());
+          console.log("Auto-saved timetable draft", timetableKey);
+        }
+      }, 30000); // Auto-save every 30 seconds
+      
+      setAutoSaveInterval(interval);
+      
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
+    }
+  }, [showTimetable, stream, year, division, timetableData]);
+
+  // Manual save function
+  const manualSaveDraft = useCallback(() => {
+    if (showTimetable && stream && year && division) {
+      const timetableKey = `${stream}_${year}_${division}`;
+      saveTimetableDraft(timetableKey, timetableData);
+      setLastSaved(new Date().toLocaleTimeString());
+      toast({
+        title: "Draft Saved",
+        description: "Your work has been saved locally"
+      });
+    }
+  }, [showTimetable, stream, year, division, timetableData, toast]);
 
   useEffect(() => {
     if (streams && streams.length > 0) {
@@ -178,19 +237,41 @@ const TimetableEditor = () => {
     
     const timetableKey = `${stream}_${year}_${division}`;
     
+    // Check for draft first
+    const draft = getTimetableDraft(timetableKey);
+    if (draft) {
+      setTimetableData(draft.data);
+      setShowTimetable(true);
+      setLastSaved(new Date(draft.lastUpdated).toLocaleTimeString());
+      
+      toast({
+        title: "Draft Loaded",
+        description: `Loaded your saved draft from ${new Date(draft.lastUpdated).toLocaleString()}`,
+      });
+      return;
+    }
+    
+    // If no draft, check for saved timetable in the database
     fetchTimetable(timetableKey)
       .then(existingTimetable => {
         if (existingTimetable) {
           setTimetableData(existingTimetable.data);
+          setShowTimetable(true);
+          
+          toast({
+            title: "Timetable Loaded",
+            description: `Loaded timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}.`,
+          });
         } else {
+          // Create new timetable if nothing exists
           setTimetableData(initializeTimetable());
+          setShowTimetable(true);
+          
+          toast({
+            title: "New Timetable Created",
+            description: `Created a new timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}. Start adding subjects!`,
+          });
         }
-        setShowTimetable(true);
-        
-        toast({
-          title: "Timetable Ready",
-          description: `Created timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}. Start adding subjects!`,
-        });
       })
       .catch(error => {
         console.error("Error fetching timetable:", error);
@@ -229,22 +310,26 @@ const TimetableEditor = () => {
         await updateTimetable(timetableKey, { data: timetableData });
         toast({
           title: "Timetable Updated",
-          description: "Your timetable has been updated successfully."
+          description: "Your timetable has been updated successfully in the database."
         });
       } else {
         await addTimetable(timetableMetadata);
         toast({
           title: "Timetable Saved",
-          description: "Your timetable has been saved successfully."
+          description: "Your timetable has been saved successfully to the database."
         });
       }
       
+      // After successful save to database, remove the draft
+      removeTimetableDraft(timetableKey);
+      setLastSaved(null);
       setIsEditing(false);
+      await refetchTimetables();
     } catch (error) {
       console.error('Error saving timetable:', error);
       toast({
         title: "Error",
-        description: "Failed to save timetable. Please try again.",
+        description: "Failed to save timetable to the database. Your work is still saved locally.",
         variant: "destructive"
       });
     }
@@ -282,6 +367,7 @@ const TimetableEditor = () => {
   };
 
   const isRoomAvailable = (roomId: string, day: string, startTime: string, type: string) => {
+    // Check if the room is available in the current timetable being edited
     if (type === "lab") {
       const startIndex = timeSlots.indexOf(startTime);
       if (startIndex === -1 || startIndex > timeSlots.length - 2) {
@@ -295,18 +381,24 @@ const TimetableEditor = () => {
           return false;
         }
       }
-      return true;
     } else {
       const slot = timetableData[day]?.[startTime];
-      return !slot || slot.room.id !== roomId;
+      if (slot && slot.room.id === roomId) {
+        return false;
+      }
     }
+    
+    // Also check conflicts with all other timetables in the database
+    return isRoomAvailable(roomId, day, startTime, existingTimetables);
   };
 
   const getAvailableRooms = (day: string, time: string, type: string) => {
     return rooms.filter(room => {
+      // Filter based on room type
       if (type === "lab" && room.type !== "lab") return false;
       if (type === "lecture" && room.type !== "classroom") return false;
       
+      // Check availability in the current and other timetables
       return isRoomAvailable(room.id, day, time, type);
     });
   };
@@ -370,6 +462,7 @@ const TimetableEditor = () => {
     }
     
     setTimetableData(newTimetableData);
+    manualSaveDraft();
     setSlotDetailsOpen(false);
   };
 
@@ -408,6 +501,7 @@ const TimetableEditor = () => {
     }
     
     setTimetableData(newTimetableData);
+    manualSaveDraft();
     
     toast({
       title: "Subject Removed",
@@ -424,6 +518,25 @@ const TimetableEditor = () => {
     return teachers.filter(teacher => 
       teacher.subjects && Array.isArray(teacher.subjects) && teacher.subjects.includes(subjectId)
     );
+  };
+
+  const checkTeacherAvailability = (teacherId: string, day: string, time: string): boolean => {
+    // Check availability in the current timetable
+    for (const dayKey in timetableData) {
+      if (dayKey !== day) continue;
+      
+      for (const timeKey in timetableData[dayKey]) {
+        if (timeKey === time) continue;
+        
+        const slot = timetableData[dayKey][timeKey];
+        if (slot && slot.teacher && slot.teacher.id === teacherId) {
+          return false;
+        }
+      }
+    }
+    
+    // Also check against all other timetables
+    return isTeacherAvailable(teacherId, day, time, existingTimetables);
   };
 
   const getStreamName = (streamId: string) => {
@@ -509,6 +622,7 @@ const TimetableEditor = () => {
       setShowTimetable(true);
       setImportDialogOpen(false);
       setImportData("");
+      manualSaveDraft();
       
       toast({
         title: "Timetable Imported",
@@ -536,6 +650,44 @@ const TimetableEditor = () => {
       }
     };
     reader.readAsText(file);
+  };
+
+  const showAvailableDrafts = () => {
+    loadAvailableDrafts();
+    setShowDraftsDialog(true);
+  };
+
+  const loadDraft = (key: string) => {
+    const keyParts = key.split('_');
+    if (keyParts.length === 3) {
+      const [streamId, yearId, divisionId] = keyParts;
+      
+      setStream(streamId);
+      setYear(yearId);
+      setDivision(divisionId);
+      
+      const draft = getTimetableDraft(key);
+      if (draft) {
+        setTimetableData(draft.data);
+        setShowTimetable(true);
+        setShowDraftsDialog(false);
+        
+        toast({
+          title: "Draft Loaded",
+          description: `Loaded your saved draft from ${new Date(draft.lastUpdated).toLocaleString()}`,
+        });
+      }
+    }
+  };
+
+  const deleteDraft = (key: string) => {
+    removeTimetableDraft(key);
+    loadAvailableDrafts();
+    
+    toast({
+      title: "Draft Deleted",
+      description: "The selected draft has been deleted."
+    });
   };
 
   if (streamsLoading) {
@@ -615,7 +767,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-streams-available" disabled>
+                      <SelectItem value="no-streams-available-1" disabled>
                         No streams available
                       </SelectItem>
                     )}
@@ -637,7 +789,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-years-available" disabled>
+                      <SelectItem value="no-years-available-1" disabled>
                         {stream ? "No years available for this stream" : "Select a stream first"}
                       </SelectItem>
                     )}
@@ -659,7 +811,7 @@ const TimetableEditor = () => {
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-divisions-available" disabled>
+                      <SelectItem value="no-divisions-available-1" disabled>
                         {year ? "No divisions available for this year" : "Select a year first"}
                       </SelectItem>
                     )}
@@ -677,6 +829,12 @@ const TimetableEditor = () => {
                   <Upload className="h-4 w-4" />
                   Import
                 </Button>
+                {Object.keys(availableDrafts).length > 0 && (
+                  <Button variant="outline" onClick={showAvailableDrafts} className="gap-2">
+                    <Clock className="h-4 w-4" />
+                    Load Draft
+                  </Button>
+                )}
               </div>
               <Button onClick={handleGenerateTimetable} className="gap-2" disabled={!stream || !year || !division}>
                 <Plus className="h-4 w-4" /> 
@@ -687,13 +845,14 @@ const TimetableEditor = () => {
         </Card>
       ) : (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-medium">
                 {getStreamName(stream)} {getYearName(year)} {getDivisionName(division)} Timetable
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {isEditing ? 'Editing mode' : 'View mode'} • Drag subjects to add them to the timetable
+                {isEditing ? 'Editing mode' : 'View mode'} • 
+                {lastSaved && <span> Last auto-saved at {lastSaved}</span>}
               </p>
             </div>
             <div className="flex gap-2">
@@ -701,10 +860,14 @@ const TimetableEditor = () => {
                 <Download className="h-4 w-4" />
                 Export
               </Button>
+              <Button variant="outline" onClick={manualSaveDraft} className="gap-2">
+                <Save className="h-4 w-4" />
+                Save Draft
+              </Button>
               {isEditing ? (
                 <Button onClick={saveTimetable} className="gap-2">
                   <Save className="h-4 w-4" />
-                  Save Timetable
+                  Save to Database
                 </Button>
               ) : (
                 <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
@@ -951,7 +1114,7 @@ const TimetableEditor = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingSubjects ? (
-                        <SelectItem value="loading-subjects" disabled>Loading subjects...</SelectItem>
+                        <SelectItem value="loading-subjects-1" disabled>Loading subjects...</SelectItem>
                       ) : filteredSubjects.length > 0 ? (
                         filteredSubjects.map(subject => (
                           <SelectItem key={subject.id} value={subject.id}>
@@ -959,7 +1122,7 @@ const TimetableEditor = () => {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="no-subjects-available" disabled>
+                        <SelectItem value="no-subjects-available-2" disabled>
                           {subjects.length === 0 ? 
                             "No subjects available. Please add subjects in Data Management." :
                             "No subjects available for the selected stream and year."}
@@ -981,22 +1144,34 @@ const TimetableEditor = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {!slotDetails.subject ? (
-                        <SelectItem value="select-subject-first" disabled>
+                        <SelectItem value="select-subject-first-1" disabled>
                           Select a subject first
                         </SelectItem>
                       ) : isLoadingTeachers ? (
-                        <SelectItem value="loading-teachers" disabled>Loading teachers...</SelectItem>
+                        <SelectItem value="loading-teachers-1" disabled>Loading teachers...</SelectItem>
                       ) : (
                         (() => {
                           const subjectTeachers = getTeachersForSubject(slotDetails.subject);
                           return subjectTeachers.length > 0 ? (
-                            subjectTeachers.map(teacher => (
-                              <SelectItem key={teacher.id} value={teacher.id}>
-                                {teacher.isTA ? "TA " : ""}{teacher.name}
-                              </SelectItem>
-                            ))
+                            subjectTeachers.map(teacher => {
+                              const isAvailable = selectedSlot ? 
+                                checkTeacherAvailability(teacher.id, selectedSlot.day, selectedSlot.time) : 
+                                true;
+                              
+                              return (
+                                <SelectItem 
+                                  key={teacher.id} 
+                                  value={teacher.id} 
+                                  disabled={!isAvailable}
+                                  className={!isAvailable ? "bg-red-100" : ""}
+                                >
+                                  {teacher.isTA ? "TA " : ""}{teacher.name}
+                                  {!isAvailable && " (Not Available)"}
+                                </SelectItem>
+                              );
+                            })
                           ) : (
-                            <SelectItem value="no-teachers-available" disabled>
+                            <SelectItem value="no-teachers-available-1" disabled>
                               No teachers assigned to this subject
                             </SelectItem>
                           );
@@ -1034,11 +1209,11 @@ const TimetableEditor = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {!selectedSlot ? (
-                        <SelectItem value="no-slot-selected" disabled>
+                        <SelectItem value="no-slot-selected-1" disabled>
                           No time slot selected
                         </SelectItem>
                       ) : isLoadingRooms ? (
-                        <SelectItem value="loading-rooms" disabled>Loading rooms...</SelectItem>
+                        <SelectItem value="loading-rooms-1" disabled>Loading rooms...</SelectItem>
                       ) : (
                         (() => {
                           const availableRooms = getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type);
@@ -1049,7 +1224,7 @@ const TimetableEditor = () => {
                               </SelectItem>
                             ))
                           ) : (
-                            <SelectItem value="no-rooms-available" disabled>
+                            <SelectItem value="no-rooms-available-1" disabled>
                               No available rooms for this time and type
                             </SelectItem>
                           );
@@ -1101,6 +1276,61 @@ const TimetableEditor = () => {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
                 <Button onClick={processImport}>Import Timetable</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={showDraftsDialog} onOpenChange={setShowDraftsDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Available Drafts</DialogTitle>
+                <DialogDescription>
+                  Continue working on your saved drafts
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4 max-h-[400px] overflow-y-auto">
+                {Object.entries(availableDrafts).length > 0 ? (
+                  Object.entries(availableDrafts).map(([key, draft]) => {
+                    const keyParts = key.split('_');
+                    if (keyParts.length === 3) {
+                      const [streamId, yearId, divisionId] = keyParts;
+                      const streamName = getStreamName(streamId);
+                      const yearName = getYearName(yearId);
+                      const divisionName = getDivisionName(divisionId);
+                      
+                      return (
+                        <Card key={key} className="mb-4">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">{streamName} {yearName} {divisionName}</CardTitle>
+                            <CardDescription>
+                              Last saved: {new Date(draft.lastUpdated).toLocaleString()}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardFooter className="pt-2 flex justify-between">
+                            <Button variant="outline" onClick={() => deleteDraft(key)} className="text-destructive">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </Button>
+                            <Button onClick={() => loadDraft(key)}>
+                              <Clock className="h-4 w-4 mr-2" />
+                              Continue Editing
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      );
+                    }
+                    return null;
+                  })
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-muted-foreground">No saved drafts available</p>
+                  </div>
+                )}
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDraftsDialog(false)}>Close</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
