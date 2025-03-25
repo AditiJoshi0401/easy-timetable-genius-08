@@ -52,7 +52,7 @@ export interface Timetable {
 }
 
 // Subjects
-export const fetchSubjects = async () => {
+export const fetchSubjects = async (): Promise<Subject[]> => {
   const { data, error } = await supabase
     .from('subjects')
     .select('*');
@@ -60,7 +60,7 @@ export const fetchSubjects = async () => {
   return data as Subject[];
 };
 
-export const addSubject = async (subject: Omit<Subject, 'id'>) => {
+export const addSubject = async (subject: Omit<Subject, 'id'>): Promise<Subject> => {
   const { data, error } = await supabase
     .from('subjects')
     .insert([subject])
@@ -69,7 +69,7 @@ export const addSubject = async (subject: Omit<Subject, 'id'>) => {
   return data[0] as Subject;
 };
 
-export const updateSubject = async (id: string, subject: Partial<Subject>) => {
+export const updateSubject = async (id: string, subject: Partial<Subject>): Promise<Subject> => {
   const { data, error } = await supabase
     .from('subjects')
     .update(subject)
@@ -79,7 +79,7 @@ export const updateSubject = async (id: string, subject: Partial<Subject>) => {
   return data[0] as Subject;
 };
 
-export const deleteSubject = async (id: string) => {
+export const deleteSubject = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('subjects')
     .delete()
@@ -89,7 +89,7 @@ export const deleteSubject = async (id: string) => {
 };
 
 // Teachers
-export const fetchTeachers = async () => {
+export const fetchTeachers = async (): Promise<Teacher[]> => {
   const { data, error } = await supabase
     .from('teachers')
     .select('*');
@@ -102,7 +102,7 @@ export const fetchTeachers = async () => {
   })) as Teacher[];
 };
 
-export const addTeacher = async (teacher: Omit<Teacher, 'id'>) => {
+export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher> => {
   // Convert isTA to ista for database
   const dbTeacher = {
     name: teacher.name,
@@ -125,7 +125,7 @@ export const addTeacher = async (teacher: Omit<Teacher, 'id'>) => {
   } as Teacher;
 };
 
-export const updateTeacher = async (id: string, teacher: Partial<Teacher>) => {
+export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Promise<Teacher> => {
   // Convert isTA to ista for database if it exists
   const dbTeacher: any = { ...teacher };
   if ('isTA' in teacher) {
@@ -147,7 +147,7 @@ export const updateTeacher = async (id: string, teacher: Partial<Teacher>) => {
   } as Teacher;
 };
 
-export const deleteTeacher = async (id: string) => {
+export const deleteTeacher = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('teachers')
     .delete()
@@ -157,7 +157,7 @@ export const deleteTeacher = async (id: string) => {
 };
 
 // Rooms
-export const fetchRooms = async () => {
+export const fetchRooms = async (): Promise<Room[]> => {
   const { data, error } = await supabase
     .from('rooms')
     .select('*');
@@ -165,7 +165,7 @@ export const fetchRooms = async () => {
   return data as Room[];
 };
 
-export const addRoom = async (room: Omit<Room, 'id'>) => {
+export const addRoom = async (room: Omit<Room, 'id'>): Promise<Room> => {
   const { data, error } = await supabase
     .from('rooms')
     .insert([room])
@@ -174,7 +174,7 @@ export const addRoom = async (room: Omit<Room, 'id'>) => {
   return data[0] as Room;
 };
 
-export const updateRoom = async (id: string, room: Partial<Room>) => {
+export const updateRoom = async (id: string, room: Partial<Room>): Promise<Room> => {
   const { data, error } = await supabase
     .from('rooms')
     .update(room)
@@ -184,7 +184,7 @@ export const updateRoom = async (id: string, room: Partial<Room>) => {
   return data[0] as Room;
 };
 
-export const deleteRoom = async (id: string) => {
+export const deleteRoom = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('rooms')
     .delete()
@@ -194,7 +194,7 @@ export const deleteRoom = async (id: string) => {
 };
 
 // Streams
-export const fetchStreams = async () => {
+export const fetchStreams = async (): Promise<Stream[]> => {
   const { data, error } = await supabase
     .from('streams')
     .select('*');
@@ -202,7 +202,7 @@ export const fetchStreams = async () => {
   return data as Stream[];
 };
 
-export const addStream = async (stream: Omit<Stream, 'id'>) => {
+export const addStream = async (stream: Omit<Stream, 'id'>): Promise<Stream> => {
   const { data, error } = await supabase
     .from('streams')
     .insert([stream])
@@ -211,7 +211,7 @@ export const addStream = async (stream: Omit<Stream, 'id'>) => {
   return data[0] as Stream;
 };
 
-export const updateStream = async (id: string, stream: Partial<Stream>) => {
+export const updateStream = async (id: string, stream: Partial<Stream>): Promise<Stream> => {
   const { data, error } = await supabase
     .from('streams')
     .update(stream)
@@ -221,7 +221,7 @@ export const updateStream = async (id: string, stream: Partial<Stream>) => {
   return data[0] as Stream;
 };
 
-export const deleteStream = async (id: string) => {
+export const deleteStream = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('streams')
     .delete()
@@ -231,7 +231,7 @@ export const deleteStream = async (id: string) => {
 };
 
 // Divisions
-export const fetchDivisions = async () => {
+export const fetchDivisions = async (): Promise<Division[]> => {
   const { data, error } = await supabase
     .from('divisions')
     .select('*');
@@ -244,7 +244,7 @@ export const fetchDivisions = async () => {
   })) as Division[];
 };
 
-export const addDivision = async (division: Omit<Division, 'id'>) => {
+export const addDivision = async (division: Omit<Division, 'id'>): Promise<Division> => {
   // Convert streamId to streamid for database
   const dbDivision = {
     name: division.name,
@@ -266,7 +266,7 @@ export const addDivision = async (division: Omit<Division, 'id'>) => {
   } as Division;
 };
 
-export const updateDivision = async (id: string, division: Partial<Division>) => {
+export const updateDivision = async (id: string, division: Partial<Division>): Promise<Division> => {
   // Convert streamId to streamid for database if it exists
   const dbDivision: any = { ...division };
   if ('streamId' in division) {
@@ -288,7 +288,7 @@ export const updateDivision = async (id: string, division: Partial<Division>) =>
   } as Division;
 };
 
-export const deleteDivision = async (id: string) => {
+export const deleteDivision = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('divisions')
     .delete()
@@ -298,7 +298,7 @@ export const deleteDivision = async (id: string) => {
 };
 
 // Timetables - Using string ID instead of UUID for timetable operations
-export const fetchTimetable = async (id: string) => {
+export const fetchTimetable = async (id: string): Promise<Timetable | null> => {
   try {
     console.log("Fetching timetable with ID:", id);
     
@@ -321,7 +321,7 @@ export const fetchTimetable = async (id: string) => {
   }
 };
 
-export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'updated_at'>) => {
+export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'updated_at'>): Promise<Timetable> => {
   try {
     console.log("Adding timetable:", timetable);
     
@@ -343,7 +343,7 @@ export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'up
   }
 };
 
-export const updateTimetable = async (id: string, timetable: Partial<Timetable>) => {
+export const updateTimetable = async (id: string, timetable: Partial<Timetable>): Promise<Timetable> => {
   try {
     console.log("Updating timetable with ID:", id, "Data:", timetable);
     
@@ -366,7 +366,7 @@ export const updateTimetable = async (id: string, timetable: Partial<Timetable>)
   }
 };
 
-export const deleteTimetable = async (id: string) => {
+export const deleteTimetable = async (id: string): Promise<boolean> => {
   try {
     console.log("Deleting timetable with ID:", id);
     
@@ -387,5 +387,3 @@ export const deleteTimetable = async (id: string) => {
     throw error;
   }
 };
-
-export default supabase;

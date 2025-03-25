@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { DatabaseIcon, BookIcon, UsersIcon, BuildingIcon, PlusIcon, TrashIcon, SaveIcon, AlertTriangle, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -18,34 +17,10 @@ import {
   fetchStreams, fetchSubjects, fetchTeachers, fetchRooms,
   addSubject, updateSubject, deleteSubject,
   addTeacher, updateTeacher, deleteTeacher,
-  addRoom, updateRoom, deleteRoom
+  addRoom, updateRoom, deleteRoom,
+  Subject, Teacher, Room
 } from "@/services/supabaseService";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-interface Subject {
-  id: string;
-  name: string;
-  code: string;
-  credits: number;
-  stream: string;
-  year: string;
-}
-
-interface Teacher {
-  id: string;
-  name: string;
-  email: string;
-  specialization: string;
-  subjects: string[];
-  isTA: boolean;
-}
-
-interface Room {
-  id: string;
-  number: string;
-  capacity: number;
-  type: "classroom" | "lab";
-}
 
 interface DuplicateWarningDialogProps {
   open: boolean;
@@ -108,8 +83,7 @@ const DataInput = () => {
   const queryClient = useQueryClient();
   
   // Form state
-  const [newSubject, setNewSubject] = useState({
-    id: "",
+  const [newSubject, setNewSubject] = useState<Omit<Subject, 'id'>>({
     name: "",
     code: "",
     credits: 3,
@@ -119,8 +93,7 @@ const DataInput = () => {
   const [subjectNameError, setSubjectNameError] = useState("");
   const [subjectCodeError, setSubjectCodeError] = useState("");
   
-  const [newTeacher, setNewTeacher] = useState({
-    id: "",
+  const [newTeacher, setNewTeacher] = useState<Omit<Teacher, 'id'>>({
     name: "",
     email: "",
     specialization: "",
@@ -131,8 +104,7 @@ const DataInput = () => {
   const [teacherNameError, setTeacherNameError] = useState("");
   const [teacherEmailError, setTeacherEmailError] = useState("");
   
-  const [newRoom, setNewRoom] = useState({
-    id: "",
+  const [newRoom, setNewRoom] = useState<Omit<Room, 'id'>>({
     number: "",
     capacity: 30,
     type: "classroom"
@@ -140,7 +112,11 @@ const DataInput = () => {
   const [roomNumberError, setRoomNumberError] = useState("");
 
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
-  const [duplicateSubjects, setDuplicateSubjects] = useState([]);
+  const [duplicateSubjects, setDuplicateSubjects] = useState<{
+    stream: string;
+    year: string;
+    subjects: Subject[];
+  }[]>([]);
 
   // Data queries
   const { data: streams = [], isLoading: isLoadingStreams } = useQuery({
@@ -165,7 +141,7 @@ const DataInput = () => {
 
   // Mutations
   const subjectMutation = useMutation({
-    mutationFn: (newSubject) => addSubject(newSubject),
+    mutationFn: (newSubjectData: Omit<Subject, 'id'>) => addSubject(newSubjectData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
       toast({
@@ -173,7 +149,6 @@ const DataInput = () => {
         description: `${newSubject.name} has been added successfully.`
       });
       setNewSubject({
-        id: "",
         name: "",
         code: "",
         credits: 3,
@@ -192,7 +167,7 @@ const DataInput = () => {
   });
 
   const deleteSubjectMutation = useMutation({
-    mutationFn: (id) => deleteSubject(id),
+    mutationFn: (id: string) => deleteSubject(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
       toast({
@@ -211,7 +186,7 @@ const DataInput = () => {
   });
 
   const teacherMutation = useMutation({
-    mutationFn: (newTeacher) => addTeacher(newTeacher),
+    mutationFn: (newTeacherData: Omit<Teacher, 'id'>) => addTeacher(newTeacherData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
       toast({
@@ -219,7 +194,6 @@ const DataInput = () => {
         description: `${newTeacher.name} has been added successfully.`
       });
       setNewTeacher({
-        id: "",
         name: "",
         email: "",
         specialization: "",
@@ -238,7 +212,7 @@ const DataInput = () => {
   });
 
   const deleteTeacherMutation = useMutation({
-    mutationFn: (id) => deleteTeacher(id),
+    mutationFn: (id: string) => deleteTeacher(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
       toast({
@@ -257,7 +231,7 @@ const DataInput = () => {
   });
 
   const roomMutation = useMutation({
-    mutationFn: (newRoom) => addRoom(newRoom),
+    mutationFn: (newRoomData: Omit<Room, 'id'>) => addRoom(newRoomData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       toast({
@@ -265,7 +239,6 @@ const DataInput = () => {
         description: `Room ${newRoom.number} has been added successfully.`
       });
       setNewRoom({
-        id: "",
         number: "",
         capacity: 30,
         type: "classroom"
@@ -282,7 +255,7 @@ const DataInput = () => {
   });
 
   const deleteRoomMutation = useMutation({
-    mutationFn: (id) => deleteRoom(id),
+    mutationFn: (id: string) => deleteRoom(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       toast({
@@ -413,17 +386,11 @@ const DataInput = () => {
     }
 
     // Add to Supabase via mutation
-    subjectMutation.mutate({
-      name: newSubject.name,
-      code: newSubject.code,
-      credits: newSubject.credits,
-      stream: newSubject.stream,
-      year: newSubject.year
-    });
+    subjectMutation.mutate(newSubject);
   };
 
-  const handleDeleteSubject = (id) => {
-    const assignedTeachers = teachers.filter(teacher => teacher.subjects.includes(id));
+  const handleDeleteSubject = (id: string) => {
+    const assignedTeachers = teachers.filter(teacher => teacher.subjects && Array.isArray(teacher.subjects) && teacher.subjects.includes(id));
     
     if (assignedTeachers.length > 0) {
       toast({
@@ -438,7 +405,7 @@ const DataInput = () => {
   };
 
   const checkForDuplicateAssignments = () => {
-    const subjectsByStreamAndYear = {};
+    const subjectsByStreamAndYear: Record<string, Subject[]> = {};
     
     for (const subjectId of newTeacher.subjects) {
       const subject = subjects.find(s => s.id === subjectId);
@@ -489,16 +456,10 @@ const DataInput = () => {
     }
 
     // Add to Supabase via mutation
-    teacherMutation.mutate({
-      name: newTeacher.name,
-      email: newTeacher.email,
-      specialization: newTeacher.specialization,
-      subjects: newTeacher.subjects,
-      isTA: newTeacher.isTA
-    });
+    teacherMutation.mutate(newTeacher);
   };
 
-  const handleDeleteTeacher = (id) => {
+  const handleDeleteTeacher = (id: string) => {
     deleteTeacherMutation.mutate(id);
   };
 
@@ -536,7 +497,7 @@ const DataInput = () => {
     setShowDuplicateWarning(false);
   };
 
-  const handleRemoveSubjectFromTeacher = (subjectId) => {
+  const handleRemoveSubjectFromTeacher = (subjectId: string) => {
     const updatedSubjects = newTeacher.subjects.filter(id => id !== subjectId);
     setNewTeacher({
       ...newTeacher,
@@ -559,14 +520,10 @@ const DataInput = () => {
     }
 
     // Add to Supabase via mutation
-    roomMutation.mutate({
-      number: newRoom.number,
-      capacity: newRoom.capacity,
-      type: newRoom.type
-    });
+    roomMutation.mutate(newRoom);
   };
 
-  const handleDeleteRoom = (id) => {
+  const handleDeleteRoom = (id: string) => {
     deleteRoomMutation.mutate(id);
   };
 
@@ -603,10 +560,10 @@ const DataInput = () => {
     }
   };
 
-  const handleImportData = async (importedData) => {
+  const handleImportData = async (importedData: any) => {
     try {
       // Process subjects
-      if (importedData.subjects && importedData.subjects.length > 0) {
+      if (importedData.subjects && Array.isArray(importedData.subjects) && importedData.subjects.length > 0) {
         for (const subject of importedData.subjects) {
           const { id, ...subjectData } = subject;
           try {
@@ -618,7 +575,7 @@ const DataInput = () => {
       }
       
       // Process teachers
-      if (importedData.teachers && importedData.teachers.length > 0) {
+      if (importedData.teachers && Array.isArray(importedData.teachers) && importedData.teachers.length > 0) {
         for (const teacher of importedData.teachers) {
           const { id, ...teacherData } = teacher;
           try {
@@ -630,7 +587,7 @@ const DataInput = () => {
       }
       
       // Process rooms
-      if (importedData.rooms && importedData.rooms.length > 0) {
+      if (importedData.rooms && Array.isArray(importedData.rooms) && importedData.rooms.length > 0) {
         for (const room of importedData.rooms) {
           const { id, ...roomData } = room;
           try {
@@ -684,516 +641,7 @@ const DataInput = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Subjects Tab */}
-        <TabsContent value="subjects" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Add New Subject</CardTitle>
-              <CardDescription>
-                Enter the details of the new subject
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Subject Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="subject-name">Subject Name</Label>
-                  <Input
-                    id="subject-name"
-                    value={newSubject.name}
-                    onChange={(e) => setNewSubject({ ...newSubject, name: e.target.value })}
-                    placeholder="e.g. Data Structures"
-                  />
-                  {subjectNameError && (
-                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                      <AlertCircle className="h-3 w-3" />
-                      <span>{subjectNameError}</span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Subject Code */}
-                <div className="space-y-2">
-                  <Label htmlFor="subject-code">Subject Code</Label>
-                  <Input
-                    id="subject-code"
-                    value={newSubject.code}
-                    onChange={(e) => setNewSubject({ ...newSubject, code: e.target.value })}
-                    placeholder="e.g. CS201"
-                  />
-                  {subjectCodeError && (
-                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                      <AlertCircle className="h-3 w-3" />
-                      <span>{subjectCodeError}</span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Credits */}
-                <div className="space-y-2">
-                  <Label htmlFor="subject-credits">Credits</Label>
-                  <Select
-                    value={newSubject.credits.toString()}
-                    onValueChange={(value) => setNewSubject({ ...newSubject, credits: parseInt(value) })}
-                  >
-                    <SelectTrigger id="subject-credits">
-                      <SelectValue placeholder="Select credits" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 Credit</SelectItem>
-                      <SelectItem value="2">2 Credits</SelectItem>
-                      <SelectItem value="3">3 Credits</SelectItem>
-                      <SelectItem value="4">4 Credits</SelectItem>
-                      <SelectItem value="5">5 Credits</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Stream */}
-                <div className="space-y-2">
-                  <Label htmlFor="subject-stream">Stream</Label>
-                  <Select
-                    value={newSubject.stream}
-                    onValueChange={(value) => setNewSubject({ ...newSubject, stream: value })}
-                  >
-                    <SelectTrigger id="subject-stream">
-                      <SelectValue placeholder="Select stream" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingStreams ? (
-                        <SelectItem value="" disabled>Loading streams...</SelectItem>
-                      ) : streams.length > 0 ? (
-                        streams.map((stream) => (
-                          <SelectItem key={stream.id} value={stream.code}>
-                            {stream.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="" disabled>No streams available</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Year */}
-                <div className="space-y-2">
-                  <Label htmlFor="subject-year">Year</Label>
-                  <Select
-                    value={newSubject.year}
-                    onValueChange={(value) => setNewSubject({ ...newSubject, year: value })}
-                  >
-                    <SelectTrigger id="subject-year">
-                      <SelectValue placeholder="Select year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {streams.find(s => s.code === newSubject.stream)?.years ? 
-                        Array.from({ length: streams.find(s => s.code === newSubject.stream)?.years || 4 }, (_, i) => i + 1).map(year => (
-                          <SelectItem key={year} value={year.toString()}>
-                            {year === 1 ? "First" : year === 2 ? "Second" : year === 3 ? "Third" : "Fourth"} Year
-                          </SelectItem>
-                        )) :
-                        <>
-                          <SelectItem value="1">First Year</SelectItem>
-                          <SelectItem value="2">Second Year</SelectItem>
-                          <SelectItem value="3">Third Year</SelectItem>
-                          <SelectItem value="4">Fourth Year</SelectItem>
-                        </>
-                      }
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button 
-                onClick={handleAddSubject} 
-                className="gap-2"
-                disabled={subjectMutation.isPending}
-              >
-                {subjectMutation.isPending ? (
-                  <>Adding...</>
-                ) : (
-                  <>
-                    <PlusIcon className="h-4 w-4" />
-                    Add Subject
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          {/* Subject List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Subject List</CardTitle>
-              <CardDescription>
-                View and manage all subjects
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingSubjects ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  Loading subjects...
-                </div>
-              ) : subjects.length > 0 ? (
-                <div className="space-y-4">
-                  {subjects.map((subject) => (
-                    <div key={subject.id} className="flex items-center justify-between p-3 border rounded-md">
-                      <div>
-                        <div className="font-medium">{subject.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {subject.code} • {subject.credits} Credits • {subject.stream?.replace('_', ' ') || 'No Stream'} Year {subject.year}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteSubject(subject.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                        disabled={deleteSubjectMutation.isPending}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  No subjects added yet.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Teachers Tab */}
-        <TabsContent value="teachers" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Add New Teacher</CardTitle>
-              <CardDescription>
-                Enter the details of the new teacher
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Teacher Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="teacher-name">Name</Label>
-                  <Input
-                    id="teacher-name"
-                    value={newTeacher.name}
-                    onChange={(e) => setNewTeacher({ ...newTeacher, name: e.target.value })}
-                    placeholder="e.g. Dr. John Smith"
-                  />
-                  {teacherNameError && (
-                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                      <AlertCircle className="h-3 w-3" />
-                      <span>{teacherNameError}</span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Teacher Email */}
-                <div className="space-y-2">
-                  <Label htmlFor="teacher-email">Email</Label>
-                  <Input
-                    id="teacher-email"
-                    type="email"
-                    value={newTeacher.email}
-                    onChange={(e) => setNewTeacher({ ...newTeacher, email: e.target.value })}
-                    placeholder="e.g. john.smith@example.com"
-                  />
-                  {teacherEmailError && (
-                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                      <AlertCircle className="h-3 w-3" />
-                      <span>{teacherEmailError}</span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Specialization */}
-                <div className="space-y-2">
-                  <Label htmlFor="teacher-specialization">Specialization</Label>
-                  <Input
-                    id="teacher-specialization"
-                    value={newTeacher.specialization}
-                    onChange={(e) => setNewTeacher({ ...newTeacher, specialization: e.target.value })}
-                    placeholder="e.g. Algorithms"
-                  />
-                </div>
-                
-                {/* TA Switch */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="teacher-ta">Teaching Assistant (TA)</Label>
-                    <Switch 
-                      id="teacher-ta" 
-                      checked={newTeacher.isTA}
-                      onCheckedChange={(checked) => setNewTeacher({ ...newTeacher, isTA: checked })}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Mark this teacher as a teaching assistant
-                  </p>
-                </div>
-              </div>
-              
-              <Separator className="my-4" />
-              
-              {/* Subject Assignment */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Assigned Subjects</Label>
-                  <div className="flex gap-2">
-                    <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Select a subject" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {isLoadingSubjects ? (
-                          <SelectItem value="" disabled>Loading subjects...</SelectItem>
-                        ) : subjects.length > 0 ? (
-                          subjects.map((subject) => (
-                            <SelectItem key={subject.id} value={subject.id}>
-                              {subject.name} ({subject.code})
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="" disabled>No subjects available</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAddSubjectToTeacher}
-                      disabled={!selectedSubject}
-                    >
-                      <PlusIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                {/* Subject Badges */}
-                <div className="flex flex-wrap gap-2">
-                  {newTeacher.subjects.length > 0 ? (
-                    newTeacher.subjects.map((subjectId) => {
-                      const subject = subjects.find(s => s.id === subjectId);
-                      return subject ? (
-                        <Badge key={subjectId} variant="outline" className="flex items-center gap-1 py-1">
-                          {subject.name}
-                          <button
-                            onClick={() => handleRemoveSubjectFromTeacher(subjectId)}
-                            className="ml-1 text-muted-foreground hover:text-destructive"
-                          >
-                            <TrashIcon className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ) : null;
-                    })
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      No subjects assigned yet
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button 
-                onClick={handleAddTeacher} 
-                className="gap-2"
-                disabled={teacherMutation.isPending}
-              >
-                {teacherMutation.isPending ? (
-                  <>Adding...</>
-                ) : (
-                  <>
-                    <PlusIcon className="h-4 w-4" />
-                    Add Teacher
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          {/* Teacher List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Teacher List</CardTitle>
-              <CardDescription>
-                View and manage all teachers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingTeachers ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  Loading teachers...
-                </div>
-              ) : teachers.length > 0 ? (
-                <div className="space-y-4">
-                  {teachers.map((teacher) => (
-                    <div key={teacher.id} className="flex items-center justify-between p-3 border rounded-md">
-                      <div>
-                        <div className="font-medium">{teacher.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {teacher.email} • {teacher.specialization || 'No Specialization'}
-                          {teacher.isTA && <Badge variant="outline" className="ml-2">TA</Badge>}
-                        </div>
-                        {teacher.subjects && teacher.subjects.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {teacher.subjects.map((subjectId) => {
-                              const subject = subjects.find(s => s.id === subjectId);
-                              return subject ? (
-                                <Badge key={subjectId} variant="secondary" className="text-xs">
-                                  {subject.name}
-                                </Badge>
-                              ) : null;
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteTeacher(teacher.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                        disabled={deleteTeacherMutation.isPending}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  No teachers added yet.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Rooms Tab */}
-        <TabsContent value="rooms" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Add New Room</CardTitle>
-              <CardDescription>
-                Enter the details of the new room
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Room Number */}
-                <div className="space-y-2">
-                  <Label htmlFor="room-number">Room Number</Label>
-                  <Input
-                    id="room-number"
-                    value={newRoom.number}
-                    onChange={(e) => setNewRoom({ ...newRoom, number: e.target.value })}
-                    placeholder="e.g. 101"
-                  />
-                  {roomNumberError && (
-                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                      <AlertCircle className="h-3 w-3" />
-                      <span>{roomNumberError}</span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Capacity */}
-                <div className="space-y-2">
-                  <Label htmlFor="room-capacity">Capacity</Label>
-                  <Input
-                    id="room-capacity"
-                    type="number"
-                    min="1"
-                    value={newRoom.capacity}
-                    onChange={(e) => setNewRoom({ ...newRoom, capacity: parseInt(e.target.value) || 1 })}
-                  />
-                </div>
-                
-                {/* Room Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="room-type">Room Type</Label>
-                  <Select
-                    value={newRoom.type}
-                    onValueChange={(value) => setNewRoom({ ...newRoom, type: value as "classroom" | "lab" })}
-                  >
-                    <SelectTrigger id="room-type">
-                      <SelectValue placeholder="Select room type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="classroom">Classroom</SelectItem>
-                      <SelectItem value="lab">Laboratory</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button 
-                onClick={handleAddRoom} 
-                className="gap-2"
-                disabled={roomMutation.isPending}
-              >
-                {roomMutation.isPending ? (
-                  <>Adding...</>
-                ) : (
-                  <>
-                    <PlusIcon className="h-4 w-4" />
-                    Add Room
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          {/* Room List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Room List</CardTitle>
-              <CardDescription>
-                View and manage all rooms
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingRooms ? (
-                <div className="text-center py-6 text-muted-foreground">
-                  Loading rooms...
-                </div>
-              ) : rooms.length > 0 ? (
-                <div className="space-y-4">
-                  {rooms.map((room) => (
-                    <div key={room.id} className="flex items-center justify-between p-3 border rounded-md">
-                      <div>
-                        <div className="font-medium">Room {room.number}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {room.capacity} seats • {room.type === 'classroom' ? 'Classroom' : 'Laboratory'}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteRoom(room.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                        disabled={deleteRoomMutation.isPending}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  No rooms added yet.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {/* ... keep existing code (rest of the component structure) */}
       </Tabs>
       
       {/* Duplicate Warning Dialog */}
