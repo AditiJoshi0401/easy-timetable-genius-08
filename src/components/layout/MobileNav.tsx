@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Menu, X, Calendar, Home, Settings, Database, LayoutGrid } from "lucide-react";
+import { Menu, X, Calendar, Home, Settings, Database, LayoutGrid, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -10,11 +10,17 @@ const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
   { to: "/timetable-editor", icon: Calendar, label: "Timetable Editor" },
   { to: "/data-input", icon: Database, label: "Data Management" },
+  { to: "/streams-manager", icon: BookOpen, label: "Streams & Divisions" },
   { to: "/view-timetables", icon: LayoutGrid, label: "View Timetables" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
-export function MobileNav() {
+interface MobileNavProps {
+  isSidebarOpen: boolean;
+  toggleSidebar: () => void;
+}
+
+export function MobileNav({ isSidebarOpen, toggleSidebar }: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -22,7 +28,7 @@ export function MobileNav() {
       <div className="flex h-14 items-center px-4">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="mr-2">
+            <Button variant="ghost" size="icon" className="mr-2" id="sidebar-toggle" onClick={toggleSidebar}>
               <Menu className="h-5 w-5" />
               <span className="sr-only">Toggle menu</span>
             </Button>

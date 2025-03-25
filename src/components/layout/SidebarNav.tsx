@@ -13,9 +13,16 @@ const navItems = [
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
-export function SidebarNav() {
+interface SidebarNavProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function SidebarNav({ isOpen, onClose }: SidebarNavProps) {
+  if (!isOpen) return null;
+  
   return (
-    <div className="h-screen w-64 border-r border-border/40 bg-sidebar shadow-subtle flex flex-col animate-slide-in">
+    <div id="sidebar" className="h-screen w-64 border-r border-border/40 bg-sidebar shadow-subtle flex flex-col animate-slide-in">
       <div className="p-6">
         <div className="flex items-center">
           <div className="relative h-8 w-8 mr-2">
@@ -40,6 +47,7 @@ export function SidebarNav() {
                   : "text-sidebar-foreground/80"
               )}
               end={item.to === "/"}
+              onClick={onClose}
             >
               <item.icon className="h-4 w-4 mr-3 flex-shrink-0" />
               {item.label}

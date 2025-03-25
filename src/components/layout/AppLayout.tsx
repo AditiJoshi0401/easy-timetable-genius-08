@@ -1,12 +1,12 @@
 
 import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import SidebarNav from './SidebarNav';
-import MobileNav from './MobileNav';
-import { useMobile } from '@/hooks/use-mobile';
+import { SidebarNav } from './SidebarNav';
+import { MobileNav } from './MobileNav';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export const AppLayout = () => {
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Close sidebar when switching to mobile view
@@ -68,7 +68,7 @@ export const AppLayout = () => {
           <div className="mx-auto max-w-6xl flex justify-between items-center">
             <div className="text-sm dark:text-white">
               <div>Timetable Genius</div>
-              <div className="text-xs text-muted-foreground">Copyright © 2025 BackslashN Devs</div>
+              <div className="text-xs text-muted-foreground dark:text-white">Copyright © 2025 BackslashN Devs</div>
             </div>
             <div className="text-sm text-muted-foreground">
               v1.0.0
