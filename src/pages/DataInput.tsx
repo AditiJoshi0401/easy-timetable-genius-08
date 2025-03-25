@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { DatabaseIcon, BookIcon, UsersIcon, BuildingIcon, PlusIcon, TrashIcon, SaveIcon, AlertTriangle, AlertCircle } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -1005,4 +1006,205 @@ const DataInput = () => {
                 className="gap-2"
                 disabled={teacherMutation.isPending}
               >
-                {teacherMutation.isPending
+                {teacherMutation.isPending ? (
+                  <>Adding...</>
+                ) : (
+                  <>
+                    <PlusIcon className="h-4 w-4" />
+                    Add Teacher
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          {/* Teacher List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Teacher List</CardTitle>
+              <CardDescription>
+                View and manage all teachers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTeachers ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  Loading teachers...
+                </div>
+              ) : teachers.length > 0 ? (
+                <div className="space-y-4">
+                  {teachers.map((teacher) => (
+                    <div key={teacher.id} className="flex items-center justify-between p-3 border rounded-md">
+                      <div>
+                        <div className="font-medium">{teacher.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {teacher.email} • {teacher.specialization || 'No Specialization'}
+                          {teacher.isTA && <Badge variant="outline" className="ml-2">TA</Badge>}
+                        </div>
+                        {teacher.subjects && teacher.subjects.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {teacher.subjects.map((subjectId) => {
+                              const subject = subjects.find(s => s.id === subjectId);
+                              return subject ? (
+                                <Badge key={subjectId} variant="secondary" className="text-xs">
+                                  {subject.name}
+                                </Badge>
+                              ) : null;
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteTeacher(teacher.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        disabled={deleteTeacherMutation.isPending}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  No teachers added yet.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Rooms Tab */}
+        <TabsContent value="rooms" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Add New Room</CardTitle>
+              <CardDescription>
+                Enter the details of the new room
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Room Number */}
+                <div className="space-y-2">
+                  <Label htmlFor="room-number">Room Number</Label>
+                  <Input
+                    id="room-number"
+                    value={newRoom.number}
+                    onChange={(e) => setNewRoom({ ...newRoom, number: e.target.value })}
+                    placeholder="e.g. 101"
+                  />
+                  {roomNumberError && (
+                    <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>{roomNumberError}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Capacity */}
+                <div className="space-y-2">
+                  <Label htmlFor="room-capacity">Capacity</Label>
+                  <Input
+                    id="room-capacity"
+                    type="number"
+                    min="1"
+                    value={newRoom.capacity}
+                    onChange={(e) => setNewRoom({ ...newRoom, capacity: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+                
+                {/* Room Type */}
+                <div className="space-y-2">
+                  <Label htmlFor="room-type">Room Type</Label>
+                  <Select
+                    value={newRoom.type}
+                    onValueChange={(value) => setNewRoom({ ...newRoom, type: value as "classroom" | "lab" })}
+                  >
+                    <SelectTrigger id="room-type">
+                      <SelectValue placeholder="Select room type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="classroom">Classroom</SelectItem>
+                      <SelectItem value="lab">Laboratory</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button 
+                onClick={handleAddRoom} 
+                className="gap-2"
+                disabled={roomMutation.isPending}
+              >
+                {roomMutation.isPending ? (
+                  <>Adding...</>
+                ) : (
+                  <>
+                    <PlusIcon className="h-4 w-4" />
+                    Add Room
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          {/* Room List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Room List</CardTitle>
+              <CardDescription>
+                View and manage all rooms
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingRooms ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  Loading rooms...
+                </div>
+              ) : rooms.length > 0 ? (
+                <div className="space-y-4">
+                  {rooms.map((room) => (
+                    <div key={room.id} className="flex items-center justify-between p-3 border rounded-md">
+                      <div>
+                        <div className="font-medium">Room {room.number}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {room.capacity} seats • {room.type === 'classroom' ? 'Classroom' : 'Laboratory'}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteRoom(room.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        disabled={deleteRoomMutation.isPending}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  No rooms added yet.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+      
+      {/* Duplicate Warning Dialog */}
+      <DuplicateWarningDialog 
+        open={showDuplicateWarning}
+        onClose={() => setShowDuplicateWarning(false)}
+        onConfirm={addSubjectToTeacherConfirmed}
+        duplicates={duplicateSubjects}
+      />
+    </div>
+  );
+};
+
+export default DataInput;
