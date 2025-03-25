@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Clock, Trash2, Save, Check, AlertCircle, Download, Upload } from "lucide-react";
+import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Trash2, Save, Check, AlertCircle, Download, Upload } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
-import { fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchDivisions, addTimetable, fetchTimetable, updateTimetable } from "@/services/supabaseService";
+import { 
+  fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchDivisions, 
+  addTimetable, fetchTimetable, updateTimetable,
+  Subject, Teacher, Room, Stream, Division
+} from "@/services/supabaseService";
 import { useQuery } from "@tanstack/react-query";
 
 const TimetableEditor = () => {
@@ -53,24 +57,24 @@ const TimetableEditor = () => {
   ];
 
   // Fetch subjects from Supabase
-  const { data: subjects = [] } = useQuery({
+  const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: fetchSubjects
   });
 
   // Fetch teachers from Supabase
-  const { data: teachers = [] } = useQuery({
+  const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
     queryKey: ['teachers'],
     queryFn: fetchTeachers
   });
 
   // Fetch rooms from Supabase
-  const { data: rooms = [] } = useQuery({
+  const { data: rooms = [], isLoading: isLoadingRooms } = useQuery({
     queryKey: ['rooms'],
     queryFn: fetchRooms
   });
 
-  // Fetch streams from Supabase - fixed the React Query options
+  // Fetch streams from Supabase
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
     queryFn: fetchStreams,
@@ -88,6 +92,12 @@ const TimetableEditor = () => {
     }
   });
 
+  // Fetch divisions from Supabase
+  const { data: allDivisions = [] } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: fetchDivisions
+  });
+
   // Initialize noStreamsDataExists state based on streams data
   useEffect(() => {
     if (streams && streams.length > 0) {
@@ -96,12 +106,6 @@ const TimetableEditor = () => {
       setNoStreamsDataExists(true);
     }
   }, [streams]);
-
-  // Fetch divisions from Supabase
-  const { data: allDivisions = [] } = useQuery({
-    queryKey: ['divisions'],
-    queryFn: fetchDivisions
-  });
 
   useEffect(() => {
     if (stream) {
@@ -138,15 +142,20 @@ const TimetableEditor = () => {
   }, [stream, year, allDivisions]);
 
   useEffect(() => {
+    // Create a mapping of subjects to teachers who can teach them
     const subjectTeacherMap: Record<string, string[]> = {};
+    
     teachers.forEach(teacher => {
-      teacher.subjects.forEach((subjectId: string) => {
-        if (!subjectTeacherMap[subjectId]) {
-          subjectTeacherMap[subjectId] = [];
-        }
-        subjectTeacherMap[subjectId].push(teacher.id);
-      });
+      if (teacher.subjects && Array.isArray(teacher.subjects)) {
+        teacher.subjects.forEach((subjectId: string) => {
+          if (!subjectTeacherMap[subjectId]) {
+            subjectTeacherMap[subjectId] = [];
+          }
+          subjectTeacherMap[subjectId].push(teacher.id);
+        });
+      }
     });
+    
     setAssignedTeachers(subjectTeacherMap);
   }, [teachers]);
 
@@ -422,11 +431,14 @@ const TimetableEditor = () => {
 
   const filteredSubjects = subjects.filter((subject) => {
     if (!stream || !year) return true;
-    return subject.stream === stream && subject.year === year;
+    return subject.stream === streams.find(s => s.id === stream)?.code && subject.year === year;
   });
 
   const getTeachersForSubject = (subjectId: string) => {
-    return teachers.filter(teacher => teacher.subjects.includes(subjectId));
+    // Return teachers who can teach this subject
+    return teachers.filter(teacher => 
+      teacher.subjects && Array.isArray(teacher.subjects) && teacher.subjects.includes(subjectId)
+    );
   };
 
   const getStreamName = (streamId: string) => {
@@ -832,7 +844,11 @@ const TimetableEditor = () => {
                       
                       <TabsContent value="subjects" className="mt-4">
                         <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                          {filteredSubjects.length > 0 ? (
+                          {isLoadingSubjects ? (
+                            <div className="flex justify-center py-4">
+                              <p className="text-muted-foreground">Loading subjects...</p>
+                            </div>
+                          ) : filteredSubjects.length > 0 ? (
                             filteredSubjects.map((subject) => (
                               <div
                                 key={subject.id}
@@ -851,7 +867,9 @@ const TimetableEditor = () => {
                                 <AlertCircle className="h-5 w-5 text-muted-foreground" />
                               </div>
                               <p className="text-sm text-muted-foreground">
-                                No subjects available for the selected stream and year.
+                                {subjects.length === 0 ? 
+                                  "No subjects available. Please add subjects in Data Management." :
+                                  "No subjects available for the selected stream and year."}
                               </p>
                             </div>
                           )}
@@ -860,7 +878,11 @@ const TimetableEditor = () => {
                       
                       <TabsContent value="teachers" className="mt-4">
                         <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                          {teachers.length > 0 ? (
+                          {isLoadingTeachers ? (
+                            <div className="flex justify-center py-4">
+                              <p className="text-muted-foreground">Loading teachers...</p>
+                            </div>
+                          ) : teachers.length > 0 ? (
                             teachers.map((teacher) => (
                               <div
                                 key={teacher.id}
@@ -875,6 +897,9 @@ const TimetableEditor = () => {
                             ))
                           ) : (
                             <div className="text-center py-6">
+                              <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
+                                <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                              </div>
                               <p className="text-sm text-muted-foreground">
                                 No teachers available. Please add teachers in Data Management.
                               </p>
@@ -885,7 +910,11 @@ const TimetableEditor = () => {
                       
                       <TabsContent value="rooms" className="mt-4">
                         <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                          {rooms.length > 0 ? (
+                          {isLoadingRooms ? (
+                            <div className="flex justify-center py-4">
+                              <p className="text-muted-foreground">Loading rooms...</p>
+                            </div>
+                          ) : rooms.length > 0 ? (
                             rooms.map((room) => (
                               <div
                                 key={room.id}
@@ -902,6 +931,9 @@ const TimetableEditor = () => {
                             ))
                           ) : (
                             <div className="text-center py-6">
+                              <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
+                                <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                              </div>
                               <p className="text-sm text-muted-foreground">
                                 No rooms available. Please add rooms in Data Management.
                               </p>
@@ -930,17 +962,27 @@ const TimetableEditor = () => {
                   <Label>Subject</Label>
                   <Select 
                     value={slotDetails.subject} 
-                    onValueChange={value => setSlotDetails({ ...slotDetails, subject: value })}
+                    onValueChange={value => setSlotDetails({ ...slotDetails, subject: value, teacher: "" })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select Subject" />
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredSubjects.map(subject => (
-                        <SelectItem key={subject.id} value={subject.id}>
-                          {subject.name} ({subject.code})
+                      {isLoadingSubjects ? (
+                        <SelectItem value="" disabled>Loading subjects...</SelectItem>
+                      ) : filteredSubjects.length > 0 ? (
+                        filteredSubjects.map(subject => (
+                          <SelectItem key={subject.id} value={subject.id}>
+                            {subject.name} ({subject.code})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          {subjects.length === 0 ? 
+                            "No subjects available. Please add subjects in Data Management." :
+                            "No subjects available for the selected stream and year."}
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -956,22 +998,27 @@ const TimetableEditor = () => {
                       <SelectValue placeholder="Select Teacher" />
                     </SelectTrigger>
                     <SelectContent>
-                      {slotDetails.subject ? (
-                        getTeachersForSubject(slotDetails.subject).length > 0 ? (
-                          getTeachersForSubject(slotDetails.subject).map(teacher => (
-                            <SelectItem key={teacher.id} value={teacher.id}>
-                              {teacher.isTA ? "TA " : ""}{teacher.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-teachers" disabled>
-                            No teachers assigned to this subject
-                          </SelectItem>
-                        )
-                      ) : (
-                        <SelectItem value="select-subject" disabled>
+                      {!slotDetails.subject ? (
+                        <SelectItem value="" disabled>
                           Select a subject first
                         </SelectItem>
+                      ) : isLoadingTeachers ? (
+                        <SelectItem value="" disabled>Loading teachers...</SelectItem>
+                      ) : (
+                        (() => {
+                          const subjectTeachers = getTeachersForSubject(slotDetails.subject);
+                          return subjectTeachers.length > 0 ? (
+                            subjectTeachers.map(teacher => (
+                              <SelectItem key={teacher.id} value={teacher.id}>
+                                {teacher.isTA ? "TA " : ""}{teacher.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>
+                              No teachers assigned to this subject
+                            </SelectItem>
+                          );
+                        })()
                       )}
                     </SelectContent>
                   </Select>
@@ -1004,22 +1051,27 @@ const TimetableEditor = () => {
                       <SelectValue placeholder="Select Room" />
                     </SelectTrigger>
                     <SelectContent>
-                      {selectedSlot ? (
-                        getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).length > 0 ? (
-                          getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).map(room => (
-                            <SelectItem key={room.id} value={room.id}>
-                              {room.number} (Capacity: {room.capacity})
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-rooms" disabled>
-                            No available rooms for this time and type
-                          </SelectItem>
-                        )
-                      ) : (
-                        <SelectItem value="no-slot" disabled>
+                      {!selectedSlot ? (
+                        <SelectItem value="" disabled>
                           No time slot selected
                         </SelectItem>
+                      ) : isLoadingRooms ? (
+                        <SelectItem value="" disabled>Loading rooms...</SelectItem>
+                      ) : (
+                        (() => {
+                          const availableRooms = getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type);
+                          return availableRooms.length > 0 ? (
+                            availableRooms.map(room => (
+                              <SelectItem key={room.id} value={room.id}>
+                                {room.number} (Capacity: {room.capacity})
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>
+                              No available rooms for this time and type
+                            </SelectItem>
+                          );
+                        })()
                       )}
                     </SelectContent>
                   </Select>
@@ -1028,7 +1080,12 @@ const TimetableEditor = () => {
               
               <DialogFooter>
                 <Button variant="outline" onClick={() => setSlotDetailsOpen(false)}>Cancel</Button>
-                <Button onClick={addSubjectToTimetable}>Add to Timetable</Button>
+                <Button 
+                  onClick={addSubjectToTimetable}
+                  disabled={!slotDetails.subject || !slotDetails.teacher || !slotDetails.room}
+                >
+                  Add to Timetable
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
