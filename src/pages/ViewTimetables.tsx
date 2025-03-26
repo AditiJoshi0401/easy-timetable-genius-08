@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileJson, FilePdf } from "lucide-react";
+import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -534,7 +534,7 @@ const ViewTimetables = () => {
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="pdf" id="pdf" />
                             <Label htmlFor="pdf" className="flex items-center cursor-pointer">
-                              <FilePdf className="h-5 w-5 mr-2 text-red-500" />
+                              <FileText className="h-5 w-5 mr-2 text-red-500" />
                               <div>
                                 <span className="font-medium">PDF Format</span>
                                 <p className="text-sm text-muted-foreground">Printable document with formatted timetable</p>
