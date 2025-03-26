@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -49,7 +48,6 @@ const ViewTimetables = () => {
     queryFn: fetchDivisions
   });
 
-  // Fetch teachers
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
@@ -64,7 +62,6 @@ const ViewTimetables = () => {
     fetchTeachers();
   }, []);
 
-  // Fetch rooms
   useEffect(() => {
     const fetchRooms = async () => {
       try {
@@ -88,11 +85,27 @@ const ViewTimetables = () => {
   }, [streams]);
 
   useEffect(() => {
-    const loadRecentTimetables = () => {
+    const loadRecentTimetables = async () => {
       try {
-        const storedRecentTimetables = localStorage.getItem('recentTimetables');
-        if (storedRecentTimetables) {
-          setRecentTimetables(JSON.parse(storedRecentTimetables));
+        const { data, error } = await supabase
+          .from('timetables')
+          .select('*')
+          .order('updated_at', { ascending: false })
+          .limit(3);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          const formattedTimetables = data.map(timetable => ({
+            id: timetable.id,
+            stream: timetable.id.split('_')[0],
+            year: timetable.id.split('_')[1],
+            division: timetable.id.split('_')[2],
+            data: timetable.data,
+            lastModified: new Date(timetable.updated_at || timetable.created_at).toLocaleDateString()
+          }));
+          
+          setRecentTimetables(formattedTimetables);
         }
       } catch (error) {
         console.error('Error loading recent timetables:', error);
@@ -241,6 +254,12 @@ const ViewTimetables = () => {
         logging: false,
         useCORS: true,
         backgroundColor: '#ffffff',
+        width: timetableRef.current.scrollWidth,
+        height: timetableRef.current.scrollHeight,
+        x: 0,
+        y: 0,
+        windowWidth: timetableRef.current.scrollWidth,
+        windowHeight: timetableRef.current.scrollHeight
       });
       
       // Remove the export styling class
@@ -300,14 +319,27 @@ const ViewTimetables = () => {
       const pdfWidth = pdf.internal.pageSize.getWidth() - 20;
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
+      // Ensure the image fits within the page
+      const maxHeight = pdf.internal.pageSize.getHeight() - 40; // Leave space for headers
+      let finalWidth = pdfWidth;
+      let finalHeight = pdfHeight;
+      
+      if (pdfHeight > maxHeight) {
+        finalHeight = maxHeight;
+        finalWidth = (imgProps.width * finalHeight) / imgProps.height;
+      }
+      
+      // Center the image horizontally if it's smaller than the page width
+      const startX = finalWidth < pdfWidth ? (pdf.internal.pageSize.getWidth() - finalWidth) / 2 : 10;
+      
       // Add the timetable image to the PDF
       pdf.addImage(
         imgData,
         'PNG',
-        10,
+        startX,
         32, // Adjusted to leave room for title and metadata
-        pdfWidth,
-        pdfHeight
+        finalWidth,
+        finalHeight
       );
       
       // Save the PDF
@@ -637,6 +669,7 @@ const ViewTimetables = () => {
                           viewType="division"
                           showTeachers={true} 
                           showRooms={true}
+                          invertAxis={true}
                         />
                       </div>
                     </TabsContent>
@@ -666,6 +699,7 @@ const ViewTimetables = () => {
                             filterId={selectedTeacher}
                             showTeachers={false}
                             showRooms={true}
+                            invertAxis={true}
                           />
                         ) : (
                           <div className="text-center py-6">
@@ -703,6 +737,7 @@ const ViewTimetables = () => {
                             filterId={selectedRoom}
                             showTeachers={true}
                             showRooms={false}
+                            invertAxis={true}
                           />
                         ) : (
                           <div className="text-center py-6">

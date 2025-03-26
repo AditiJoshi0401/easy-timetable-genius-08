@@ -507,16 +507,18 @@ const TimetableEditor = () => {
     );
   };
 
-  const checkTeacherAvailability = (teacherId: string, day: string, time: string): boolean => {
+  const checkTeacherAvailability = (teacherId: string, day: string, time: string, currentSlotId?: string): boolean => {
     for (const dayKey in timetableData) {
       if (dayKey !== day) continue;
       
       for (const timeKey in timetableData[dayKey]) {
-        if (timeKey === time) continue;
+        if (timeKey === time && currentSlotId) continue;
         
         const slot = timetableData[dayKey][timeKey];
         if (slot && slot.teacher && slot.teacher.id === teacherId) {
-          return false;
+          if (timeKey === time) {
+            return false;
+          }
         }
       }
     }
@@ -1177,6 +1179,7 @@ const TimetableEditor = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="lecture">Lecture</SelectItem>
+                      <SelectItem value="tutorial">Tutorial</SelectItem>
                       <SelectItem value="lab">Lab (2 hours)</SelectItem>
                     </SelectContent>
                   </Select>
