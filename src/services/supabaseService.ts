@@ -49,6 +49,7 @@ export interface Timetable {
   data: any;
   created_at?: string;
   updated_at?: string;
+  composite_id?: string; // Adding a field to store our composite key
 }
 
 // LocalStorage helpers for timetable drafts
@@ -106,6 +107,9 @@ export const getAllTimetableDrafts = (): Record<string, { data: any, lastUpdated
   
   return drafts;
 };
+
+// Helper to create a proper key-value mapping between composite ID and DB ID
+const timetableIdCache: Record<string, string> = {};
 
 // Conflict checking functions
 export const isTeacherAvailable = (
@@ -411,37 +415,49 @@ export const fetchAllTimetables = async (): Promise<Timetable[]> => {
   }
 };
 
-// Timetables - Using string ID instead of UUID for timetable operations
-export const fetchTimetable = async (id: string): Promise<Timetable | null> => {
+// Create a function to get timetable by composite ID
+export const fetchTimetableByCompositeId = async (compositeId: string): Promise<Timetable | null> => {
   try {
-    console.log("Fetching timetable with ID:", id);
+    console.log("Fetching timetable with composite ID:", compositeId);
     
     const { data, error } = await supabase
       .from('timetables')
       .select('*')
-      .eq('id', id)
+      .eq('name', compositeId)
       .maybeSingle();
     
     if (error) {
-      console.error("Error fetching timetable:", error);
+      console.error("Error fetching timetable by composite ID:", error);
       throw error;
     }
     
     console.log("Timetable fetch result:", data);
     return data as Timetable | null;
   } catch (error) {
-    console.error("Exception in fetchTimetable:", error);
+    console.error("Exception in fetchTimetableByCompositeId:", error);
     throw error;
   }
+};
+
+// Modified fetch timetable function to use name field instead of ID
+export const fetchTimetable = async (compositeId: string): Promise<Timetable | null> => {
+  return fetchTimetableByCompositeId(compositeId);
 };
 
 export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'updated_at'>): Promise<Timetable> => {
   try {
     console.log("Adding timetable:", timetable);
     
+    // Ensure the composite ID is stored in the name field for retrieval
+    const timetableToSave = {
+      name: timetable.id, // Use the composite ID as the name for querying
+      division_id: timetable.division_id,
+      data: timetable.data
+    };
+    
     const { data, error } = await supabase
       .from('timetables')
-      .insert([timetable])
+      .insert([timetableToSave])
       .select();
     
     if (error) {
@@ -450,21 +466,35 @@ export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'up
     }
     
     console.log("Added timetable result:", data[0]);
-    return data[0] as Timetable;
+    return {
+      ...data[0],
+      composite_id: timetable.id // Keep track of the composite ID
+    } as Timetable;
   } catch (error) {
     console.error("Exception in addTimetable:", error);
     throw error;
   }
 };
 
-export const updateTimetable = async (id: string, timetable: Partial<Timetable>): Promise<Timetable> => {
+export const updateTimetable = async (compositeId: string, timetable: Partial<Timetable>): Promise<Timetable> => {
   try {
-    console.log("Updating timetable with ID:", id, "Data:", timetable);
+    console.log("Updating timetable with composite ID:", compositeId);
+    
+    // First find the timetable by composite ID (stored in name field)
+    const existingTimetable = await fetchTimetableByCompositeId(compositeId);
+    
+    if (!existingTimetable) {
+      throw new Error(`Timetable with composite ID ${compositeId} not found`);
+    }
     
     const { data, error } = await supabase
       .from('timetables')
-      .update({ ...timetable, updated_at: new Date().toISOString() })
-      .eq('id', id)
+      .update({ 
+        data: timetable.data, 
+        division_id: timetable.division_id,
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', existingTimetable.id)
       .select();
     
     if (error) {
@@ -473,21 +503,31 @@ export const updateTimetable = async (id: string, timetable: Partial<Timetable>)
     }
     
     console.log("Updated timetable result:", data[0]);
-    return data[0] as Timetable;
+    return {
+      ...data[0],
+      composite_id: compositeId
+    } as Timetable;
   } catch (error) {
     console.error("Exception in updateTimetable:", error);
     throw error;
   }
 };
 
-export const deleteTimetable = async (id: string): Promise<boolean> => {
+export const deleteTimetable = async (compositeId: string): Promise<boolean> => {
   try {
-    console.log("Deleting timetable with ID:", id);
+    console.log("Deleting timetable with composite ID:", compositeId);
+    
+    // First find the timetable by composite ID (stored in name field)
+    const existingTimetable = await fetchTimetableByCompositeId(compositeId);
+    
+    if (!existingTimetable) {
+      throw new Error(`Timetable with composite ID ${compositeId} not found`);
+    }
     
     const { error } = await supabase
       .from('timetables')
       .delete()
-      .eq('id', id);
+      .eq('id', existingTimetable.id);
     
     if (error) {
       console.error("Error deleting timetable:", error);
