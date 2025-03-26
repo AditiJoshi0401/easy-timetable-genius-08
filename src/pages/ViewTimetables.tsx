@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileJson, FilePdf } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,6 +11,11 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchStreams, fetchDivisions, fetchTimetable } from "@/services/supabaseService";
 import { useToast } from "@/components/ui/use-toast";
+import TimetableDisplay from "@/components/timetable/TimetableDisplay";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const ViewTimetables = () => {
   const navigate = useNavigate();
@@ -24,6 +29,9 @@ const ViewTimetables = () => {
   const [divisions, setDivisions] = useState<any[]>([]);
   const [recentTimetables, setRecentTimetables] = useState<any[]>([]);
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"json" | "pdf">("json");
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const timetableRef = useRef<HTMLDivElement>(null);
 
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
@@ -175,7 +183,84 @@ const ViewTimetables = () => {
     handleLoadTimetable();
   };
 
-  const exportTimetable = () => {
+  const exportAsPdf = async () => {
+    if (!timetableRef.current || !selectedTimetable || !selectedTimetable.data) {
+      toast({
+        title: "Nothing to Export",
+        description: "There is no timetable data to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const fileName = `timetable_${getStreamName(selectedTimetable.stream)}_${getYearName(selectedTimetable.year)}_${getDivisionName(selectedTimetable.division)}.pdf`;
+      
+      timetableRef.current.classList.add('pdf-export');
+      
+      const canvas = await html2canvas(timetableRef.current, {
+        scale: 1.5,
+        logging: false,
+        useCORS: true,
+      });
+      
+      timetableRef.current.classList.remove('pdf-export');
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+      });
+      
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      pdf.text(
+        `Timetable: ${getStreamName(selectedTimetable.stream)} ${getYearName(selectedTimetable.year)} ${getDivisionName(selectedTimetable.division)}`,
+        pdf.internal.pageSize.getWidth() / 2,
+        15,
+        { align: 'center' }
+      );
+      
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.text(
+        `Generated on: ${new Date().toLocaleString()}`,
+        pdf.internal.pageSize.getWidth() - 15,
+        10,
+        { align: 'right' }
+      );
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth() - 20;
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(
+        imgData,
+        'PNG',
+        10,
+        25,
+        pdfWidth,
+        pdfHeight
+      );
+      
+      pdf.save(fileName);
+      
+      toast({
+        title: "PDF Exported Successfully",
+        description: `Your timetable has been exported as ${fileName}`
+      });
+      
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast({
+        title: "Export Failed",
+        description: "There was an error exporting the timetable as PDF.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportAsJson = () => {
     if (!selectedTimetable || !selectedTimetable.data) {
       toast({
         title: "Nothing to Export",
@@ -206,9 +291,22 @@ const ViewTimetables = () => {
     linkElement.click();
     
     toast({
-      title: "Timetable Exported",
-      description: "Your timetable has been exported successfully."
+      title: "JSON Exported",
+      description: "Your timetable has been exported successfully as JSON."
     });
+  };
+
+  const handleExport = () => {
+    setExportDialogOpen(true);
+  };
+
+  const handleExportConfirm = () => {
+    if (exportFormat === "json") {
+      exportAsJson();
+    } else {
+      exportAsPdf();
+    }
+    setExportDialogOpen(false);
   };
 
   if (streamsLoading) {
@@ -407,10 +505,50 @@ const ViewTimetables = () => {
                   </CardDescription>
                 </div>
                 {selectedTimetable && (
-                  <Button variant="outline" size="sm" className="gap-2" onClick={exportTimetable}>
-                    <Download className="h-4 w-4" />
-                    Export
-                  </Button>
+                  <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
+                        <Download className="h-4 w-4" />
+                        Export
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Export Timetable</DialogTitle>
+                        <DialogDescription>
+                          Choose your preferred export format
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value as "json" | "pdf")} className="space-y-3">
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="json" id="json" />
+                            <Label htmlFor="json" className="flex items-center cursor-pointer">
+                              <FileJson className="h-5 w-5 mr-2 text-blue-500" />
+                              <div>
+                                <span className="font-medium">JSON Format</span>
+                                <p className="text-sm text-muted-foreground">Raw data format that can be imported later</p>
+                              </div>
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="pdf" id="pdf" />
+                            <Label htmlFor="pdf" className="flex items-center cursor-pointer">
+                              <FilePdf className="h-5 w-5 mr-2 text-red-500" />
+                              <div>
+                                <span className="font-medium">PDF Format</span>
+                                <p className="text-sm text-muted-foreground">Printable document with formatted timetable</p>
+                              </div>
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setExportDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleExportConfirm}>Export</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 )}
               </div>
             </CardHeader>
@@ -426,19 +564,12 @@ const ViewTimetables = () => {
                     </TabsList>
                     
                     <TabsContent value="division">
-                      <div className="text-center py-12">
-                        <p className="text-muted-foreground">
-                          Division timetable view for {getStreamName(selectedTimetable.stream)} {getYearName(selectedTimetable.year)} {getDivisionName(selectedTimetable.division)}
-                        </p>
-                        {selectedTimetable.data && Object.keys(selectedTimetable.data).length > 0 ? (
-                          <p className="text-sm text-muted-foreground mt-2">
-                            Timetable loaded successfully.
-                          </p>
-                        ) : (
-                          <p className="text-sm text-muted-foreground mt-2">
-                            This timetable is empty or contains no scheduled classes.
-                          </p>
-                        )}
+                      <div className="py-4" ref={timetableRef}>
+                        <TimetableDisplay 
+                          timetableData={selectedTimetable.data} 
+                          showTeachers={true} 
+                          showRooms={true}
+                        />
                       </div>
                     </TabsContent>
                     
