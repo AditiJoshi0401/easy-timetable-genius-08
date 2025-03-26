@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Trash2, Save, Check, AlertCircle, Download, Upload, Clock } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -103,7 +102,6 @@ const TimetableEditor = () => {
     queryFn: fetchAllTimetables
   });
 
-  // Function to load drafts from localStorage
   const loadAvailableDrafts = useCallback(() => {
     const drafts = getAllTimetableDrafts();
     setAvailableDrafts(drafts);
@@ -114,19 +112,17 @@ const TimetableEditor = () => {
     loadAvailableDrafts();
   }, [loadAvailableDrafts]);
 
-  // Auto-save functionality
   useEffect(() => {
     if (showTimetable && stream && year && division) {
       const timetableKey = `${stream}_${year}_${division}`;
       
-      // Set up auto-save
       const interval = window.setInterval(() => {
         if (Object.keys(timetableData).length > 0) {
           saveTimetableDraft(timetableKey, timetableData);
           setLastSaved(new Date().toLocaleTimeString());
           console.log("Auto-saved timetable draft", timetableKey);
         }
-      }, 30000); // Auto-save every 30 seconds
+      }, 30000);
       
       setAutoSaveInterval(interval);
       
@@ -138,7 +134,6 @@ const TimetableEditor = () => {
     }
   }, [showTimetable, stream, year, division, timetableData]);
 
-  // Manual save function
   const manualSaveDraft = useCallback(() => {
     if (showTimetable && stream && year && division) {
       const timetableKey = `${stream}_${year}_${division}`;
@@ -237,7 +232,6 @@ const TimetableEditor = () => {
     
     const timetableKey = `${stream}_${year}_${division}`;
     
-    // Check for draft first
     const draft = getTimetableDraft(timetableKey);
     if (draft) {
       setTimetableData(draft.data);
@@ -251,7 +245,6 @@ const TimetableEditor = () => {
       return;
     }
     
-    // If no draft, check for saved timetable in the database
     fetchTimetable(timetableKey)
       .then(existingTimetable => {
         if (existingTimetable) {
@@ -263,7 +256,6 @@ const TimetableEditor = () => {
             description: `Loaded timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}.`,
           });
         } else {
-          // Create new timetable if nothing exists
           setTimetableData(initializeTimetable());
           setShowTimetable(true);
           
@@ -320,7 +312,6 @@ const TimetableEditor = () => {
         });
       }
       
-      // After successful save to database, remove the draft
       removeTimetableDraft(timetableKey);
       setLastSaved(null);
       setIsEditing(false);
@@ -366,8 +357,7 @@ const TimetableEditor = () => {
     }
   };
 
-  const isRoomAvailable = (roomId: string, day: string, startTime: string, type: string) => {
-    // Check if the room is available in the current timetable being edited
+  const checkRoomAvailability = (roomId: string, day: string, startTime: string, type: string) => {
     if (type === "lab") {
       const startIndex = timeSlots.indexOf(startTime);
       if (startIndex === -1 || startIndex > timeSlots.length - 2) {
@@ -388,18 +378,15 @@ const TimetableEditor = () => {
       }
     }
     
-    // Also check conflicts with all other timetables in the database
     return isRoomAvailable(roomId, day, startTime, existingTimetables);
   };
 
   const getAvailableRooms = (day: string, time: string, type: string) => {
     return rooms.filter(room => {
-      // Filter based on room type
       if (type === "lab" && room.type !== "lab") return false;
       if (type === "lecture" && room.type !== "classroom") return false;
       
-      // Check availability in the current and other timetables
-      return isRoomAvailable(room.id, day, time, type);
+      return checkRoomAvailability(room.id, day, time, type);
     });
   };
 
@@ -521,7 +508,6 @@ const TimetableEditor = () => {
   };
 
   const checkTeacherAvailability = (teacherId: string, day: string, time: string): boolean => {
-    // Check availability in the current timetable
     for (const dayKey in timetableData) {
       if (dayKey !== day) continue;
       
@@ -535,7 +521,6 @@ const TimetableEditor = () => {
       }
     }
     
-    // Also check against all other timetables
     return isTeacherAvailable(teacherId, day, time, existingTimetables);
   };
 
