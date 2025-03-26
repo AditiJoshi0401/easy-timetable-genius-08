@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useRef } from "react";
-import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson } from "lucide-react";
+import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,8 +15,7 @@ import { useToast } from "@/components/ui/use-toast";
 import TimetableDisplay from "@/components/timetable/TimetableDisplay";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
 
 const ViewTimetables = () => {
@@ -30,7 +30,7 @@ const ViewTimetables = () => {
   const [divisions, setDivisions] = useState<any[]>([]);
   const [recentTimetables, setRecentTimetables] = useState<any[]>([]);
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"json" | "pdf">("json");
+  const [exportFormat, setExportFormat] = useState<"json" | "excel">("excel");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
@@ -89,20 +89,38 @@ const ViewTimetables = () => {
       try {
         const { data, error } = await supabase
           .from('timetables')
-          .select('*')
+          .select('*, streams(*), divisions(*)')
           .order('updated_at', { ascending: false })
           .limit(3);
           
         if (error) throw error;
         
         if (data && data.length > 0) {
-          const formattedTimetables = data.map(timetable => ({
-            id: timetable.id,
-            stream: timetable.id.split('_')[0],
-            year: timetable.id.split('_')[1],
-            division: timetable.id.split('_')[2],
-            data: timetable.data,
-            lastModified: new Date(timetable.updated_at || timetable.created_at).toLocaleDateString()
+          const formattedTimetables = await Promise.all(data.map(async (timetable) => {
+            // Get stream, year, and division info
+            const streamInfo = timetable.streams;
+            const divisionInfo = timetable.divisions;
+            
+            // Find the year from the division if it exists
+            let yearValue = "";
+            if (divisionInfo) {
+              yearValue = divisionInfo.year.toString();
+            } else if (timetable.id.includes('_')) {
+              // Fallback to parsing from ID
+              yearValue = timetable.id.split('_')[1];
+            }
+            
+            return {
+              id: timetable.id,
+              stream: streamInfo?.id || timetable.id.split('_')[0],
+              year: yearValue,
+              division: divisionInfo?.id || timetable.id.split('_')[2],
+              streamName: streamInfo?.name || "Unknown Stream",
+              yearName: `Year ${yearValue}`,
+              divisionName: divisionInfo?.name || "Unknown Division",
+              data: timetable.data,
+              lastModified: new Date(timetable.updated_at || timetable.created_at).toLocaleDateString()
+            };
           }));
           
           setRecentTimetables(formattedTimetables);
@@ -232,8 +250,9 @@ const ViewTimetables = () => {
     handleLoadTimetable();
   };
 
-  const exportAsPdf = async () => {
-    if (!timetableRef.current || !selectedTimetable || !selectedTimetable.data) {
+  // Convert timetable data to Excel format
+  const exportAsExcel = () => {
+    if (!selectedTimetable || !selectedTimetable.data) {
       toast({
         title: "Nothing to Export",
         description: "There is no timetable data to export.",
@@ -243,118 +262,129 @@ const ViewTimetables = () => {
     }
 
     try {
-      const fileName = `timetable_${getStreamName(selectedTimetable.stream)}_${getYearName(selectedTimetable.year)}_${getDivisionName(selectedTimetable.division)}.pdf`;
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       
-      // Add a class for styling during export
-      timetableRef.current.classList.add('pdf-export');
-      
-      // Capture the timetable as an image
-      const canvas = await html2canvas(timetableRef.current, {
-        scale: 2, // Higher scale for better quality
-        logging: false,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        width: timetableRef.current.scrollWidth,
-        height: timetableRef.current.scrollHeight,
-        x: 0,
-        y: 0,
-        windowWidth: timetableRef.current.scrollWidth,
-        windowHeight: timetableRef.current.scrollHeight
+      // Get all periods from the timetable
+      const periods = Array.from(
+        new Set(
+          Object.values(selectedTimetable.data)
+            .flatMap((dayData: any) => Object.keys(dayData))
+        )
+      ).sort((a, b) => {
+        // Extract the starting hour from the time slot (e.g., "9:30" from "9:30 - 10:30")
+        const getStartHour = (timeSlot: string) => {
+          const match = timeSlot.match(/^(\d+):(\d+)/);
+          if (!match) return 0;
+          let hours = parseInt(match[1]);
+          const minutes = parseInt(match[2]);
+          
+          // Convert to 24-hour format for proper sorting
+          if (timeSlot.includes("PM") && hours < 12) {
+            hours += 12;
+          }
+          return hours * 60 + minutes;
+        };
+        
+        return getStartHour(a) - getStartHour(b);
       });
       
-      // Remove the export styling class
-      timetableRef.current.classList.remove('pdf-export');
+      // Create header row
+      const header = ["Period/Day", ...days];
       
-      const imgData = canvas.toDataURL('image/png');
-      
-      // Create PDF in landscape mode to better fit the timetable
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4',
+      // Create data rows
+      const rows = periods.map(period => {
+        const row: any[] = [period];
+        
+        days.forEach(day => {
+          const slot = selectedTimetable.data[day]?.[period];
+          
+          if (slot) {
+            let cellContent = "";
+            
+            // Add subject
+            const subjectName = typeof slot.subject === 'string' 
+              ? slot.subject 
+              : slot.subject?.name || 'Unknown Subject';
+            cellContent = subjectName;
+            
+            // Add teacher if available
+            if (slot.teacher) {
+              const teacherName = typeof slot.teacher === 'string'
+                ? slot.teacher
+                : slot.teacher?.name || 'Unknown Teacher';
+              cellContent += `\n${teacherName}`;
+            }
+            
+            // Add room if available
+            if (slot.room) {
+              const roomNumber = typeof slot.room === 'string'
+                ? slot.room
+                : slot.room?.number || 'Unknown Room';
+              cellContent += `\nRoom: ${roomNumber}`;
+            }
+            
+            // Add type if available
+            if (slot.type) {
+              cellContent += `\nType: ${slot.type}`;
+            }
+            
+            row.push(cellContent);
+          } else {
+            row.push("-");
+          }
+        });
+        
+        return row;
       });
       
-      // Add title
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(16);
-      pdf.text(
-        `Timetable: ${getStreamName(selectedTimetable.stream)} ${getYearName(selectedTimetable.year)} ${getDivisionName(selectedTimetable.division)}`,
-        pdf.internal.pageSize.getWidth() / 2,
-        15,
-        { align: 'center' }
-      );
+      // Combine header and data
+      const worksheetData = [header, ...rows];
       
-      // Add generation timestamp
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      pdf.text(
-        `Generated on: ${new Date().toLocaleString()}`,
-        pdf.internal.pageSize.getWidth() - 15,
-        10,
-        { align: 'right' }
-      );
+      // Create worksheet
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
       
-      // Add view type info
-      pdf.setFontSize(12);
-      pdf.text(
-        `View: ${viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} View`,
-        15,
-        20
-      );
-      
-      if (viewMode === "teacher" && selectedTeacher) {
-        const teacher = teachers.find(t => t.id === selectedTeacher);
-        if (teacher) {
-          pdf.text(`Teacher: ${teacher.name}`, 15, 26);
-        }
-      } else if (viewMode === "room" && selectedRoom) {
-        const room = rooms.find(r => r.id === selectedRoom);
-        if (room) {
-          pdf.text(`Room: ${room.number}`, 15, 26);
-        }
+      // Set column widths
+      const columnWidths = [{ wch: 20 }]; // Width for first column (Period)
+      for (let i = 0; i < days.length; i++) {
+        columnWidths.push({ wch: 25 }); // Width for day columns
       }
+      ws['!cols'] = columnWidths;
       
-      // Calculate dimensions to fit the page while maintaining aspect ratio
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth() - 20;
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      // Add title at the top
+      XLSX.utils.sheet_add_aoa(ws, [
+        [`Timetable: ${getStreamName(selectedTimetable.stream)} ${getYearName(selectedTimetable.year)} ${getDivisionName(selectedTimetable.division)}`],
+        [`Generated on: ${new Date().toLocaleString()}`],
+        [`View: ${viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} View`]
+      ], { origin: "A1" });
       
-      // Ensure the image fits within the page
-      const maxHeight = pdf.internal.pageSize.getHeight() - 40; // Leave space for headers
-      let finalWidth = pdfWidth;
-      let finalHeight = pdfHeight;
-      
-      if (pdfHeight > maxHeight) {
-        finalHeight = maxHeight;
-        finalWidth = (imgProps.width * finalHeight) / imgProps.height;
-      }
-      
-      // Center the image horizontally if it's smaller than the page width
-      const startX = finalWidth < pdfWidth ? (pdf.internal.pageSize.getWidth() - finalWidth) / 2 : 10;
-      
-      // Add the timetable image to the PDF
-      pdf.addImage(
-        imgData,
-        'PNG',
-        startX,
-        32, // Adjusted to leave room for title and metadata
-        finalWidth,
-        finalHeight
+      // Merge cells for the title
+      if (!ws['!merges']) ws['!merges'] = [];
+      ws['!merges'].push(
+        { s: { r: 0, c: 0 }, e: { r: 0, c: days.length } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: days.length } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: days.length } }
       );
       
-      // Save the PDF
-      pdf.save(fileName);
+      // Add the worksheet to the workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Timetable");
+      
+      // Generate file name
+      const fileName = `timetable_${getStreamName(selectedTimetable.stream)}_${getYearName(selectedTimetable.year)}_${getDivisionName(selectedTimetable.division)}.xlsx`;
+      
+      // Write and download the file
+      XLSX.writeFile(wb, fileName);
       
       toast({
-        title: "PDF Exported Successfully",
+        title: "Excel Exported Successfully",
         description: `Your timetable has been exported as ${fileName}`
       });
-      
     } catch (error) {
-      console.error("Error exporting PDF:", error);
+      console.error("Error exporting Excel:", error);
       toast({
         title: "Export Failed",
-        description: "There was an error exporting the timetable as PDF.",
+        description: "There was an error exporting the timetable as Excel.",
         variant: "destructive"
       });
     }
@@ -404,7 +434,7 @@ const ViewTimetables = () => {
     if (exportFormat === "json") {
       exportAsJson();
     } else {
-      exportAsPdf();
+      exportAsExcel();
     }
     setExportDialogOpen(false);
   };
@@ -567,7 +597,7 @@ const ViewTimetables = () => {
                       onClick={() => handleLoadTimetable(timetable)}
                     >
                       <div className="font-medium text-sm">
-                        {getStreamName(timetable.stream)} {getYearName(timetable.year)} {getDivisionName(timetable.division)}
+                        {timetable.streamName} {timetable.yearName} {timetable.divisionName}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         Last modified: {timetable.lastModified}
@@ -620,7 +650,7 @@ const ViewTimetables = () => {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="py-4">
-                        <RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value as "json" | "pdf")} className="space-y-3">
+                        <RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value as "json" | "excel")} className="space-y-3">
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="json" id="json" />
                             <Label htmlFor="json" className="flex items-center cursor-pointer">
@@ -632,12 +662,12 @@ const ViewTimetables = () => {
                             </Label>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="pdf" id="pdf" />
-                            <Label htmlFor="pdf" className="flex items-center cursor-pointer">
-                              <FileText className="h-5 w-5 mr-2 text-red-500" />
+                            <RadioGroupItem value="excel" id="excel" />
+                            <Label htmlFor="excel" className="flex items-center cursor-pointer">
+                              <FileSpreadsheet className="h-5 w-5 mr-2 text-green-500" />
                               <div>
-                                <span className="font-medium">PDF Format</span>
-                                <p className="text-sm text-muted-foreground">Printable document with formatted timetable</p>
+                                <span className="font-medium">Excel Format</span>
+                                <p className="text-sm text-muted-foreground">Editable spreadsheet with formatted timetable</p>
                               </div>
                             </Label>
                           </div>
@@ -669,7 +699,6 @@ const ViewTimetables = () => {
                           viewType="division"
                           showTeachers={true} 
                           showRooms={true}
-                          invertAxis={true}
                         />
                       </div>
                     </TabsContent>
@@ -699,7 +728,6 @@ const ViewTimetables = () => {
                             filterId={selectedTeacher}
                             showTeachers={false}
                             showRooms={true}
-                            invertAxis={true}
                           />
                         ) : (
                           <div className="text-center py-6">
@@ -737,7 +765,6 @@ const ViewTimetables = () => {
                             filterId={selectedRoom}
                             showTeachers={true}
                             showRooms={false}
-                            invertAxis={true}
                           />
                         ) : (
                           <div className="text-center py-6">

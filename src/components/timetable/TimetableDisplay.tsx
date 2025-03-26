@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface TimetableDisplayProps {
@@ -10,6 +10,28 @@ interface TimetableDisplayProps {
   filterId?: string;
   invertAxis?: boolean;
 }
+
+// Define a set of pleasing background colors for subjects
+const SUBJECT_COLORS = [
+  "#F2FCE2", // Soft Green
+  "#FEF7CD", // Soft Yellow
+  "#FEC6A1", // Soft Orange
+  "#E5DEFF", // Soft Purple
+  "#FFDEE2", // Soft Pink
+  "#FDE1D3", // Soft Peach
+  "#D3E4FD", // Soft Blue
+  "#F1F0FB", // Soft Gray
+  "#E0F2F1", // Soft Teal
+  "#EDE7F6", // Soft Lavender
+  "#FFF3E0", // Soft Amber
+  "#E8F5E9", // Mint Green
+  "#F3E5F5", // Pale Purple
+  "#E1F5FE", // Light Blue
+  "#FFF8E1", // Light Yellow
+];
+
+// Map to store subject-to-color associations
+const subjectColorMap = new Map();
 
 const TimetableDisplay: React.FC<TimetableDisplayProps> = ({ 
   timetableData, 
@@ -30,22 +52,33 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
   // Create an array of days and periods from timetable data
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   
-  // Sort the periods to ensure 9:30 - 10:30 comes first
-  const periods = Array.from(
-    new Set(
-      Object.values(timetableData)
-        .flatMap((dayData: any) => Object.keys(dayData))
-    )
-  ).sort((a, b) => {
-    // Extract the starting hour from the time slot (e.g., "9:30" from "9:30 - 10:30")
-    const getStartHour = (timeSlot: string) => {
-      const match = timeSlot.match(/^(\d+):(\d+)/);
-      if (!match) return 0;
-      return parseInt(match[1]) + parseInt(match[2]) / 60;
-    };
+  // Sort the periods to ensure correct time ordering (9:30 - 10:30 comes first)
+  const periods = useMemo(() => {
+    const allPeriods = Array.from(
+      new Set(
+        Object.values(timetableData)
+          .flatMap((dayData: any) => Object.keys(dayData))
+      )
+    );
     
-    return getStartHour(a) - getStartHour(b);
-  });
+    return allPeriods.sort((a, b) => {
+      // Extract the starting hour and minute from the time slot (e.g., "9:30" from "9:30 - 10:30")
+      const getStartTime = (timeSlot: string) => {
+        const match = timeSlot.match(/^(\d+):(\d+)/);
+        if (!match) return 0;
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        
+        // Convert to 24-hour format for proper sorting
+        if (timeSlot.includes("PM") && hours < 12) {
+          hours += 12;
+        }
+        return hours * 60 + minutes;
+      };
+      
+      return getStartTime(a) - getStartTime(b);
+    });
+  }, [timetableData]);
 
   // Function to filter and transform data based on view type
   const getFilteredData = () => {
@@ -87,6 +120,21 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
 
   const filteredData = getFilteredData();
 
+  // Get a color for a subject - consistently maps subjects to colors
+  const getSubjectColor = (subject: any) => {
+    const subjectId = typeof subject === 'string' ? subject : subject?.id || subject?.name;
+    
+    if (!subjectId) return "#FFFFFF"; // Default white for unknown subjects
+    
+    if (!subjectColorMap.has(subjectId)) {
+      // Assign a new color from the palette
+      const colorIndex = subjectColorMap.size % SUBJECT_COLORS.length;
+      subjectColorMap.set(subjectId, SUBJECT_COLORS[colorIndex]);
+    }
+    
+    return subjectColorMap.get(subjectId);
+  };
+
   // Render normal timetable (days as rows, periods as columns)
   if (!invertAxis) {
     return (
@@ -108,9 +156,14 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
                 <TableCell className="border border-border font-medium">{day}</TableCell>
                 {periods.map((period) => {
                   const slot = filteredData[day]?.[period];
+                  const backgroundColor = slot?.subject ? getSubjectColor(slot.subject) : "transparent";
                   
                   return (
-                    <TableCell key={`${day}-${period}`} className="border border-border p-2 text-center">
+                    <TableCell 
+                      key={`${day}-${period}`} 
+                      className="border border-border p-2 text-center"
+                      style={{ backgroundColor }}
+                    >
                       {slot ? (
                         <div className="space-y-1">
                           <div className="font-medium">
@@ -172,9 +225,14 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
               <TableCell className="border border-border font-medium">{period}</TableCell>
               {days.map((day) => {
                 const slot = filteredData[day]?.[period];
+                const backgroundColor = slot?.subject ? getSubjectColor(slot.subject) : "transparent";
                 
                 return (
-                  <TableCell key={`${period}-${day}`} className="border border-border p-2 text-center">
+                  <TableCell 
+                    key={`${period}-${day}`} 
+                    className="border border-border p-2 text-center"
+                    style={{ backgroundColor }}
+                  >
                     {slot ? (
                       <div className="space-y-1">
                         <div className="font-medium">
