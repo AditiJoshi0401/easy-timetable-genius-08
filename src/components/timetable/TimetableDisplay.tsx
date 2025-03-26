@@ -54,12 +54,24 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
                   <TableCell key={`${day}-${period}`} className="border border-border p-2 text-center">
                     {slot ? (
                       <div className="space-y-1">
-                        <div className="font-medium">{slot.subject}</div>
+                        <div className="font-medium">
+                          {typeof slot.subject === 'string' 
+                            ? slot.subject 
+                            : slot.subject?.name || 'Unknown Subject'}
+                        </div>
                         {showTeachers && slot.teacher && (
-                          <div className="text-xs text-muted-foreground">{slot.teacher}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {typeof slot.teacher === 'string'
+                              ? slot.teacher
+                              : slot.teacher?.name || 'Unknown Teacher'}
+                          </div>
                         )}
                         {showRooms && slot.room && (
-                          <div className="text-xs text-muted-foreground">Room: {slot.room}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Room: {typeof slot.room === 'string'
+                              ? slot.room
+                              : slot.room?.number || 'Unknown Room'}
+                          </div>
                         )}
                       </div>
                     ) : (
