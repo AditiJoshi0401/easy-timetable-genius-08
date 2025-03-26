@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -16,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { supabase } from "@/integrations/supabase/client";
 
 const ViewTimetables = () => {
   const navigate = useNavigate();
@@ -31,6 +33,10 @@ const ViewTimetables = () => {
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
   const [exportFormat, setExportFormat] = useState<"json" | "pdf">("json");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [selectedTeacher, setSelectedTeacher] = useState("");
+  const [selectedRoom, setSelectedRoom] = useState("");
   const timetableRef = useRef<HTMLDivElement>(null);
 
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
@@ -42,6 +48,36 @@ const ViewTimetables = () => {
     queryKey: ['divisions'],
     queryFn: fetchDivisions
   });
+
+  // Fetch teachers
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      try {
+        const { data, error } = await supabase.from('teachers').select('*');
+        if (error) throw error;
+        setTeachers(data || []);
+      } catch (error: any) {
+        console.error('Error fetching teachers:', error.message);
+      }
+    };
+
+    fetchTeachers();
+  }, []);
+
+  // Fetch rooms
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const { data, error } = await supabase.from('rooms').select('*');
+        if (error) throw error;
+        setRooms(data || []);
+      } catch (error: any) {
+        console.error('Error fetching rooms:', error.message);
+      }
+    };
+
+    fetchRooms();
+  }, []);
 
   useEffect(() => {
     if (streams && streams.length > 0) {
@@ -196,22 +232,30 @@ const ViewTimetables = () => {
     try {
       const fileName = `timetable_${getStreamName(selectedTimetable.stream)}_${getYearName(selectedTimetable.year)}_${getDivisionName(selectedTimetable.division)}.pdf`;
       
+      // Add a class for styling during export
       timetableRef.current.classList.add('pdf-export');
       
+      // Capture the timetable as an image
       const canvas = await html2canvas(timetableRef.current, {
-        scale: 1.5,
+        scale: 2, // Higher scale for better quality
         logging: false,
         useCORS: true,
+        backgroundColor: '#ffffff',
       });
       
+      // Remove the export styling class
       timetableRef.current.classList.remove('pdf-export');
       
       const imgData = canvas.toDataURL('image/png');
+      
+      // Create PDF in landscape mode to better fit the timetable
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
+        format: 'a4',
       });
       
+      // Add title
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(16);
       pdf.text(
@@ -221,6 +265,7 @@ const ViewTimetables = () => {
         { align: 'center' }
       );
       
+      // Add generation timestamp
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(10);
       pdf.text(
@@ -230,19 +275,42 @@ const ViewTimetables = () => {
         { align: 'right' }
       );
       
+      // Add view type info
+      pdf.setFontSize(12);
+      pdf.text(
+        `View: ${viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} View`,
+        15,
+        20
+      );
+      
+      if (viewMode === "teacher" && selectedTeacher) {
+        const teacher = teachers.find(t => t.id === selectedTeacher);
+        if (teacher) {
+          pdf.text(`Teacher: ${teacher.name}`, 15, 26);
+        }
+      } else if (viewMode === "room" && selectedRoom) {
+        const room = rooms.find(r => r.id === selectedRoom);
+        if (room) {
+          pdf.text(`Room: ${room.number}`, 15, 26);
+        }
+      }
+      
+      // Calculate dimensions to fit the page while maintaining aspect ratio
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth() - 20;
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
       
+      // Add the timetable image to the PDF
       pdf.addImage(
         imgData,
         'PNG',
         10,
-        25,
+        32, // Adjusted to leave room for title and metadata
         pdfWidth,
         pdfHeight
       );
       
+      // Save the PDF
       pdf.save(fileName);
       
       toast({
@@ -556,17 +624,17 @@ const ViewTimetables = () => {
               {selectedTimetable ? (
                 <div>
                   <Tabs value={viewMode} onValueChange={setViewMode}>
-                    <TabsList className="mb-4 grid w-full grid-cols-4">
+                    <TabsList className="mb-4 grid w-full grid-cols-3">
                       <TabsTrigger value="division">Division</TabsTrigger>
                       <TabsTrigger value="teacher">Teacher</TabsTrigger>
                       <TabsTrigger value="room">Room</TabsTrigger>
-                      <TabsTrigger value="lab">Lab</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="division">
                       <div className="py-4" ref={timetableRef}>
                         <TimetableDisplay 
                           timetableData={selectedTimetable.data} 
+                          viewType="division"
                           showTeachers={true} 
                           showRooms={true}
                         />
@@ -574,35 +642,76 @@ const ViewTimetables = () => {
                     </TabsContent>
                     
                     <TabsContent value="teacher">
-                      <div className="text-center py-12">
-                        <p className="text-muted-foreground">
-                          Teacher-specific timetable view
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          (This is a placeholder - teacher-specific views would be shown here)
-                        </p>
+                      <div className="mb-4">
+                        <Label>Select Teacher</Label>
+                        <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a teacher" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teachers.map((teacher) => (
+                              <SelectItem key={teacher.id} value={teacher.id}>
+                                {teacher.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="py-4" ref={timetableRef}>
+                        {selectedTeacher ? (
+                          <TimetableDisplay 
+                            timetableData={selectedTimetable.data}
+                            viewType="teacher"
+                            filterId={selectedTeacher}
+                            showTeachers={false}
+                            showRooms={true}
+                          />
+                        ) : (
+                          <div className="text-center py-6">
+                            <User className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-muted-foreground">
+                              Select a teacher to view their timetable
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </TabsContent>
                     
                     <TabsContent value="room">
-                      <div className="text-center py-12">
-                        <p className="text-muted-foreground">
-                          Room availability view
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          (This is a placeholder - room schedules would be shown here)
-                        </p>
+                      <div className="mb-4">
+                        <Label>Select Room</Label>
+                        <Select value={selectedRoom} onValueChange={setSelectedRoom}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a room" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {rooms.map((room) => (
+                              <SelectItem key={room.id} value={room.id}>
+                                {room.number} ({room.type})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="lab">
-                      <div className="text-center py-12">
-                        <p className="text-muted-foreground">
-                          Lab availability view
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          (This is a placeholder - lab schedules would be shown here)
-                        </p>
+                      
+                      <div className="py-4" ref={timetableRef}>
+                        {selectedRoom ? (
+                          <TimetableDisplay 
+                            timetableData={selectedTimetable.data}
+                            viewType="room"
+                            filterId={selectedRoom}
+                            showTeachers={true}
+                            showRooms={false}
+                          />
+                        ) : (
+                          <div className="text-center py-6">
+                            <Building className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-muted-foreground">
+                              Select a room to view its schedule
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </TabsContent>
                   </Tabs>

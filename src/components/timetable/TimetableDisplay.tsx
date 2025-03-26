@@ -4,14 +4,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 interface TimetableDisplayProps {
   timetableData: any;
+  viewType?: "division" | "teacher" | "room";
   showTeachers?: boolean;
   showRooms?: boolean;
+  filterId?: string;
 }
 
 const TimetableDisplay: React.FC<TimetableDisplayProps> = ({ 
   timetableData, 
+  viewType = "division",
   showTeachers = true,
-  showRooms = true 
+  showRooms = true,
+  filterId
 }) => {
   if (!timetableData || Object.keys(timetableData).length === 0) {
     return (
@@ -29,6 +33,46 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
         .flatMap((dayData: any) => Object.keys(dayData))
     )
   ).sort();
+
+  // Function to filter and transform data based on view type
+  const getFilteredData = () => {
+    if (viewType === "division" || !filterId) {
+      return timetableData;
+    }
+
+    // Filter timetable data for a specific teacher or room
+    const filteredData: any = {};
+    
+    days.forEach(day => {
+      filteredData[day] = {};
+      
+      if (timetableData[day]) {
+        periods.forEach(period => {
+          const slot = timetableData[day][period];
+          
+          if (slot) {
+            let match = false;
+            
+            if (viewType === "teacher" && slot.teacher) {
+              const teacherId = typeof slot.teacher === 'string' ? slot.teacher : slot.teacher?.id;
+              match = teacherId === filterId;
+            } else if (viewType === "room" && slot.room) {
+              const roomId = typeof slot.room === 'string' ? slot.room : slot.room?.id;
+              match = roomId === filterId;
+            }
+            
+            if (match) {
+              filteredData[day][period] = {...slot};
+            }
+          }
+        });
+      }
+    });
+    
+    return filteredData;
+  };
+
+  const filteredData = getFilteredData();
 
   return (
     <div className="overflow-x-auto">
@@ -48,7 +92,7 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
             <TableRow key={day}>
               <TableCell className="border border-border font-medium">{day}</TableCell>
               {periods.map((period) => {
-                const slot = timetableData[day]?.[period];
+                const slot = filteredData[day]?.[period];
                 
                 return (
                   <TableCell key={`${day}-${period}`} className="border border-border p-2 text-center">
