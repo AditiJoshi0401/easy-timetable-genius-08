@@ -656,397 +656,373 @@ const ViewTimetables = () => {
         icon={<LayoutGrid className="h-6 w-6" />}
       />
 
-      {streamsLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <p>Loading...</p>
-        </div>
-      ) : noStreamsDataExists ? (
-        <Card className="animate-scale-in">
-          <CardHeader>
-            <CardTitle>No Streams and Divisions Found</CardTitle>
-            <CardDescription>
-              You need to set up streams and divisions before viewing timetables
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              Before viewing timetables, you need to set up your academic structure by defining
-              streams, years, and divisions.
-            </p>
-            <Button onClick={handleNavigateToStreamsManager}>
-              Set Up Streams & Divisions
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Filters</CardTitle>
-                <CardDescription>
-                  Select criteria to filter timetables
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Stream</Label>
-                  <Select value={stream} onValueChange={setStream}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Stream" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {streams.length > 0 ? (
-                        streams.map(stream => (
-                          <SelectItem key={stream.id} value={stream.id}>
-                            {stream.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-streams-available" disabled>
-                          No streams available
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Filters</CardTitle>
+              <CardDescription>
+                Select criteria to filter timetables
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Stream</Label>
+                <Select value={stream} onValueChange={setStream}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Stream" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {streams.length > 0 ? (
+                      streams.map(stream => (
+                        <SelectItem key={stream.id} value={stream.id}>
+                          {stream.name}
                         </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      ))
+                    ) : (
+                      <SelectItem value="no-streams-available" disabled>
+                        No streams available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
-                  <Label>Year</Label>
-                  <Select value={year} onValueChange={setYear} disabled={!stream || years.length === 0}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {years.length > 0 ? (
-                        years.map((year: any) => (
-                          <SelectItem key={year.id} value={year.id}>
-                            {year.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-years-available" disabled>
-                          {stream ? "No years available for this stream" : "Select a stream first"}
+              <div className="space-y-2">
+                <Label>Year</Label>
+                <Select value={year} onValueChange={setYear} disabled={!stream || years.length === 0}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.length > 0 ? (
+                      years.map((year: any) => (
+                        <SelectItem key={year.id} value={year.id}>
+                          {year.name}
                         </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      ))
+                    ) : (
+                      <SelectItem value="no-years-available" disabled>
+                        {stream ? "No years available for this stream" : "Select a stream first"}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
-                  <Label>Division</Label>
-                  <Select value={division} onValueChange={setDivision} disabled={!year || divisions.length === 0}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Division" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {divisions.length > 0 ? (
-                        divisions.map((division: any) => (
-                          <SelectItem key={division.id} value={division.id}>
-                            {division.name}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-divisions-available" disabled>
-                          {year ? "No divisions available for this year" : "Select a year first"}
+              <div className="space-y-2">
+                <Label>Division</Label>
+                <Select value={division} onValueChange={setDivision} disabled={!year || divisions.length === 0}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Division" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {divisions.length > 0 ? (
+                      divisions.map((division: any) => (
+                        <SelectItem key={division.id} value={division.id}>
+                          {division.name}
                         </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      ))
+                    ) : (
+                      <SelectItem value="no-divisions-available" disabled>
+                        {year ? "No divisions available for this year" : "Select a year first"}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="flex justify-between mt-2">
-                  <Button variant="outline" onClick={handleNavigateToStreamsManager} size="sm">
-                    Manage Structure
-                  </Button>
-                  <Button onClick={handleApplyFilters} size="sm">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Apply Filters
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              <div className="flex justify-between mt-2">
+                <Button variant="outline" onClick={handleNavigateToStreamsManager} size="sm">
+                  Manage Structure
+                </Button>
+                <Button onClick={handleApplyFilters} size="sm">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Apply Filters
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Timetables</CardTitle>
-                <CardDescription>
-                  Quick access to recently edited timetables
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {recentTimetables.length > 0 ? (
-                    recentTimetables.map((timetable) => (
-                      <div
-                        key={timetable.id}
-                        className="p-3 border rounded-md hover:bg-accent/50 cursor-pointer transition-colors"
-                        onClick={() => handleLoadTimetable(timetable)}
-                      >
-                        <div className="font-medium text-sm">
-                          {timetable.displayName || `${timetable.streamName} ${timetable.yearName} ${timetable.divisionName}`}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Last modified: {timetable.lastModified}
-                        </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Timetables</CardTitle>
+              <CardDescription>
+                Quick access to recently edited timetables
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {recentTimetables.length > 0 ? (
+                  recentTimetables.map((timetable) => (
+                    <div
+                      key={timetable.id}
+                      className="p-3 border rounded-md hover:bg-accent/50 cursor-pointer transition-colors"
+                      onClick={() => handleLoadTimetable(timetable)}
+                    >
+                      <div className="font-medium text-sm">
+                        {timetable.displayName || `${timetable.streamName} ${timetable.yearName} ${timetable.divisionName}`}
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6">
-                      <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        No recent timetables found
-                      </p>
-                      <Button variant="link" size="sm" onClick={() => navigate('/timetable-editor')}>
-                        Create your first timetable
-                      </Button>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Last modified: {timetable.lastModified}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="md:col-span-2">
-            <Card className="h-full">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>
-                      {selectedTimetable ? generateTimetableName(
-                        getStreamName(selectedTimetable.stream),
-                        selectedTimetable.year,
-                        getDivisionName(selectedTimetable.division)
-                      ) : "Timetable Viewer"}
-                    </CardTitle>
-                    <CardDescription>
-                      {selectedTimetable
-                        ? `Viewing ${getStreamName(selectedTimetable.stream)} ${getYearName(selectedTimetable.year)} ${getDivisionName(selectedTimetable.division)}`
-                        : "Select a timetable to view"}
-                    </CardDescription>
-                  </div>
-                  {selectedTimetable && (
-                    <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
-                          <Download className="h-4 w-4" />
-                          Export
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Export Timetable</DialogTitle>
-                          <DialogDescription>
-                            Choose your preferred export format
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          <RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value as "json" | "excel")} className="space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="json" id="json" />
-                              <Label htmlFor="json" className="flex items-center cursor-pointer">
-                                <FileJson className="h-5 w-5 mr-2 text-blue-500" />
-                                <div>
-                                  <span className="font-medium">JSON Format</span>
-                                  <p className="text-sm text-muted-foreground">Raw data format that can be imported later</p>
-                                </div>
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="excel" id="excel" />
-                              <Label htmlFor="excel" className="flex items-center cursor-pointer">
-                                <FileSpreadsheet className="h-5 w-5 mr-2 text-green-500" />
-                                <div>
-                                  <span className="font-medium">Excel Format</span>
-                                  <p className="text-sm text-muted-foreground">Editable spreadsheet with formatted timetable</p>
-                                </div>
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setExportDialogOpen(false)}>Cancel</Button>
-                          <Button onClick={handleExportConfirm}>Export</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {selectedTimetable ? (
-                  <div>
-                    <Tabs value={viewMode} onValueChange={setViewMode as any}>
-                      <TabsList className="mb-4 grid w-full grid-cols-3">
-                        <TabsTrigger value="division">Division</TabsTrigger>
-                        <TabsTrigger value="teacher">Teacher</TabsTrigger>
-                        <TabsTrigger value="room">Room</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="division">
-                        <div className="py-4" ref={timetableRef}>
-                          <TimetableDisplay 
-                            timetableData={selectedTimetable.data} 
-                            viewType="division"
-                            showTeachers={true} 
-                            showRooms={true}
-                          />
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="teacher">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Stream (Optional)</Label>
-                              <Select value={streamForFilter} onValueChange={setStreamForFilter}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="All Streams" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="">All Streams</SelectItem>
-                                  {streams.map(stream => (
-                                    <SelectItem key={stream.id} value={stream.id}>
-                                      {stream.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label>Year (Optional)</Label>
-                              <Select value={yearForFilter} onValueChange={setYearForFilter}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="All Years" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="">All Years</SelectItem>
-                                  {[1, 2, 3, 4, 5].map(y => (
-                                    <SelectItem key={y} value={y.toString()}>
-                                      Year {y}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Role (Optional)</Label>
-                              <Select value={selectedRole} onValueChange={setSelectedRole as any}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="All Roles" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="">All Roles</SelectItem>
-                                  {getAllRoleTypes().map(role => (
-                                    <SelectItem key={role} value={role}>
-                                      {getRoleDisplayName(role)}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label>Teacher</Label>
-                              <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select Teacher" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {teachers.length > 0 ? (
-                                    teachers.map(renderTeacherOption)
-                                  ) : (
-                                    <SelectItem value="no-teachers-available" disabled>
-                                      No teachers available
-                                    </SelectItem>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          
-                          <Button 
-                            className="w-full"
-                            disabled={!selectedTeacher}
-                          >
-                            View Teacher Timetable
-                          </Button>
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="room">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Room Type</Label>
-                              <Select>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="All Room Types" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="">All Room Types</SelectItem>
-                                  {ROOM_TYPES.map((type, idx) => (
-                                    <SelectItem key={idx} value={type.toLowerCase()}>
-                                      {type}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label>Room</Label>
-                              <Select value={selectedRoom} onValueChange={setSelectedRoom}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select Room" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {rooms.length > 0 ? (
-                                    rooms.map(room => (
-                                      <SelectItem key={room.id} value={room.id}>
-                                        {room.number} ({room.type})
-                                      </SelectItem>
-                                    ))
-                                  ) : (
-                                    <SelectItem value="no-rooms-available" disabled>
-                                      No rooms available
-                                    </SelectItem>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          
-                          <Button 
-                            className="w-full"
-                            disabled={!selectedRoom}
-                          >
-                            View Room Schedule
-                          </Button>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
+                  ))
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-64 space-y-4">
-                    <Calendar className="h-16 w-16 text-muted-foreground" />
-                    <div className="text-center">
-                      <h3 className="text-lg font-medium">No Timetable Selected</h3>
-                      <p className="text-sm text-muted-foreground max-w-md mx-auto mt-1">
-                        Select a stream, year, and division to view a timetable, or choose from your recent timetables
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={() => navigate('/timetable-editor')}>
-                      Create New Timetable
+                  <div className="text-center py-6">
+                    <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      No recent timetables found
+                    </p>
+                    <Button variant="link" size="sm" onClick={() => navigate('/timetable-editor')}>
+                      Create your first timetable
                     </Button>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      )}
+
+        <div className="md:col-span-2">
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>
+                    {selectedTimetable ? generateTimetableName(
+                      getStreamName(selectedTimetable.stream),
+                      selectedTimetable.year,
+                      getDivisionName(selectedTimetable.division)
+                    ) : "Timetable Viewer"}
+                  </CardTitle>
+                  <CardDescription>
+                    {selectedTimetable
+                      ? `Viewing ${getStreamName(selectedTimetable.stream)} ${getYearName(selectedTimetable.year)} ${getDivisionName(selectedTimetable.division)}`
+                      : "Select a timetable to view"}
+                  </CardDescription>
+                </div>
+                {selectedTimetable && (
+                  <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
+                        <Download className="h-4 w-4" />
+                        Export
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Export Timetable</DialogTitle>
+                        <DialogDescription>
+                          Choose your preferred export format
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <RadioGroup value={exportFormat} onValueChange={(value) => setExportFormat(value as "json" | "excel")} className="space-y-3">
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="json" id="json" />
+                            <Label htmlFor="json" className="flex items-center cursor-pointer">
+                              <FileJson className="h-5 w-5 mr-2 text-blue-500" />
+                              <div>
+                                <span className="font-medium">JSON Format</span>
+                                <p className="text-sm text-muted-foreground">Raw data format that can be imported later</p>
+                              </div>
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="excel" id="excel" />
+                            <Label htmlFor="excel" className="flex items-center cursor-pointer">
+                              <FileSpreadsheet className="h-5 w-5 mr-2 text-green-500" />
+                              <div>
+                                <span className="font-medium">Excel Format</span>
+                                <p className="text-sm text-muted-foreground">Editable spreadsheet with formatted timetable</p>
+                              </div>
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setExportDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleExportConfirm}>Export</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {selectedTimetable ? (
+                <div>
+                  <Tabs value={viewMode} onValueChange={setViewMode as any}>
+                    <TabsList className="mb-4 grid w-full grid-cols-3">
+                      <TabsTrigger value="division">Division</TabsTrigger>
+                      <TabsTrigger value="teacher">Teacher</TabsTrigger>
+                      <TabsTrigger value="room">Room</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="division">
+                      <div className="py-4" ref={timetableRef}>
+                        <TimetableDisplay 
+                          timetableData={selectedTimetable.data} 
+                          viewType="division"
+                          showTeachers={true} 
+                          showRooms={true}
+                        />
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="teacher">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Stream (Optional)</Label>
+                            <Select value={streamForFilter} onValueChange={setStreamForFilter}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="All Streams" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Streams</SelectItem>
+                                {streams.map(stream => (
+                                  <SelectItem key={stream.id} value={stream.id}>
+                                    {stream.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Year (Optional)</Label>
+                            <Select value={yearForFilter} onValueChange={setYearForFilter}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="All Years" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Years</SelectItem>
+                                {[1, 2, 3, 4, 5].map(y => (
+                                  <SelectItem key={y} value={y.toString()}>
+                                    Year {y}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Role (Optional)</Label>
+                            <Select value={selectedRole} onValueChange={setSelectedRole as any}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="All Roles" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Roles</SelectItem>
+                                {getAllRoleTypes().map(role => (
+                                  <SelectItem key={role} value={role}>
+                                    {getRoleDisplayName(role)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Teacher</Label>
+                            <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Teacher" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {teachers.length > 0 ? (
+                                  teachers.map(renderTeacherOption)
+                                ) : (
+                                  <SelectItem value="no-teachers-available" disabled>
+                                    No teachers available
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          className="w-full"
+                          disabled={!selectedTeacher}
+                        >
+                          View Teacher Timetable
+                        </Button>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="room">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Room Type</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="All Room Types" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Room Types</SelectItem>
+                                {ROOM_TYPES.map((type, idx) => (
+                                  <SelectItem key={idx} value={type.toLowerCase()}>
+                                    {type}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Room</Label>
+                            <Select value={selectedRoom} onValueChange={setSelectedRoom}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select Room" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {rooms.length > 0 ? (
+                                  rooms.map(room => (
+                                    <SelectItem key={room.id} value={room.id}>
+                                      {room.number} ({room.type})
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="no-rooms-available" disabled>
+                                    No rooms available
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          className="w-full"
+                          disabled={!selectedRoom}
+                        >
+                          View Room Schedule
+                        </Button>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                  <Calendar className="h-16 w-16 text-muted-foreground" />
+                  <div className="text-center">
+                    <h3 className="text-lg font-medium">No Timetable Selected</h3>
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto mt-1">
+                      Select a stream, year, and division to view a timetable, or choose from your recent timetables
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={() => navigate('/timetable-editor')}>
+                    Create New Timetable
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
