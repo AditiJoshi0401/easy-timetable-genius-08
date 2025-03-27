@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -9,6 +10,11 @@ interface TimetableDisplayProps {
   showStreamInfo?: boolean;
   filterId?: string;
   invertAxis?: boolean;
+  // Add new props for teacher and room filtering
+  teacherId?: string;
+  roomId?: string;
+  teachers?: any[];
+  rooms?: any[];
 }
 
 // Define a set of pleasing background colors for subjects
@@ -40,7 +46,11 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
   showRooms = true,
   showStreamInfo = false,
   filterId,
-  invertAxis = false
+  invertAxis = false,
+  teacherId,
+  roomId,
+  teachers,
+  rooms
 }) => {
   if (!timetableData || Object.keys(timetableData).length === 0) {
     return (
@@ -105,7 +115,7 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
 
   // Function to filter and transform data based on view type
   const getFilteredData = () => {
-    if (viewType === "division" || !filterId) {
+    if (viewType === "division" || (!filterId && !teacherId && !roomId)) {
       return timetableData;
     }
 
@@ -124,10 +134,10 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
             
             if (viewType === "teacher" && slot.teacher) {
               const teacherId = typeof slot.teacher === 'string' ? slot.teacher : slot.teacher?.id;
-              match = teacherId === filterId;
+              match = teacherId === filterId || teacherId === teacherId;
             } else if (viewType === "room" && slot.room) {
               const roomId = typeof slot.room === 'string' ? slot.room : slot.room?.id;
-              match = roomId === filterId;
+              match = roomId === filterId || roomId === roomId;
             } else if (viewType === "subject" && slot.subject) {
               const subjectId = typeof slot.subject === 'string' ? slot.subject : slot.subject?.id;
               match = subjectId === filterId;

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -66,17 +65,14 @@ const ViewTimetables = () => {
     queryFn: fetchDivisions
   });
 
-  // Fetch teachers with role filtering
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
         const { data, error } = await supabase.from('teachers').select('*');
         if (error) throw error;
         
-        // Apply role filter if selected
         let filteredTeachers = data || [];
         
-        // Filter by stream, year and role if selected
         if (streamForFilter) {
           filteredTeachers = filteredTeachers.filter(teacher => 
             teacher.subjects?.some((s: any) => 
@@ -93,10 +89,8 @@ const ViewTimetables = () => {
           );
         }
         
-        // Use 'ista' property to match with TA role, or look for explicitly set role property
         if (selectedRole) {
           filteredTeachers = filteredTeachers.filter(teacher => {
-            // For backward compatibility, map 'ista' to 'TA' role
             const teacherRole = teacher.ista ? 'TA' : (teacher.role || 'Teacher');
             return teacherRole === selectedRole;
           });
@@ -142,7 +136,6 @@ const ViewTimetables = () => {
         const { data, error } = await supabase.from('subjects').select('*');
         if (error) throw error;
         
-        // Filter by stream and year if selected
         let filteredSubjects = data || [];
         if (streamForFilter) {
           filteredSubjects = filteredSubjects.filter(subject => 
@@ -382,10 +375,8 @@ const ViewTimetables = () => {
       const wb = XLSX.utils.book_new();
       const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       
-      // Ensure we include all time slots in the predefined order
       const periodSet = new Set();
       
-      // First collect all periods that exist in the data
       days.forEach(day => {
         if (selectedTimetable.data[day]) {
           Object.keys(selectedTimetable.data[day]).forEach(period => {
@@ -394,22 +385,17 @@ const ViewTimetables = () => {
         }
       });
       
-      // Use all predefined time slots, or just the ones in the data if none match
       let periods = [];
       
-      // If some of the existing periods match our time slot order, use that order
       const matchingPeriods = TIME_SLOT_ORDER.filter(period => periodSet.has(period));
       
       if (matchingPeriods.length > 0) {
-        // Use our predefined order for known periods
         periods = [...TIME_SLOT_ORDER];
         
-        // Add any additional periods that aren't in our predefined list
         Array.from(periodSet)
           .filter(period => !TIME_SLOT_ORDER.includes(period as string))
           .forEach(period => periods.push(period as string));
       } else {
-        // If none match our predefined order, just use all periods found
         periods = Array.from(periodSet) as string[];
       }
       
@@ -548,7 +534,6 @@ const ViewTimetables = () => {
     setExportDialogOpen(false);
   };
 
-  // Reset filter selectors when changing view mode
   useEffect(() => {
     setSelectedTeacher("");
     setSelectedRoom("");
@@ -600,9 +585,7 @@ const ViewTimetables = () => {
     );
   }
 
-  // Updated teacher rendering to handle missing role property
   const renderTeacherOption = (teacher: any) => {
-    // Determine display role - if ista is true, use 'TA', otherwise use 'role' if available or 'Teacher' as default
     const displayRole = teacher.ista ? 'TA' : (teacher.role || 'Teacher');
     return (
       <SelectItem key={teacher.id} value={teacher.id}>
@@ -912,8 +895,7 @@ const ViewTimetables = () => {
                             <TimetableDisplay 
                               timetableData={selectedTimetable.data}
                               viewType="teacher"
-                              teacherId={selectedTeacher}
-                              teachers={teachers}
+                              filterId={selectedTeacher}
                               showTeachers={false}
                               showRooms={true}
                             />
@@ -958,8 +940,7 @@ const ViewTimetables = () => {
                             <TimetableDisplay 
                               timetableData={selectedTimetable.data}
                               viewType="room"
-                              roomId={selectedRoom}
-                              rooms={rooms}
+                              filterId={selectedRoom}
                               showTeachers={true}
                               showRooms={false}
                             />
