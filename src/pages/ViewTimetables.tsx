@@ -1,41 +1,24 @@
+
 import { useState, useEffect, useRef } from "react";
-import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson, FileSpreadsheet } from "lucide-react";
+import { Calendar, LayoutGrid, Filter, Download, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { FeatureCard } from "@/components/ui/feature-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchStreams, fetchDivisions, fetchTimetable } from "@/services/supabaseService";
 import { useToast } from "@/components/ui/use-toast";
-import TimetableDisplay from "@/components/timetable/TimetableDisplay";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
 import { checkForDuplicates, generateTimetableName } from "@/utils/dataValidation";
-import { RoleType, getAllRoleTypes, getRoleDisplayName } from "@/models/Role";
-
-interface Teacher {
-  id: string;
-  name: string;
-  email: string;
-  ista: boolean;
-  role?: RoleType;
-  specialization: string;
-  subjects: any[];
-  cabin?: string;
-}
-
-interface Room {
-  id: string;
-  number: string;
-  type: string;
-  capacity: number;
-}
+import { RoleType, getRoleDisplayName } from "@/models/Role";
+import DivisionTimetableTab from "@/components/timetable/DivisionTimetableTab";
+import TeacherTimetableTab from "@/components/timetable/TeacherTimetableTab";
+import RoomTimetableTab from "@/components/timetable/RoomTimetableTab";
 
 const ViewTimetables = () => {
   const navigate = useNavigate();
@@ -44,22 +27,13 @@ const ViewTimetables = () => {
   const [year, setYear] = useState("");
   const [division, setDivision] = useState("");
   const [selectedTimetable, setSelectedTimetable] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<"division" | "teacher" | "room" | "subject">("division");
+  const [viewMode, setViewMode] = useState<"division" | "teacher" | "room">("division");
   const [years, setYears] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [recentTimetables, setRecentTimetables] = useState<any[]>([]);
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
   const [exportFormat, setExportFormat] = useState<"json" | "excel">("excel");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [selectedRoom, setSelectedRoom] = useState("");
-  const [selectedSubject, setSelectedSubject] = useState("");
-  const [selectedRole, setSelectedRole] = useState<RoleType | "">("");
-  const [streamForFilter, setStreamForFilter] = useState("");
-  const [yearForFilter, setYearForFilter] = useState("");
   const timetableRef = useRef<HTMLDivElement>(null);
 
   const TIME_SLOT_ORDER = [
@@ -73,8 +47,6 @@ const ViewTimetables = () => {
     "4:30 - 5:30"
   ];
 
-  const ROOM_TYPES = ["Classroom", "Lab", "Seminar Hall", "Cabin", "Shared Cabin"];
-
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
     queryFn: fetchStreams
@@ -85,106 +57,7 @@ const ViewTimetables = () => {
     queryFn: fetchDivisions
   });
 
-  useEffect(() => {
-    const fetchTeachers = async () => {
-      try {
-        const { data, error } = await supabase.from('teachers').select('*');
-        if (error) throw error;
-        
-        let filteredTeachers = data || [];
-        
-        if (streamForFilter) {
-          filteredTeachers = filteredTeachers.filter(teacher => 
-            teacher.subjects?.some((s: any) => 
-              typeof s === 'object' && s.stream === streamForFilter
-            )
-          );
-        }
-        
-        if (yearForFilter) {
-          filteredTeachers = filteredTeachers.filter(teacher => 
-            teacher.subjects?.some((s: any) => 
-              typeof s === 'object' && s.year === yearForFilter
-            )
-          );
-        }
-        
-        if (selectedRole) {
-          filteredTeachers = filteredTeachers.filter(teacher => {
-            if (selectedRole === 'TA') {
-              return teacher.ista || teacher.role === 'TA';
-            } else if (teacher.role) {
-              return teacher.role === selectedRole;
-            } else {
-              return selectedRole === 'Teacher' && !teacher.ista;
-            }
-          });
-        }
-        
-        const uniqueTeachers = checkForDuplicates(filteredTeachers, 'name', 'email');
-        if (uniqueTeachers.length !== filteredTeachers.length) {
-          console.log(`Filtered out ${filteredTeachers.length - uniqueTeachers.length} duplicate teachers`);
-        }
-        
-        setTeachers(uniqueTeachers || []);
-      } catch (error: any) {
-        console.error('Error fetching teachers:', error.message);
-      }
-    };
-
-    fetchTeachers();
-  }, [streamForFilter, yearForFilter, selectedRole]);
-
-  useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const { data, error } = await supabase.from('rooms').select('*');
-        if (error) throw error;
-        
-        const uniqueRooms = checkForDuplicates(data || [], 'number');
-        if (uniqueRooms.length !== (data || []).length) {
-          console.log(`Filtered out ${(data || []).length - uniqueRooms.length} duplicate rooms`);
-        }
-        
-        setRooms(uniqueRooms || []);
-      } catch (error: any) {
-        console.error('Error fetching rooms:', error.message);
-      }
-    };
-
-    fetchRooms();
-  }, []);
-
-  useEffect(() => {
-    const fetchSubjects = async () => {
-      try {
-        const { data, error } = await supabase.from('subjects').select('*');
-        if (error) throw error;
-        
-        let filteredSubjects = data || [];
-        if (streamForFilter) {
-          filteredSubjects = filteredSubjects.filter(subject => 
-            subject.stream === streamForFilter
-          );
-        }
-        
-        if (yearForFilter) {
-          filteredSubjects = filteredSubjects.filter(subject => 
-            subject.year === yearForFilter
-          );
-        }
-        
-        const uniqueSubjects = checkForDuplicates(filteredSubjects, 'name', 'code');
-        
-        setSubjects(uniqueSubjects || []);
-      } catch (error: any) {
-        console.error('Error fetching subjects:', error.message);
-      }
-    };
-
-    fetchSubjects();
-  }, [streamForFilter, yearForFilter]);
-
+  // Effect for streams data check
   useEffect(() => {
     if (streams && streams.length > 0) {
       setNoStreamsDataExists(false);
@@ -193,6 +66,7 @@ const ViewTimetables = () => {
     }
   }, [streams]);
 
+  // Load recent timetables
   useEffect(() => {
     const loadRecentTimetables = async () => {
       try {
@@ -269,6 +143,7 @@ const ViewTimetables = () => {
     loadRecentTimetables();
   }, []);
 
+  // Update years when stream changes
   useEffect(() => {
     if (stream) {
       console.log("Selected stream:", stream);
@@ -293,6 +168,7 @@ const ViewTimetables = () => {
     }
   }, [stream, streams]);
 
+  // Update divisions when stream and year change
   useEffect(() => {
     if (stream && year) {
       console.log("Filtering divisions for stream:", stream, "year:", year);
@@ -582,12 +458,6 @@ const ViewTimetables = () => {
     setExportDialogOpen(false);
   };
 
-  useEffect(() => {
-    setSelectedTeacher("");
-    setSelectedRoom("");
-    setSelectedSubject("");
-  }, [viewMode]);
-
   if (streamsLoading) {
     return (
       <div className="space-y-6">
@@ -633,21 +503,6 @@ const ViewTimetables = () => {
     );
   }
 
-  const renderTeacherOption = (teacher: Teacher) => {
-    let displayRole = '';
-    if (teacher.role) {
-      displayRole = getRoleDisplayName(teacher.role as RoleType);
-    } else {
-      displayRole = teacher.ista ? 'Teaching Assistant' : 'Teacher';
-    }
-    
-    return (
-      <SelectItem key={teacher.id} value={teacher.id}>
-        {teacher.name} {displayRole ? `(${displayRole})` : ''}
-      </SelectItem>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -658,92 +513,7 @@ const ViewTimetables = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Filters</CardTitle>
-              <CardDescription>
-                Select criteria to filter timetables
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Stream</Label>
-                <Select value={stream} onValueChange={setStream}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Stream" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {streams.length > 0 ? (
-                      streams.map(stream => (
-                        <SelectItem key={stream.id} value={stream.id}>
-                          {stream.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-streams-available" disabled>
-                        No streams available
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Year</Label>
-                <Select value={year} onValueChange={setYear} disabled={!stream || years.length === 0}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.length > 0 ? (
-                      years.map((year: any) => (
-                        <SelectItem key={year.id} value={year.id}>
-                          {year.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-years-available" disabled>
-                        {stream ? "No years available for this stream" : "Select a stream first"}
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Division</Label>
-                <Select value={division} onValueChange={setDivision} disabled={!year || divisions.length === 0}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Division" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {divisions.length > 0 ? (
-                      divisions.map((division: any) => (
-                        <SelectItem key={division.id} value={division.id}>
-                          {division.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-divisions-available" disabled>
-                        {year ? "No divisions available for this year" : "Select a year first"}
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex justify-between mt-2">
-                <Button variant="outline" onClick={handleNavigateToStreamsManager} size="sm">
-                  Manage Structure
-                </Button>
-                <Button onClick={handleApplyFilters} size="sm">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Apply Filters
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
+          {/* Filters Card */}
           <Card>
             <CardHeader>
               <CardTitle>Recent Timetables</CardTitle>
@@ -852,166 +622,51 @@ const ViewTimetables = () => {
             </CardHeader>
             <CardContent>
               {selectedTimetable ? (
-                <div>
-                  <Tabs value={viewMode} onValueChange={setViewMode as any}>
-                    <TabsList className="mb-4 grid w-full grid-cols-3">
-                      <TabsTrigger value="division">Division</TabsTrigger>
-                      <TabsTrigger value="teacher">Teacher</TabsTrigger>
-                      <TabsTrigger value="room">Room</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="division">
-                      <div className="py-4" ref={timetableRef}>
-                        <TimetableDisplay 
-                          timetableData={selectedTimetable.data} 
-                          viewType="division"
-                          showTeachers={true} 
-                          showRooms={true}
-                        />
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="teacher">
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Stream (Optional)</Label>
-                            <Select value={streamForFilter} onValueChange={setStreamForFilter}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="All Streams" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="">All Streams</SelectItem>
-                                {streams.map(stream => (
-                                  <SelectItem key={stream.id} value={stream.id}>
-                                    {stream.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label>Year (Optional)</Label>
-                            <Select value={yearForFilter} onValueChange={setYearForFilter}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="All Years" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="">All Years</SelectItem>
-                                {[1, 2, 3, 4, 5].map(y => (
-                                  <SelectItem key={y} value={y.toString()}>
-                                    Year {y}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Role (Optional)</Label>
-                            <Select value={selectedRole} onValueChange={setSelectedRole as any}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="All Roles" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="">All Roles</SelectItem>
-                                {getAllRoleTypes().map(role => (
-                                  <SelectItem key={role} value={role}>
-                                    {getRoleDisplayName(role)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label>Teacher</Label>
-                            <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select Teacher" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {teachers.length > 0 ? (
-                                  teachers.map(renderTeacherOption)
-                                ) : (
-                                  <SelectItem value="no-teachers-available" disabled>
-                                    No teachers available
-                                  </SelectItem>
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        
-                        <Button 
-                          className="w-full"
-                          disabled={!selectedTeacher}
-                        >
-                          View Teacher Timetable
-                        </Button>
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="room">
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Room Type</Label>
-                            <Select>
-                              <SelectTrigger>
-                                <SelectValue placeholder="All Room Types" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="">All Room Types</SelectItem>
-                                {ROOM_TYPES.map((type, idx) => (
-                                  <SelectItem key={idx} value={type.toLowerCase()}>
-                                    {type}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label>Room</Label>
-                            <Select value={selectedRoom} onValueChange={setSelectedRoom}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select Room" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {rooms.length > 0 ? (
-                                  rooms.map(room => (
-                                    <SelectItem key={room.id} value={room.id}>
-                                      {room.number} ({room.type})
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="no-rooms-available" disabled>
-                                    No rooms available
-                                  </SelectItem>
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        
-                        <Button 
-                          className="w-full"
-                          disabled={!selectedRoom}
-                        >
-                          View Room Schedule
-                        </Button>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </div>
+                <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "division" | "teacher" | "room")}>
+                  <TabsList className="mb-4 grid w-full grid-cols-3">
+                    <TabsTrigger value="division">Division</TabsTrigger>
+                    <TabsTrigger value="teacher">Teacher</TabsTrigger>
+                    <TabsTrigger value="room">Room</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="division">
+                    <DivisionTimetableTab 
+                      streams={streams}
+                      years={years}
+                      divisions={divisions}
+                      stream={stream}
+                      year={year}
+                      division={division}
+                      selectedTimetable={selectedTimetable}
+                      setStream={setStream}
+                      setYear={setYear}
+                      setDivision={setDivision}
+                      onApplyFilters={handleApplyFilters}
+                      onManageStructure={handleNavigateToStreamsManager}
+                      timetableRef={timetableRef}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="teacher">
+                    <TeacherTimetableTab 
+                      streams={streams}
+                      selectedTimetable={selectedTimetable}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="room">
+                    <RoomTimetableTab 
+                      selectedTimetable={selectedTimetable}
+                    />
+                  </TabsContent>
+                </Tabs>
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 space-y-4">
                   <Calendar className="h-16 w-16 text-muted-foreground" />
                   <div className="text-center">
                     <h3 className="text-lg font-medium">No Timetable Selected</h3>
                     <p className="text-sm text-muted-foreground max-w-md mx-auto mt-1">
-                      Select a stream, year, and division to view a timetable, or choose from your recent timetables
+                      Select a timetable from the recent list, or create a new timetable
                     </p>
                   </div>
                   <Button variant="outline" onClick={() => navigate('/timetable-editor')}>

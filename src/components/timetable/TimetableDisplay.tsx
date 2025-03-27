@@ -116,7 +116,7 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
 
   // Function to filter and transform data based on view type
   const getFilteredData = () => {
-    if (viewType === "division" || (!filterId && !teacherId && !roomId)) {
+    if (viewType === "division" && !filterId && !teacherId && !roomId) {
       return timetableData;
     }
 
@@ -134,14 +134,17 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
             let match = false;
             
             if (viewType === "teacher" && slot.teacher) {
-              const teacherId = typeof slot.teacher === 'string' ? slot.teacher : slot.teacher?.id;
-              match = teacherId === filterId || teacherId === teacherId;
+              const slotTeacherId = typeof slot.teacher === 'string' ? slot.teacher : slot.teacher?.id;
+              match = slotTeacherId === filterId || slotTeacherId === teacherId;
             } else if (viewType === "room" && slot.room) {
-              const roomId = typeof slot.room === 'string' ? slot.room : slot.room?.id;
-              match = roomId === filterId || roomId === roomId;
+              const slotRoomId = typeof slot.room === 'string' ? slot.room : slot.room?.id;
+              match = slotRoomId === filterId || slotRoomId === roomId;
             } else if (viewType === "subject" && slot.subject) {
               const subjectId = typeof slot.subject === 'string' ? slot.subject : slot.subject?.id;
               match = subjectId === filterId;
+            } else if (viewType === "division") {
+              // For division view, just include all slots
+              match = true;
             }
             
             if (match) {
@@ -212,6 +215,9 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
                             {typeof slot.teacher === 'string'
                               ? slot.teacher
                               : slot.teacher?.name || 'Unknown Teacher'}
+                            {typeof slot.teacher === 'object' && slot.teacher && slot.teacher.role && (
+                              <span> ({getRoleDisplayName(slot.teacher.role as RoleType)})</span>
+                            )}
                           </div>
                         )}
                         {showRooms && slot.room && (
@@ -219,11 +225,16 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
                             Room: {typeof slot.room === 'string'
                               ? slot.room
                               : slot.room?.number || 'Unknown Room'}
+                            {typeof slot.room === 'object' && slot.room && slot.room.type && (
+                              <span> ({slot.room.type})</span>
+                            )}
                           </div>
                         )}
-                        {showStreamInfo && slot.stream && slot.year && slot.division && (
+                        {showStreamInfo && slot.stream && (
                           <div className="text-xs text-muted-foreground">
-                            {slot.stream} - Year {slot.year} - {slot.division}
+                            {slot.stream}
+                            {slot.year && <span> - Year {slot.year}</span>}
+                            {slot.division && <span> - {slot.division}</span>}
                           </div>
                         )}
                         {slot.type && (
