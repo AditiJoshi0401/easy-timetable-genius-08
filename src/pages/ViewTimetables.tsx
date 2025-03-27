@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -93,10 +92,13 @@ const ViewTimetables = () => {
           );
         }
         
+        // Use 'ista' property to match with TA role, or look for explicitly set role property
         if (selectedRole) {
-          filteredTeachers = filteredTeachers.filter(teacher => 
-            teacher.role === selectedRole
-          );
+          filteredTeachers = filteredTeachers.filter(teacher => {
+            // For backward compatibility, map 'ista' to 'TA' role
+            const teacherRole = teacher.ista ? 'TA' : (teacher.role || 'Teacher');
+            return teacherRole === selectedRole;
+          });
         }
         
         const uniqueTeachers = checkForDuplicates(filteredTeachers, 'name', 'email');
@@ -276,7 +278,7 @@ const ViewTimetables = () => {
     if (stream && year) {
       console.log("Filtering divisions for stream:", stream, "year:", year);
       const filteredDivisions = allDivisions.filter(d => 
-        d.streamid === stream && d.year.toString() === year
+        d.streamId === stream && d.year.toString() === year
       );
       console.log("Filtered divisions:", filteredDivisions);
       setDivisions(filteredDivisions);
@@ -597,6 +599,17 @@ const ViewTimetables = () => {
     );
   }
 
+  // Updated teacher rendering to handle missing role property
+  const renderTeacherOption = (teacher: any) => {
+    // Determine display role - if ista is true, use 'TA', otherwise use 'role' if available or 'Teacher' as default
+    const displayRole = teacher.ista ? 'TA' : (teacher.role || 'Teacher');
+    return (
+      <SelectItem key={teacher.id} value={teacher.id}>
+        {teacher.name} {displayRole ? `(${displayRole})` : ''}
+      </SelectItem>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -882,11 +895,7 @@ const ViewTimetables = () => {
                               </SelectTrigger>
                               <SelectContent>
                                 {teachers.length > 0 ? (
-                                  teachers.map((teacher) => (
-                                    <SelectItem key={teacher.id} value={teacher.id}>
-                                      {teacher.name} {teacher.role ? `(${teacher.role})` : ''}
-                                    </SelectItem>
-                                  ))
+                                  teachers.map((teacher) => renderTeacherOption(teacher))
                                 ) : (
                                   <SelectItem value="no-teachers" disabled>
                                     No teachers available with these filters
@@ -900,94 +909,4 @@ const ViewTimetables = () => {
                       
                       <div className="py-4" ref={timetableRef}>
                         {selectedTeacher ? (
-                          <TimetableDisplay 
-                            timetableData={selectedTimetable.data}
-                            viewType="teacher"
-                            filterId={selectedTeacher}
-                            showTeachers={false}
-                            showRooms={true}
-                            showStreamInfo={true}
-                          />
-                        ) : (
-                          <div className="text-center py-6">
-                            <User className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                            <p className="text-muted-foreground">
-                              Select a teacher to view their timetable
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="room">
-                      <div className="mb-4">
-                        <Label>Select Room</Label>
-                        <Select value={selectedRoom} onValueChange={setSelectedRoom}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a room" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {rooms.map((room) => (
-                              <SelectItem key={room.id} value={room.id}>
-                                {room.number} ({room.type})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div className="py-4" ref={timetableRef}>
-                        {selectedRoom ? (
-                          <TimetableDisplay 
-                            timetableData={selectedTimetable.data}
-                            viewType="room"
-                            filterId={selectedRoom}
-                            showTeachers={true}
-                            showRooms={false}
-                            showStreamInfo={true}
-                          />
-                        ) : (
-                          <div className="text-center py-6">
-                            <Building className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                            <p className="text-muted-foreground">
-                              Select a room to view its schedule
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FeatureCard
-                    title="Division Timetables"
-                    description="View full timetables for each class division"
-                    icon={<Book className="h-8 w-8" />}
-                  />
-                  <FeatureCard
-                    title="Teacher Schedules"
-                    description="Check individual teacher timetables"
-                    icon={<User className="h-8 w-8" />}
-                  />
-                  <FeatureCard
-                    title="Room Availability"
-                    description="View room usage and availability"
-                    icon={<LayoutGrid className="h-8 w-8" />}
-                  />
-                  <FeatureCard
-                    title="Export Options"
-                    description="Export timetables in various formats"
-                    icon={<Download className="h-8 w-8" />}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default ViewTimetables;
+                          <
