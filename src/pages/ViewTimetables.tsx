@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -905,8 +906,94 @@ const ViewTimetables = () => {
                             </Select>
                           </div>
                         </div>
-                      </div>
                       
-                      <div className="py-4" ref={timetableRef}>
-                        {selectedTeacher ? (
-                          <
+                        <div className="py-4" ref={timetableRef}>
+                          {selectedTeacher ? (
+                            <TimetableDisplay 
+                              timetableData={selectedTimetable.data}
+                              viewType="teacher"
+                              teacherId={selectedTeacher}
+                              teachers={teachers}
+                              showTeachers={false}
+                              showRooms={true}
+                            />
+                          ) : (
+                            <div className="text-center py-12 border rounded-md bg-muted/20">
+                              <User className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                              <p className="text-muted-foreground">
+                                Select a teacher to view their timetable
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="room">
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Select Room</Label>
+                          <Select value={selectedRoom} onValueChange={setSelectedRoom}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a room" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {rooms.length > 0 ? (
+                                rooms.map((room) => (
+                                  <SelectItem key={room.id} value={room.id}>
+                                    Room {room.number}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="no-rooms" disabled>
+                                  No rooms available
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="py-4" ref={timetableRef}>
+                          {selectedRoom ? (
+                            <TimetableDisplay 
+                              timetableData={selectedTimetable.data}
+                              viewType="room"
+                              roomId={selectedRoom}
+                              rooms={rooms}
+                              showTeachers={true}
+                              showRooms={false}
+                            />
+                          ) : (
+                            <div className="text-center py-12 border rounded-md bg-muted/20">
+                              <Building className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                              <p className="text-muted-foreground">
+                                Select a room to view its timetable
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-medium mb-2">No Timetable Selected</h3>
+                  <p className="text-muted-foreground max-w-md mb-4">
+                    Use the filters on the left to select and load a timetable, or click on a recent timetable.
+                  </p>
+                  <Button variant="outline" onClick={() => navigate('/timetable-editor')}>
+                    Create New Timetable
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ViewTimetables;
