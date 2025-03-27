@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -16,6 +17,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
+import { checkForDuplicates, generateTimetableName } from "@/utils/dataValidation";
+import { RoleType } from "@/models/Role";
 
 const ViewTimetables = () => {
   const navigate = useNavigate();
@@ -24,7 +27,7 @@ const ViewTimetables = () => {
   const [year, setYear] = useState("");
   const [division, setDivision] = useState("");
   const [selectedTimetable, setSelectedTimetable] = useState<any>(null);
-  const [viewMode, setViewMode] = useState("division");
+  const [viewMode, setViewMode] = useState<"division" | "teacher" | "room" | "subject">("division");
   const [years, setYears] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [recentTimetables, setRecentTimetables] = useState<any[]>([]);
@@ -33,8 +36,13 @@ const ViewTimetables = () => {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedRole, setSelectedRole] = useState<RoleType | "">("");
+  const [streamForFilter, setStreamForFilter] = useState("");
+  const [yearForFilter, setYearForFilter] = useState("");
   const timetableRef = useRef<HTMLDivElement>(null);
 
   const TIME_SLOT_ORDER = [
@@ -58,15 +66,42 @@ const ViewTimetables = () => {
     queryFn: fetchDivisions
   });
 
+  // Fetch teachers with role filtering
   useEffect(() => {
     const fetchTeachers = async () => {
       try {
         const { data, error } = await supabase.from('teachers').select('*');
         if (error) throw error;
         
-        const uniqueTeachers = checkForDuplicates(data || [], 'name');
-        if (uniqueTeachers.length !== (data || []).length) {
-          console.log(`Filtered out ${(data || []).length - uniqueTeachers.length} duplicate teachers`);
+        // Apply role filter if selected
+        let filteredTeachers = data || [];
+        
+        // Filter by stream, year and role if selected
+        if (streamForFilter) {
+          filteredTeachers = filteredTeachers.filter(teacher => 
+            teacher.subjects?.some((s: any) => 
+              typeof s === 'object' && s.stream === streamForFilter
+            )
+          );
+        }
+        
+        if (yearForFilter) {
+          filteredTeachers = filteredTeachers.filter(teacher => 
+            teacher.subjects?.some((s: any) => 
+              typeof s === 'object' && s.year === yearForFilter
+            )
+          );
+        }
+        
+        if (selectedRole) {
+          filteredTeachers = filteredTeachers.filter(teacher => 
+            teacher.role === selectedRole
+          );
+        }
+        
+        const uniqueTeachers = checkForDuplicates(filteredTeachers, 'name', 'email');
+        if (uniqueTeachers.length !== filteredTeachers.length) {
+          console.log(`Filtered out ${filteredTeachers.length - uniqueTeachers.length} duplicate teachers`);
         }
         
         setTeachers(uniqueTeachers || []);
@@ -76,7 +111,7 @@ const ViewTimetables = () => {
     };
 
     fetchTeachers();
-  }, []);
+  }, [streamForFilter, yearForFilter, selectedRole]);
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -97,6 +132,37 @@ const ViewTimetables = () => {
 
     fetchRooms();
   }, []);
+
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      try {
+        const { data, error } = await supabase.from('subjects').select('*');
+        if (error) throw error;
+        
+        // Filter by stream and year if selected
+        let filteredSubjects = data || [];
+        if (streamForFilter) {
+          filteredSubjects = filteredSubjects.filter(subject => 
+            subject.stream === streamForFilter
+          );
+        }
+        
+        if (yearForFilter) {
+          filteredSubjects = filteredSubjects.filter(subject => 
+            subject.year === yearForFilter
+          );
+        }
+        
+        const uniqueSubjects = checkForDuplicates(filteredSubjects, 'name', 'code');
+        
+        setSubjects(uniqueSubjects || []);
+      } catch (error: any) {
+        console.error('Error fetching subjects:', error.message);
+      }
+    };
+
+    fetchSubjects();
+  }, [streamForFilter, yearForFilter]);
 
   useEffect(() => {
     if (streams && streams.length > 0) {
@@ -149,13 +215,11 @@ const ViewTimetables = () => {
             
             let displayName = "Timetable";
             if (streamInfo && streamInfo.name) {
-              displayName = streamInfo.name;
-              if (yearValue) {
-                displayName += ` Year ${yearValue}`;
-                if (divisionInfo && divisionInfo.name) {
-                  displayName += ` ${divisionInfo.name}`;
-                }
-              }
+              displayName = generateTimetableName(
+                streamInfo.name,
+                yearValue,
+                divisionInfo?.name
+              );
             } else {
               displayName = `Timetable ${timetable.id.substring(0, 6)}`;
             }
@@ -212,7 +276,7 @@ const ViewTimetables = () => {
     if (stream && year) {
       console.log("Filtering divisions for stream:", stream, "year:", year);
       const filteredDivisions = allDivisions.filter(d => 
-        d.streamId === stream && d.year.toString() === year
+        d.streamid === stream && d.year.toString() === year
       );
       console.log("Filtered divisions:", filteredDivisions);
       setDivisions(filteredDivisions);
@@ -301,36 +365,6 @@ const ViewTimetables = () => {
     handleLoadTimetable();
   };
 
-  const checkForDuplicates = (items: any[], field: string) => {
-    const existingValues = new Map();
-    
-    const uniqueItems = [];
-    
-    for (const item of items) {
-      const value = typeof item[field] === 'string' 
-        ? item[field].toLowerCase().trim() 
-        : item[field];
-      
-      if (field === 'name' && item.email) {
-        const emailKey = item.email.toLowerCase().trim();
-        if (existingValues.has(emailKey)) {
-          console.log(`Duplicate teacher found by email: ${item.email}`);
-          continue;
-        }
-        existingValues.set(emailKey, true);
-      }
-      
-      if (value && !existingValues.has(value)) {
-        existingValues.set(value, true);
-        uniqueItems.push(item);
-      } else if (value) {
-        console.log(`Duplicate ${field} found: ${value}`);
-      }
-    }
-    
-    return uniqueItems;
-  };
-
   const exportAsExcel = () => {
     if (!selectedTimetable || !selectedTimetable.data) {
       toast({
@@ -345,9 +379,36 @@ const ViewTimetables = () => {
       const wb = XLSX.utils.book_new();
       const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       
-      const periods = [...TIME_SLOT_ORDER].filter(period => {
-        return days.some(day => selectedTimetable.data[day]?.[period] !== undefined);
+      // Ensure we include all time slots in the predefined order
+      const periodSet = new Set();
+      
+      // First collect all periods that exist in the data
+      days.forEach(day => {
+        if (selectedTimetable.data[day]) {
+          Object.keys(selectedTimetable.data[day]).forEach(period => {
+            periodSet.add(period);
+          });
+        }
       });
+      
+      // Use all predefined time slots, or just the ones in the data if none match
+      let periods = [];
+      
+      // If some of the existing periods match our time slot order, use that order
+      const matchingPeriods = TIME_SLOT_ORDER.filter(period => periodSet.has(period));
+      
+      if (matchingPeriods.length > 0) {
+        // Use our predefined order for known periods
+        periods = [...TIME_SLOT_ORDER];
+        
+        // Add any additional periods that aren't in our predefined list
+        Array.from(periodSet)
+          .filter(period => !TIME_SLOT_ORDER.includes(period as string))
+          .forEach(period => periods.push(period as string));
+      } else {
+        // If none match our predefined order, just use all periods found
+        periods = Array.from(periodSet) as string[];
+      }
       
       const header = ["Period/Day", ...days];
       
@@ -483,6 +544,13 @@ const ViewTimetables = () => {
     }
     setExportDialogOpen(false);
   };
+
+  // Reset filter selectors when changing view mode
+  useEffect(() => {
+    setSelectedTeacher("");
+    setSelectedRoom("");
+    setSelectedSubject("");
+  }, [viewMode]);
 
   if (streamsLoading) {
     return (
@@ -671,7 +739,11 @@ const ViewTimetables = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>
-                    {selectedTimetable ? `${getStreamName(selectedTimetable.stream)} ${getYearName(selectedTimetable.year)} ${getDivisionName(selectedTimetable.division)}` : "Timetable Viewer"}
+                    {selectedTimetable ? generateTimetableName(
+                      getStreamName(selectedTimetable.stream),
+                      selectedTimetable.year,
+                      getDivisionName(selectedTimetable.division)
+                    ) : "Timetable Viewer"}
                   </CardTitle>
                   <CardDescription>
                     {selectedTimetable
@@ -730,7 +802,7 @@ const ViewTimetables = () => {
             <CardContent>
               {selectedTimetable ? (
                 <div>
-                  <Tabs value={viewMode} onValueChange={setViewMode}>
+                  <Tabs value={viewMode} onValueChange={setViewMode as any}>
                     <TabsList className="mb-4 grid w-full grid-cols-3">
                       <TabsTrigger value="division">Division</TabsTrigger>
                       <TabsTrigger value="teacher">Teacher</TabsTrigger>
@@ -749,20 +821,81 @@ const ViewTimetables = () => {
                     </TabsContent>
                     
                     <TabsContent value="teacher">
-                      <div className="mb-4">
-                        <Label>Select Teacher</Label>
-                        <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a teacher" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {teachers.map((teacher) => (
-                              <SelectItem key={teacher.id} value={teacher.id}>
-                                {teacher.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Stream (Optional)</Label>
+                            <Select value={streamForFilter} onValueChange={setStreamForFilter}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="All Streams" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Streams</SelectItem>
+                                {streams.map(stream => (
+                                  <SelectItem key={stream.id} value={stream.id}>
+                                    {stream.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Year (Optional)</Label>
+                            <Select value={yearForFilter} onValueChange={setYearForFilter}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="All Years" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Years</SelectItem>
+                                {[1, 2, 3, 4, 5].map(y => (
+                                  <SelectItem key={y} value={y.toString()}>
+                                    Year {y}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label>Role (Optional)</Label>
+                            <Select value={selectedRole} onValueChange={setSelectedRole as any}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="All Roles" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">All Roles</SelectItem>
+                                <SelectItem value="Teacher">Teacher</SelectItem>
+                                <SelectItem value="TA">Teaching Assistant</SelectItem>
+                                <SelectItem value="HOD">Head of Department</SelectItem>
+                                <SelectItem value="Director">Director</SelectItem>
+                                <SelectItem value="Staff">Staff</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Select Teacher</Label>
+                            <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a teacher" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {teachers.length > 0 ? (
+                                  teachers.map((teacher) => (
+                                    <SelectItem key={teacher.id} value={teacher.id}>
+                                      {teacher.name} {teacher.role ? `(${teacher.role})` : ''}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="no-teachers" disabled>
+                                    No teachers available with these filters
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="py-4" ref={timetableRef}>
@@ -773,6 +906,7 @@ const ViewTimetables = () => {
                             filterId={selectedTeacher}
                             showTeachers={false}
                             showRooms={true}
+                            showStreamInfo={true}
                           />
                         ) : (
                           <div className="text-center py-6">
@@ -810,6 +944,7 @@ const ViewTimetables = () => {
                             filterId={selectedRoom}
                             showTeachers={true}
                             showRooms={false}
+                            showStreamInfo={true}
                           />
                         ) : (
                           <div className="text-center py-6">
