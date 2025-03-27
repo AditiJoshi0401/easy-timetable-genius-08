@@ -1,4 +1,3 @@
-
 import React, { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -61,22 +60,44 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
       )
     );
     
+    // Define a specific order for the periods (9:30 to 5:30)
+    const timeOrder = [
+      "9:30 - 10:30",
+      "10:30 - 11:30",
+      "11:30 - 12:30",
+      "12:30 - 1:30",
+      "1:30 - 2:30",
+      "2:30 - 3:30",
+      "3:30 - 4:30",
+      "4:30 - 5:30"
+    ];
+    
+    // Return the periods sorted according to our predefined order
     return allPeriods.sort((a, b) => {
-      // Extract the starting hour and minute from the time slot (e.g., "9:30" from "9:30 - 10:30")
-      const getStartTime = (timeSlot: string) => {
-        const match = timeSlot.match(/^(\d+):(\d+)/);
-        if (!match) return 0;
-        let hours = parseInt(match[1]);
-        const minutes = parseInt(match[2]);
-        
-        // Convert to 24-hour format for proper sorting
-        if (timeSlot.includes("PM") && hours < 12) {
-          hours += 12;
-        }
-        return hours * 60 + minutes;
-      };
+      const indexA = timeOrder.indexOf(a);
+      const indexB = timeOrder.indexOf(b);
       
-      return getStartTime(a) - getStartTime(b);
+      // If either period isn't in our predefined list, sort them regularly
+      if (indexA === -1 || indexB === -1) {
+        // Extract the starting hour and minute from the time slot (e.g., "9:30" from "9:30 - 10:30")
+        const getStartTime = (timeSlot: string) => {
+          const match = timeSlot.match(/^(\d+):(\d+)/);
+          if (!match) return 0;
+          let hours = parseInt(match[1]);
+          const minutes = parseInt(match[2]);
+          
+          // Convert to 24-hour format for proper sorting
+          if (timeSlot.includes("PM") && hours < 12) {
+            hours += 12;
+          }
+          return hours * 60 + minutes;
+        };
+        
+        return getStartTime(a) - getStartTime(b);
+      }
+      
+      // Otherwise use our predefined order
+      return indexA - indexB;
     });
   }, [timetableData]);
 

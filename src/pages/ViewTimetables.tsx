@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -38,6 +37,17 @@ const ViewTimetables = () => {
   const [selectedRoom, setSelectedRoom] = useState("");
   const timetableRef = useRef<HTMLDivElement>(null);
 
+  const TIME_SLOT_ORDER = [
+    "9:30 - 10:30",
+    "10:30 - 11:30",
+    "11:30 - 12:30",
+    "12:30 - 1:30",
+    "1:30 - 2:30",
+    "2:30 - 3:30",
+    "3:30 - 4:30",
+    "4:30 - 5:30"
+  ];
+
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
     queryFn: fetchStreams
@@ -53,7 +63,13 @@ const ViewTimetables = () => {
       try {
         const { data, error } = await supabase.from('teachers').select('*');
         if (error) throw error;
-        setTeachers(data || []);
+        
+        const uniqueTeachers = checkForDuplicates(data || [], 'name');
+        if (uniqueTeachers.length !== (data || []).length) {
+          console.log(`Filtered out ${(data || []).length - uniqueTeachers.length} duplicate teachers`);
+        }
+        
+        setTeachers(uniqueTeachers || []);
       } catch (error: any) {
         console.error('Error fetching teachers:', error.message);
       }
@@ -67,7 +83,13 @@ const ViewTimetables = () => {
       try {
         const { data, error } = await supabase.from('rooms').select('*');
         if (error) throw error;
-        setRooms(data || []);
+        
+        const uniqueRooms = checkForDuplicates(data || [], 'number');
+        if (uniqueRooms.length !== (data || []).length) {
+          console.log(`Filtered out ${(data || []).length - uniqueRooms.length} duplicate rooms`);
+        }
+        
+        setRooms(uniqueRooms || []);
       } catch (error: any) {
         console.error('Error fetching rooms:', error.message);
       }
@@ -87,7 +109,6 @@ const ViewTimetables = () => {
   useEffect(() => {
     const loadRecentTimetables = async () => {
       try {
-        // Modified query to handle possibly missing relationships
         const { data, error } = await supabase
           .from('timetables')
           .select('*')
@@ -98,17 +119,14 @@ const ViewTimetables = () => {
         
         if (data && data.length > 0) {
           const formattedTimetables = await Promise.all(data.map(async (timetable) => {
-            // Get the stream and division info separately since the join might not work
             let streamInfo = null;
             let divisionInfo = null;
             
-            // Extract IDs from the timetable name/id
             const parts = timetable.name.split('_');
             const streamId = parts[0] || '';
             const yearValue = parts.length > 1 ? parts[1] : '';
             const divisionId = parts.length > 2 ? parts[2] : '';
             
-            // Fetch stream info separately
             if (streamId) {
               const { data: streamData } = await supabase
                 .from('streams')
@@ -119,7 +137,6 @@ const ViewTimetables = () => {
               streamInfo = streamData;
             }
             
-            // Fetch division info separately
             if (divisionId) {
               const { data: divisionData } = await supabase
                 .from('divisions')
@@ -130,7 +147,6 @@ const ViewTimetables = () => {
               divisionInfo = divisionData;
             }
             
-            // Generate a human-readable name
             let displayName = "Timetable";
             if (streamInfo && streamInfo.name) {
               displayName = streamInfo.name;
@@ -141,7 +157,6 @@ const ViewTimetables = () => {
                 }
               }
             } else {
-              // Fallback if stream info couldn't be fetched
               displayName = `Timetable ${timetable.id.substring(0, 6)}`;
             }
             
@@ -286,7 +301,36 @@ const ViewTimetables = () => {
     handleLoadTimetable();
   };
 
-  // Convert timetable data to Excel format
+  const checkForDuplicates = (items: any[], field: string) => {
+    const existingValues = new Map();
+    
+    const uniqueItems = [];
+    
+    for (const item of items) {
+      const value = typeof item[field] === 'string' 
+        ? item[field].toLowerCase().trim() 
+        : item[field];
+      
+      if (field === 'name' && item.email) {
+        const emailKey = item.email.toLowerCase().trim();
+        if (existingValues.has(emailKey)) {
+          console.log(`Duplicate teacher found by email: ${item.email}`);
+          continue;
+        }
+        existingValues.set(emailKey, true);
+      }
+      
+      if (value && !existingValues.has(value)) {
+        existingValues.set(value, true);
+        uniqueItems.push(item);
+      } else if (value) {
+        console.log(`Duplicate ${field} found: ${value}`);
+      }
+    }
+    
+    return uniqueItems;
+  };
+
   const exportAsExcel = () => {
     if (!selectedTimetable || !selectedTimetable.data) {
       toast({
@@ -298,38 +342,15 @@ const ViewTimetables = () => {
     }
 
     try {
-      // Create workbook and worksheet
       const wb = XLSX.utils.book_new();
       const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       
-      // Get all periods from the timetable
-      const periods = Array.from(
-        new Set(
-          Object.values(selectedTimetable.data)
-            .flatMap((dayData: any) => Object.keys(dayData))
-        )
-      ).sort((a, b) => {
-        // Extract the starting hour from the time slot (e.g., "9:30" from "9:30 - 10:30")
-        const getStartHour = (timeSlot: string) => {
-          const match = timeSlot.match(/^(\d+):(\d+)/);
-          if (!match) return 0;
-          let hours = parseInt(match[1]);
-          const minutes = parseInt(match[2]);
-          
-          // Convert to 24-hour format for proper sorting
-          if (timeSlot.includes("PM") && hours < 12) {
-            hours += 12;
-          }
-          return hours * 60 + minutes;
-        };
-        
-        return getStartHour(a) - getStartHour(b);
+      const periods = [...TIME_SLOT_ORDER].filter(period => {
+        return days.some(day => selectedTimetable.data[day]?.[period] !== undefined);
       });
       
-      // Create header row
       const header = ["Period/Day", ...days];
       
-      // Create data rows
       const rows = periods.map(period => {
         const row: any[] = [period];
         
@@ -339,13 +360,11 @@ const ViewTimetables = () => {
           if (slot) {
             let cellContent = "";
             
-            // Add subject
             const subjectName = typeof slot.subject === 'string' 
               ? slot.subject 
               : slot.subject?.name || 'Unknown Subject';
             cellContent = subjectName;
             
-            // Add teacher if available
             if (slot.teacher) {
               const teacherName = typeof slot.teacher === 'string'
                 ? slot.teacher
@@ -353,7 +372,6 @@ const ViewTimetables = () => {
               cellContent += `\n${teacherName}`;
             }
             
-            // Add room if available
             if (slot.room) {
               const roomNumber = typeof slot.room === 'string'
                 ? slot.room
@@ -361,7 +379,6 @@ const ViewTimetables = () => {
               cellContent += `\nRoom: ${roomNumber}`;
             }
             
-            // Add type if available
             if (slot.type) {
               cellContent += `\nType: ${slot.type}`;
             }
@@ -375,27 +392,22 @@ const ViewTimetables = () => {
         return row;
       });
       
-      // Combine header and data
       const worksheetData = [header, ...rows];
       
-      // Create worksheet
       const ws = XLSX.utils.aoa_to_sheet(worksheetData);
       
-      // Set column widths
-      const columnWidths = [{ wch: 20 }]; // Width for first column (Period)
+      const columnWidths = [{ wch: 20 }];
       for (let i = 0; i < days.length; i++) {
-        columnWidths.push({ wch: 25 }); // Width for day columns
+        columnWidths.push({ wch: 25 });
       }
       ws['!cols'] = columnWidths;
       
-      // Add title at the top
       XLSX.utils.sheet_add_aoa(ws, [
         [`Timetable: ${getStreamName(selectedTimetable.stream)} ${getYearName(selectedTimetable.year)} ${getDivisionName(selectedTimetable.division)}`],
         [`Generated on: ${new Date().toLocaleString()}`],
         [`View: ${viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} View`]
       ], { origin: "A1" });
       
-      // Merge cells for the title
       if (!ws['!merges']) ws['!merges'] = [];
       ws['!merges'].push(
         { s: { r: 0, c: 0 }, e: { r: 0, c: days.length } },
@@ -403,13 +415,10 @@ const ViewTimetables = () => {
         { s: { r: 2, c: 0 }, e: { r: 2, c: days.length } }
       );
       
-      // Add the worksheet to the workbook
       XLSX.utils.book_append_sheet(wb, ws, "Timetable");
       
-      // Generate file name
       const fileName = `timetable_${getStreamName(selectedTimetable.stream)}_${getYearName(selectedTimetable.year)}_${getDivisionName(selectedTimetable.division)}.xlsx`;
       
-      // Write and download the file
       XLSX.writeFile(wb, fileName);
       
       toast({
