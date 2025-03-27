@@ -91,7 +91,7 @@ const ViewTimetables = () => {
         
         if (selectedRole) {
           filteredTeachers = filteredTeachers.filter(teacher => {
-            const teacherRole = teacher.ista ? 'TA' : (teacher.role || 'Teacher');
+            const teacherRole = teacher.ista ? 'TA' : (teacher.role as RoleType || 'Teacher');
             return teacherRole === selectedRole;
           });
         }
@@ -586,7 +586,7 @@ const ViewTimetables = () => {
   }
 
   const renderTeacherOption = (teacher: any) => {
-    const displayRole = teacher.ista ? 'TA' : (teacher.role || 'Teacher');
+    const displayRole = teacher.ista ? 'TA' : (teacher.role as RoleType || 'Teacher');
     return (
       <SelectItem key={teacher.id} value={teacher.id}>
         {teacher.name} {displayRole ? `(${displayRole})` : ''}
