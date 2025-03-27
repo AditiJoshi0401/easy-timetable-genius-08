@@ -87,9 +87,10 @@ const ViewTimetables = () => {
   useEffect(() => {
     const loadRecentTimetables = async () => {
       try {
+        // Modified query to handle possibly missing relationships
         const { data, error } = await supabase
           .from('timetables')
-          .select('*, streams(*), divisions(*)')
+          .select('*')
           .order('updated_at', { ascending: false })
           .limit(3);
           
@@ -97,27 +98,62 @@ const ViewTimetables = () => {
         
         if (data && data.length > 0) {
           const formattedTimetables = await Promise.all(data.map(async (timetable) => {
-            // Get stream, year, and division info
-            const streamInfo = timetable.streams;
-            const divisionInfo = timetable.divisions;
+            // Get the stream and division info separately since the join might not work
+            let streamInfo = null;
+            let divisionInfo = null;
             
-            // Find the year from the division if it exists
-            let yearValue = "";
-            if (divisionInfo) {
-              yearValue = divisionInfo.year.toString();
-            } else if (timetable.id.includes('_')) {
-              // Fallback to parsing from ID
-              yearValue = timetable.id.split('_')[1];
+            // Extract IDs from the timetable name/id
+            const parts = timetable.name.split('_');
+            const streamId = parts[0] || '';
+            const yearValue = parts.length > 1 ? parts[1] : '';
+            const divisionId = parts.length > 2 ? parts[2] : '';
+            
+            // Fetch stream info separately
+            if (streamId) {
+              const { data: streamData } = await supabase
+                .from('streams')
+                .select('*')
+                .eq('id', streamId)
+                .maybeSingle();
+                
+              streamInfo = streamData;
+            }
+            
+            // Fetch division info separately
+            if (divisionId) {
+              const { data: divisionData } = await supabase
+                .from('divisions')
+                .select('*')
+                .eq('id', divisionId)
+                .maybeSingle();
+                
+              divisionInfo = divisionData;
+            }
+            
+            // Generate a human-readable name
+            let displayName = "Timetable";
+            if (streamInfo && streamInfo.name) {
+              displayName = streamInfo.name;
+              if (yearValue) {
+                displayName += ` Year ${yearValue}`;
+                if (divisionInfo && divisionInfo.name) {
+                  displayName += ` ${divisionInfo.name}`;
+                }
+              }
+            } else {
+              // Fallback if stream info couldn't be fetched
+              displayName = `Timetable ${timetable.id.substring(0, 6)}`;
             }
             
             return {
               id: timetable.id,
-              stream: streamInfo?.id || timetable.id.split('_')[0],
+              stream: streamId,
               year: yearValue,
-              division: divisionInfo?.id || timetable.id.split('_')[2],
+              division: divisionId,
               streamName: streamInfo?.name || "Unknown Stream",
               yearName: `Year ${yearValue}`,
               divisionName: divisionInfo?.name || "Unknown Division",
+              displayName: displayName,
               data: timetable.data,
               lastModified: new Date(timetable.updated_at || timetable.created_at).toLocaleDateString()
             };
@@ -597,7 +633,7 @@ const ViewTimetables = () => {
                       onClick={() => handleLoadTimetable(timetable)}
                     >
                       <div className="font-medium text-sm">
-                        {timetable.streamName} {timetable.yearName} {timetable.divisionName}
+                        {timetable.displayName || `${timetable.streamName} ${timetable.yearName} ${timetable.divisionName}`}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         Last modified: {timetable.lastModified}
