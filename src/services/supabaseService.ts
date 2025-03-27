@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { RoleType } from '@/models/Role';
 
 // Types
 export interface Subject {
@@ -17,6 +18,8 @@ export interface Teacher {
   specialization: string;
   subjects: string[];
   isTA: boolean;  // Interface uses isTA, but database uses ista
+  role?: RoleType;  // Added role property
+  cabin?: string;   // Added cabin property
 }
 
 export interface Room {
@@ -195,6 +198,7 @@ export const fetchTeachers = async (): Promise<Teacher[]> => {
   return data.map(teacher => ({
     ...teacher,
     isTA: teacher.ista,
+    role: teacher.role as RoleType | undefined,
   })) as Teacher[];
 };
 
@@ -206,6 +210,8 @@ export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher>
     specialization: teacher.specialization,
     subjects: teacher.subjects,
     ista: teacher.isTA,
+    role: teacher.role,
+    cabin: teacher.cabin
   };
   
   const { data, error } = await supabase
@@ -218,6 +224,7 @@ export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher>
   return {
     ...data[0],
     isTA: data[0].ista,
+    role: data[0].role as RoleType | undefined,
   } as Teacher;
 };
 
@@ -240,6 +247,7 @@ export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Prom
   return {
     ...data[0],
     isTA: data[0].ista,
+    role: data[0].role as RoleType | undefined,
   } as Teacher;
 };
 
@@ -447,7 +455,7 @@ export const addTimetable = async (timetable: Omit<Timetable, 'created_at' | 'up
   try {
     console.log("Adding timetable:", timetable);
     
-    // Ensure the composite ID is stored in the name field for retrieval
+    // Ensure the composite ID is stored in the name field for querying
     const timetableToSave = {
       name: timetable.id, // Use the composite ID as the name for querying
       division_id: timetable.division_id,

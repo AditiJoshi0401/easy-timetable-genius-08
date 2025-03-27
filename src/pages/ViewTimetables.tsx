@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Filter, Download, Book, User, FileText, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -636,7 +637,7 @@ const ViewTimetables = () => {
   const renderTeacherOption = (teacher: Teacher) => {
     let displayRole = '';
     if (teacher.role) {
-      displayRole = getRoleDisplayName(teacher.role);
+      displayRole = getRoleDisplayName(teacher.role as RoleType);
     } else {
       displayRole = teacher.ista ? 'Teaching Assistant' : 'Teacher';
     }
