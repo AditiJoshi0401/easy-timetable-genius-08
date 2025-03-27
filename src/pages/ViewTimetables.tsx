@@ -17,7 +17,25 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
 import { checkForDuplicates, generateTimetableName } from "@/utils/dataValidation";
-import { RoleType } from "@/models/Role";
+import { RoleType, getAllRoleTypes, getRoleDisplayName } from "@/models/Role";
+
+interface Teacher {
+  id: string;
+  name: string;
+  email: string;
+  ista: boolean;
+  role?: RoleType;
+  specialization: string;
+  subjects: any[];
+  cabin?: string;
+}
+
+interface Room {
+  id: string;
+  number: string;
+  type: string;
+  capacity: number;
+}
 
 const ViewTimetables = () => {
   const navigate = useNavigate();
@@ -33,8 +51,8 @@ const ViewTimetables = () => {
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
   const [exportFormat, setExportFormat] = useState<"json" | "excel">("excel");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [teachers, setTeachers] = useState<any[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("");
@@ -54,6 +72,8 @@ const ViewTimetables = () => {
     "3:30 - 4:30",
     "4:30 - 5:30"
   ];
+
+  const ROOM_TYPES = ["Classroom", "Lab", "Seminar Hall", "Cabin", "Shared Cabin"];
 
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
@@ -91,8 +111,13 @@ const ViewTimetables = () => {
         
         if (selectedRole) {
           filteredTeachers = filteredTeachers.filter(teacher => {
-            const teacherRole = teacher.ista ? 'TA' : 'Teacher';
-            return teacherRole === selectedRole;
+            if (selectedRole === 'TA') {
+              return teacher.ista || teacher.role === 'TA';
+            } else if (teacher.role) {
+              return teacher.role === selectedRole;
+            } else {
+              return selectedRole === 'Teacher' && !teacher.ista;
+            }
           });
         }
         
@@ -419,14 +444,26 @@ const ViewTimetables = () => {
               const teacherName = typeof slot.teacher === 'string'
                 ? slot.teacher
                 : slot.teacher?.name || 'Unknown Teacher';
-              cellContent += `\n${teacherName}`;
+                
+              const teacherRole = typeof slot.teacher === 'object' && slot.teacher
+                ? (slot.teacher.role 
+                   ? getRoleDisplayName(slot.teacher.role as RoleType)
+                   : (slot.teacher.ista ? 'Teaching Assistant' : 'Teacher'))
+                : '';
+                
+              cellContent += `\n${teacherName} (${teacherRole})`;
             }
             
             if (slot.room) {
               const roomNumber = typeof slot.room === 'string'
                 ? slot.room
                 : slot.room?.number || 'Unknown Room';
-              cellContent += `\nRoom: ${roomNumber}`;
+                
+              const roomType = typeof slot.room === 'object' && slot.room && slot.room.type
+                ? slot.room.type
+                : '';
+                
+              cellContent += `\nRoom: ${roomNumber}${roomType ? ` (${roomType})` : ''}`;
             }
             
             if (slot.type) {
@@ -464,6 +501,17 @@ const ViewTimetables = () => {
         { s: { r: 1, c: 0 }, e: { r: 1, c: days.length } },
         { s: { r: 2, c: 0 }, e: { r: 2, c: days.length } }
       );
+      
+      const headerRow = 4;
+      for (let i = 0; i <= days.length; i++) {
+        if (!ws[XLSX.utils.encode_cell({ r: headerRow, c: i })]) {
+          ws[XLSX.utils.encode_cell({ r: headerRow, c: i })] = { v: "", t: "s" };
+        }
+        if (!ws[XLSX.utils.encode_cell({ r: headerRow, c: i })].s) {
+          ws[XLSX.utils.encode_cell({ r: headerRow, c: i })].s = {};
+        }
+        ws[XLSX.utils.encode_cell({ r: headerRow, c: i })].s.font = { bold: true };
+      }
       
       XLSX.utils.book_append_sheet(wb, ws, "Timetable");
       
@@ -585,8 +633,14 @@ const ViewTimetables = () => {
     );
   }
 
-  const renderTeacherOption = (teacher: any) => {
-    const displayRole = teacher.ista ? 'TA' : 'Teacher';
+  const renderTeacherOption = (teacher: Teacher) => {
+    let displayRole = '';
+    if (teacher.role) {
+      displayRole = getRoleDisplayName(teacher.role);
+    } else {
+      displayRole = teacher.ista ? 'Teaching Assistant' : 'Teacher';
+    }
+    
     return (
       <SelectItem key={teacher.id} value={teacher.id}>
         {teacher.name} {displayRole ? `(${displayRole})` : ''}
@@ -863,11 +917,11 @@ const ViewTimetables = () => {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="">All Roles</SelectItem>
-                                <SelectItem value="Teacher">Teacher</SelectItem>
-                                <SelectItem value="TA">Teaching Assistant</SelectItem>
-                                <SelectItem value="HOD">Head of Department</SelectItem>
-                                <SelectItem value="Director">Director</SelectItem>
-                                <SelectItem value="Staff">Staff</SelectItem>
+                                {getAllRoleTypes().map(role => (
+                                  <SelectItem key={role} value={role}>
+                                    {getRoleDisplayName(role)}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -923,7 +977,7 @@ const ViewTimetables = () => {
                               {rooms.length > 0 ? (
                                 rooms.map((room) => (
                                   <SelectItem key={room.id} value={room.id}>
-                                    Room {room.number}
+                                    Room {room.number} {room.type ? `(${room.type})` : ''}
                                   </SelectItem>
                                 ))
                               ) : (
