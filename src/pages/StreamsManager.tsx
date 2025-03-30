@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Database, PlusCircle, Edit, Trash2, CheckCircle2, XCircle, BookOpen, Users, AlertCircle, UserRound } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -938,4 +939,148 @@ const StreamsManager = () => {
                     {divisionNameError && (
                       <div className="text-sm text-destructive flex items-center gap-1 mt-1">
                         <AlertCircle className="h-3 w-3" />
-                        <span>
+                        <span>{divisionNameError}</span>
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={divisionForm.control}
+                name="year"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Year</FormLabel>
+                    <FormControl>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        {...field}
+                        value={field.value}
+                        onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
+                      >
+                        {getAvailableYearsForStream(divisionForm.getValues('streamId')).map(year => (
+                          <option key={year} value={year}>
+                            Year {year}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormDescription>
+                      The academic year this division belongs to
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={divisionForm.control}
+                name="strength"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Student Strength</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={1} {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      The number of students in this division
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => {
+                  divisionForm.reset();
+                  setIsDivisionDialogOpen(false);
+                  setIsEditing(false);
+                  setDivisionNameError("");
+                }}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {isEditing ? "Save Changes" : "Add Division"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for adding/editing roles */}
+      <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditing ? "Edit Role" : "Add New Role"}</DialogTitle>
+            <DialogDescription>
+              {isEditing ? "Modify the role details below" : "Enter the details for the new staff role"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...roleForm}>
+            <form onSubmit={roleForm.handleSubmit(handleRoleSubmit)} className="space-y-4">
+              <FormField
+                control={roleForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Teacher, HOD, TA" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      The name of the staff role
+                    </FormDescription>
+                    {roleNameError && (
+                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>{roleNameError}</span>
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={roleForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Subject teacher, Department head" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      A short description of this role (optional)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => {
+                  roleForm.reset();
+                  setIsRoleDialogOpen(false);
+                  setIsEditing(false);
+                  setRoleNameError("");
+                }}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {isEditing ? "Save Changes" : "Add Role"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default StreamsManager;
