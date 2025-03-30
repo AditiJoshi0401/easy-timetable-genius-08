@@ -124,29 +124,35 @@ export type Database = {
       }
       teachers: {
         Row: {
+          cabin: string | null
           created_at: string | null
           email: string
           id: string
           ista: boolean
           name: string
+          role: string | null
           specialization: string
           subjects: string[]
         }
         Insert: {
+          cabin?: string | null
           created_at?: string | null
           email: string
           id?: string
           ista?: boolean
           name: string
+          role?: string | null
           specialization: string
           subjects: string[]
         }
         Update: {
+          cabin?: string | null
           created_at?: string | null
           email?: string
           id?: string
           ista?: boolean
           name?: string
+          role?: string | null
           specialization?: string
           subjects?: string[]
         }
