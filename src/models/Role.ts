@@ -1,5 +1,5 @@
 
-export type RoleType = 'Teacher' | 'TA' | 'HOD' | 'Director' | 'Staff';
+export type RoleType = string;
 
 export interface Role {
   id: string;
@@ -7,30 +7,31 @@ export interface Role {
   description?: string;
 }
 
-export const DEFAULT_ROLES: Role[] = [
-  { id: '1', name: 'Teacher', description: 'Regular teaching faculty' },
-  { id: '2', name: 'TA', description: 'Teaching Assistant' },
-  { id: '3', name: 'HOD', description: 'Head of Department' },
-  { id: '4', name: 'Director', description: 'Program Director' },
-  { id: '5', name: 'Staff', description: 'Administrative Staff' }
-];
-
 // Map role types to display names for UI
-export const ROLE_DISPLAY_NAMES: Record<RoleType, string> = {
-  'Teacher': 'Teacher',
-  'TA': 'Teaching Assistant',
-  'HOD': 'Head of Department',
-  'Director': 'Program Director',
-  'Staff': 'Administrative Staff'
-};
+export const ROLE_DISPLAY_NAMES: Record<string, string> = {};
 
 // Helper function to get role display name
 export const getRoleDisplayName = (roleType: RoleType | undefined | null): string => {
-  if (!roleType) return 'Teacher';
-  return ROLE_DISPLAY_NAMES[roleType] || 'Teacher';
+  if (!roleType) return '';
+  return ROLE_DISPLAY_NAMES[roleType] || roleType;
 };
 
 // Helper function to get all role types as an array
 export const getAllRoleTypes = (): RoleType[] => {
-  return Object.keys(ROLE_DISPLAY_NAMES) as RoleType[];
+  return Object.keys(ROLE_DISPLAY_NAMES);
+};
+
+// Add a new role to the display names
+export const addRoleDisplayName = (role: Role): void => {
+  ROLE_DISPLAY_NAMES[role.name] = role.description || role.name;
+};
+
+// Remove a role from the display names
+export const removeRoleDisplayName = (roleName: string): void => {
+  delete ROLE_DISPLAY_NAMES[roleName];
+};
+
+// Update the display name for a role
+export const updateRoleDisplayName = (roleName: string, displayName: string): void => {
+  ROLE_DISPLAY_NAMES[roleName] = displayName;
 };

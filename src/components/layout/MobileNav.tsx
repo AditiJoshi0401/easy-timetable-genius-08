@@ -10,7 +10,7 @@ const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
   { to: "/timetable-editor", icon: Calendar, label: "Timetable Editor" },
   { to: "/data-input", icon: Database, label: "Data Management" },
-  { to: "/streams-manager", icon: BookOpen, label: "Streams & Divisions" },
+  { to: "/streams-manager", icon: BookOpen, label: "Structure" },
   { to: "/view-timetables", icon: LayoutGrid, label: "View Timetables" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];

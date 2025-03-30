@@ -17,7 +17,7 @@ const navItems = [{
 }, {
   to: "/streams-manager",
   icon: BookOpen,
-  label: "Streams & Divisions"
+  label: "Structure"
 }, {
   to: "/view-timetables",
   icon: LayoutGrid,

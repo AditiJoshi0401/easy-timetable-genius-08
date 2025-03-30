@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { Database, PlusCircle, Edit, Trash2, CheckCircle2, XCircle, BookOpen, Users, AlertCircle } from "lucide-react";
+import { Database, PlusCircle, Edit, Trash2, CheckCircle2, XCircle, BookOpen, Users, AlertCircle, UserRound } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { fetchStreams, fetchDivisions, addStream, updateStream, deleteStream, addDivision, updateDivision, deleteDivision, Stream, Division } from "@/services/supabaseService";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { RoleType, addRoleDisplayName, getAllRoleTypes, getRoleDisplayName, removeRoleDisplayName, updateRoleDisplayName } from "@/models/Role";
+
+// Define schema for role form
+const roleFormSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  description: z.string().optional(),
+});
 
 // Define schema for stream form
 const streamFormSchema = z.object({
@@ -36,17 +43,21 @@ const divisionFormSchema = z.object({
 
 type FormStream = z.infer<typeof streamFormSchema>;
 type FormDivision = z.infer<typeof divisionFormSchema>;
+type FormRole = z.infer<typeof roleFormSchema>;
 
 const StreamsManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isStreamDialogOpen, setIsStreamDialogOpen] = useState(false);
   const [isDivisionDialogOpen, setIsDivisionDialogOpen] = useState(false);
+  const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(1);
   const [streamNameError, setStreamNameError] = useState("");
   const [streamCodeError, setStreamCodeError] = useState("");
   const [divisionNameError, setDivisionNameError] = useState("");
+  const [roleNameError, setRoleNameError] = useState("");
+  const [roles, setRoles] = useState<FormRole[]>([]);
 
   // Stream form
   const streamForm = useForm<FormStream>({
@@ -69,6 +80,15 @@ const StreamsManager = () => {
     },
   });
 
+  // Role form
+  const roleForm = useForm<FormRole>({
+    resolver: zodResolver(roleFormSchema),
+    defaultValues: {
+      name: "",
+      description: ""
+    },
+  });
+
   // Fetch streams
   const { 
     data: streams = [], 
@@ -88,6 +108,92 @@ const StreamsManager = () => {
     queryKey: ['divisions'],
     queryFn: fetchDivisions
   });
+
+  // Set default streamId for division form when streams are loaded
+  useEffect(() => {
+    if (streams.length > 0 && !divisionForm.getValues('streamId')) {
+      divisionForm.setValue('streamId', streams[0].id || "");
+    }
+  }, [streams, divisionForm]);
+
+  // Role management
+  const handleRoleSubmit = (data: FormRole) => {
+    // Check for duplicate role name
+    if (checkDuplicateRole(data)) {
+      return;
+    }
+
+    if (isEditing && data.id) {
+      // Update existing role
+      const roleIndex = roles.findIndex(r => r.id === data.id);
+      if (roleIndex !== -1) {
+        const updatedRoles = [...roles];
+        updatedRoles[roleIndex] = data;
+        setRoles(updatedRoles);
+        updateRoleDisplayName(data.name, data.description || data.name);
+        toast({
+          title: "Role Updated",
+          description: "The role has been updated successfully."
+        });
+      }
+    } else {
+      // Add new role
+      const newRole = {
+        ...data,
+        id: crypto.randomUUID()
+      };
+      setRoles([...roles, newRole]);
+      addRoleDisplayName(newRole);
+      toast({
+        title: "Role Added",
+        description: "The role has been added successfully."
+      });
+    }
+    
+    roleForm.reset();
+    setIsRoleDialogOpen(false);
+    setIsEditing(false);
+    setRoleNameError("");
+  };
+
+  const editRole = (role: FormRole) => {
+    roleForm.reset(role);
+    setIsEditing(true);
+    setIsRoleDialogOpen(true);
+  };
+
+  const deleteRole = (id: string) => {
+    const role = roles.find(r => r.id === id);
+    if (role) {
+      const updatedRoles = roles.filter(r => r.id !== id);
+      setRoles(updatedRoles);
+      removeRoleDisplayName(role.name);
+      toast({
+        title: "Role Deleted",
+        description: "The role has been deleted successfully."
+      });
+    }
+  };
+
+  const checkDuplicateRole = (data: FormRole): boolean => {
+    setRoleNameError("");
+    
+    const nameExists = roles.some(role => 
+      role.name.toLowerCase() === data.name.toLowerCase() && 
+      (!data.id || role.id !== data.id)
+    );
+    
+    if (nameExists) {
+      setRoleNameError("A role with this name already exists");
+      toast({
+        title: "Duplicate Role Name",
+        description: "A role with this name already exists. Please use a different name.",
+        variant: "destructive"
+      });
+    }
+    
+    return nameExists;
+  };
 
   // Add stream mutation
   const addStreamMutation = useMutation({
@@ -218,13 +324,6 @@ const StreamsManager = () => {
       });
     }
   });
-
-  // Set default streamId for division form when streams are loaded
-  useEffect(() => {
-    if (streams.length > 0 && !divisionForm.getValues('streamId')) {
-      divisionForm.setValue('streamId', streams[0].id || "");
-    }
-  }, [streams, divisionForm]);
 
   // Check for duplicate stream name or code
   const checkDuplicateStream = (data: FormStream): boolean => {
@@ -398,7 +497,7 @@ const StreamsManager = () => {
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="Streams & Divisions"
+        title="Structure"
         description="Manage your institution's academic structure"
         icon={<Database className="h-6 w-6" />}
       />
@@ -407,6 +506,7 @@ const StreamsManager = () => {
         <TabsList>
           <TabsTrigger value="streams">Streams</TabsTrigger>
           <TabsTrigger value="divisions">Divisions</TabsTrigger>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
         </TabsList>
 
         <TabsContent value="streams" className="space-y-4">
@@ -605,6 +705,68 @@ const StreamsManager = () => {
                   })}
               </div>
             </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="roles" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-medium">Staff Roles</h2>
+            <Button onClick={() => {
+              roleForm.reset({
+                name: "",
+                description: ""
+              });
+              setIsEditing(false);
+              setIsRoleDialogOpen(true);
+            }} className="gap-2">
+              <PlusCircle className="h-4 w-4" />
+              Add Role
+            </Button>
+          </div>
+
+          {roles.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <UserRound className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <h3 className="text-lg font-medium">No Roles Added</h3>
+                <p className="text-muted-foreground mt-1 mb-4">
+                  Define staff roles like Teacher, TA, HOD, etc.
+                </p>
+                <Button onClick={() => {
+                  roleForm.reset();
+                  setIsEditing(false);
+                  setIsRoleDialogOpen(true);
+                }} className="gap-2">
+                  <PlusCircle className="h-4 w-4" />
+                  Add Role
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {roles.map((role) => (
+                <Card key={role.id} className="hover:shadow-sm transition-shadow">
+                  <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-medium">{role.name}</h3>
+                      {role.description && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {role.description}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => editRole(role)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => deleteRole(role.id!)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
       </Tabs>
@@ -834,6 +996,76 @@ const StreamsManager = () => {
                 </Button>
                 <Button type="submit">
                   {isEditing ? "Save Changes" : "Add Division"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for adding/editing roles */}
+      <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditing ? "Edit Role" : "Add New Role"}</DialogTitle>
+            <DialogDescription>
+              {isEditing ? "Modify the role details below" : "Define a new role for staff members"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...roleForm}>
+            <form onSubmit={roleForm.handleSubmit(handleRoleSubmit)} className="space-y-4">
+              <FormField
+                control={roleForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Teacher, TA, HOD" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      The name of the role (e.g., Teacher, TA, HOD)
+                    </FormDescription>
+                    {roleNameError && (
+                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>{roleNameError}</span>
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={roleForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Teaching Assistant, Head of Department" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      A longer description or display name for the role
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => {
+                  roleForm.reset();
+                  setIsRoleDialogOpen(false);
+                  setIsEditing(false);
+                  setRoleNameError("");
+                }}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {isEditing ? "Save Changes" : "Add Role"}
                 </Button>
               </DialogFooter>
             </form>
