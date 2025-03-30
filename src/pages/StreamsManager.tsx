@@ -137,11 +137,22 @@ const StreamsManager = () => {
         });
       }
     } else {
-      // Add new role
-      const newRole = {
-        ...data,
-        id: crypto.randomUUID()
+      // Add new role - ensure name is required
+      if (!data.name) {
+        toast({
+          title: "Invalid Role",
+          description: "Role name is required",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const newRole: Role = {
+        id: crypto.randomUUID(),
+        name: data.name,
+        description: data.description
       };
+      
       setRoles([...roles, newRole]);
       addRoleDisplayName(newRole);
       toast({

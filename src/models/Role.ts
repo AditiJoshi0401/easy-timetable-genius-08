@@ -23,6 +23,10 @@ export const getAllRoleTypes = (): RoleType[] => {
 
 // Add a new role to the display names
 export const addRoleDisplayName = (role: Role): void => {
+  if (!role.name) {
+    console.error('Cannot add role with empty name');
+    return;
+  }
   ROLE_DISPLAY_NAMES[role.name] = role.description || role.name;
 };
 
