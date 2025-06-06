@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import TimetableDisplay from "@/components/timetable/TimetableDisplay";
-import { RoleType, getAllRoleTypes, getRoleDisplayName } from "@/models/Role";
+import { RoleType, getAllRoleTypes, getRoleDisplayName, getTeacherLectureCount } from "@/models/Role";
 import { supabase } from "@/integrations/supabase/client";
 import { checkForDuplicates } from "@/utils/dataValidation";
 
@@ -18,6 +18,10 @@ interface Teacher {
   specialization: string;
   subjects: any[];
   cabin?: string;
+  lectures?: number;
+  tutorials?: number;
+  practical?: number;
+  credits?: number;
 }
 
 interface TeacherTimetableTabProps {
@@ -126,9 +130,18 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
       displayRole = teacher.ista ? 'Teaching Assistant' : 'Teacher';
     }
     
+    // Get lecture count for this teacher
+    const lectureCount = getTeacherLectureCount(teacher.id);
+    
     return (
       <SelectItem key={teacher.id} value={teacher.id}>
-        {teacher.name} {displayRole ? `(${displayRole})` : ''}
+        <div className="flex flex-col items-start">
+          <span>{teacher.name} {displayRole ? `(${displayRole})` : ''}</span>
+          <span className="text-xs text-muted-foreground">
+            Lectures assigned: {lectureCount}
+            {teacher.lectures && ` | Max: ${teacher.lectures}`}
+          </span>
+        </div>
       </SelectItem>
     );
   };
@@ -225,6 +238,15 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
         >
           View Teacher Timetable
         </Button>
+        
+        {selectedTeacher && (
+          <div className="bg-muted/50 p-4 rounded-lg">
+            <h4 className="font-medium mb-2">Teacher Lecture Summary</h4>
+            <p className="text-sm text-muted-foreground">
+              Total lectures assigned: {getTeacherLectureCount(selectedTeacher)}
+            </p>
+          </div>
+        )}
       </div>
 
       {filteredTeacherData && (

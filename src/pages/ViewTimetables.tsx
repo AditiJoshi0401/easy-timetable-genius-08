@@ -274,10 +274,25 @@ const ViewTimetables = () => {
 
     try {
       const wb = XLSX.utils.book_new();
-      const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       
+      // Use official ordering for days and time slots
+      const officialDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const officialTimeSlots = [
+        "9:30 - 10:30",
+        "10:30 - 11:30", 
+        "11:30 - 12:30",
+        "12:30 - 1:30",
+        "1:30 - 2:30",
+        "2:30 - 3:30",
+        "3:30 - 4:30",
+        "4:30 - 5:30"
+      ];
+      
+      // Filter to only include days that have data
+      const days = officialDays.filter(day => selectedTimetable.data[day]);
+      
+      // Get all periods and sort them according to official order
       const periodSet = new Set();
-      
       days.forEach(day => {
         if (selectedTimetable.data[day]) {
           Object.keys(selectedTimetable.data[day]).forEach(period => {
@@ -286,19 +301,18 @@ const ViewTimetables = () => {
         }
       });
       
-      let periods = [];
-      
-      const matchingPeriods = TIME_SLOT_ORDER.filter(period => periodSet.has(period));
-      
-      if (matchingPeriods.length > 0) {
-        periods = [...TIME_SLOT_ORDER];
+      // Sort periods according to official time slots order
+      const periods = Array.from(periodSet).sort((a: any, b: any) => {
+        const indexA = officialTimeSlots.indexOf(a);
+        const indexB = officialTimeSlots.indexOf(b);
         
-        Array.from(periodSet)
-          .filter(period => !TIME_SLOT_ORDER.includes(period as string))
-          .forEach(period => periods.push(period as string));
-      } else {
-        periods = Array.from(periodSet) as string[];
-      }
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB;
+        }
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        return a.localeCompare(b);
+      });
       
       const header = ["Period/Day", ...days];
       
@@ -327,7 +341,7 @@ const ViewTimetables = () => {
                    : (slot.teacher.ista ? 'Teaching Assistant' : 'Teacher'))
                 : '';
                 
-              cellContent += `\n${teacherName} (${teacherRole})`;
+              cellContent += `\n${teacherName}${teacherRole ? ` (${teacherRole})` : ''}`;
             }
             
             if (slot.room) {
@@ -344,6 +358,20 @@ const ViewTimetables = () => {
             
             if (slot.type) {
               cellContent += `\nType: ${slot.type}`;
+            }
+            
+            // Add lecture details if available
+            if (slot.lectures) {
+              cellContent += `\nLectures: ${slot.lectures}`;
+            }
+            if (slot.tutorials) {
+              cellContent += `\nTutorials: ${slot.tutorials}`;
+            }
+            if (slot.practical) {
+              cellContent += `\nPractical: ${slot.practical}`;
+            }
+            if (slot.credits) {
+              cellContent += `\nCredits: ${slot.credits}`;
             }
             
             row.push(cellContent);
@@ -419,6 +447,42 @@ const ViewTimetables = () => {
       return;
     }
 
+    // Create ordered timetable data
+    const officialDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const officialTimeSlots = [
+      "9:30 - 10:30",
+      "10:30 - 11:30", 
+      "11:30 - 12:30",
+      "12:30 - 1:30",
+      "1:30 - 2:30",
+      "2:30 - 3:30",
+      "3:30 - 4:30",
+      "4:30 - 5:30"
+    ];
+
+    const orderedTimetableData: any = {};
+    
+    // Order days according to official order
+    officialDays.forEach(day => {
+      if (selectedTimetable.data[day]) {
+        orderedTimetableData[day] = {};
+        
+        // Order time slots according to official order
+        officialTimeSlots.forEach(timeSlot => {
+          if (selectedTimetable.data[day][timeSlot]) {
+            orderedTimetableData[day][timeSlot] = selectedTimetable.data[day][timeSlot];
+          }
+        });
+        
+        // Add any additional time slots not in official order
+        Object.keys(selectedTimetable.data[day]).forEach(timeSlot => {
+          if (!officialTimeSlots.includes(timeSlot)) {
+            orderedTimetableData[day][timeSlot] = selectedTimetable.data[day][timeSlot];
+          }
+        });
+      }
+    });
+
     const exportData = {
       stream: selectedTimetable.stream,
       year: selectedTimetable.year,
@@ -426,7 +490,7 @@ const ViewTimetables = () => {
       streamName: getStreamName(selectedTimetable.stream),
       yearName: getYearName(selectedTimetable.year),
       divisionName: getDivisionName(selectedTimetable.division),
-      timetableData: selectedTimetable.data
+      timetableData: orderedTimetableData
     };
 
     const dataStr = JSON.stringify(exportData, null, 2);

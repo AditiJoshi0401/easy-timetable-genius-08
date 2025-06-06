@@ -11,7 +11,6 @@ interface TimetableDisplayProps {
   showStreamInfo?: boolean;
   filterId?: string;
   invertAxis?: boolean;
-  // Add new props for teacher and room filtering
   teacherId?: string;
   roomId?: string;
   teachers?: any[];
@@ -40,6 +39,20 @@ const SUBJECT_COLORS = [
 // Map to store subject-to-color associations
 const subjectColorMap = new Map();
 
+// Define the official day and time slot order
+const OFFICIAL_DAYS_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const OFFICIAL_TIME_SLOTS_ORDER = [
+  "9:30 - 10:30",
+  "10:30 - 11:30", 
+  "11:30 - 12:30",
+  "12:30 - 1:30",
+  "1:30 - 2:30",
+  "2:30 - 3:30",
+  "3:30 - 4:30",
+  "4:30 - 5:30"
+];
+
 const TimetableDisplay: React.FC<TimetableDisplayProps> = ({ 
   timetableData, 
   viewType = "division",
@@ -61,10 +74,10 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
     );
   }
 
-  // Create an array of days and periods from timetable data
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  // Use official ordering for days and periods
+  const days = OFFICIAL_DAYS_ORDER.filter(day => timetableData[day]);
   
-  // Sort the periods to ensure correct time ordering (9:30 - 10:30 comes first)
+  // Sort the periods to ensure correct time ordering using official order
   const periods = useMemo(() => {
     const allPeriods = Array.from(
       new Set(
@@ -73,44 +86,22 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
       )
     );
     
-    // Define a specific order for the periods (9:30 to 5:30)
-    const timeOrder = [
-      "9:30 - 10:30",
-      "10:30 - 11:30",
-      "11:30 - 12:30",
-      "12:30 - 1:30",
-      "1:30 - 2:30",
-      "2:30 - 3:30",
-      "3:30 - 4:30",
-      "4:30 - 5:30"
-    ];
-    
-    // Return the periods sorted according to our predefined order
+    // Sort periods according to official time slots order
     return allPeriods.sort((a, b) => {
-      const indexA = timeOrder.indexOf(a);
-      const indexB = timeOrder.indexOf(b);
+      const indexA = OFFICIAL_TIME_SLOTS_ORDER.indexOf(a);
+      const indexB = OFFICIAL_TIME_SLOTS_ORDER.indexOf(b);
       
-      // If either period isn't in our predefined list, sort them regularly
-      if (indexA === -1 || indexB === -1) {
-        // Extract the starting hour and minute from the time slot (e.g., "9:30" from "9:30 - 10:30")
-        const getStartTime = (timeSlot: string) => {
-          const match = timeSlot.match(/^(\d+):(\d+)/);
-          if (!match) return 0;
-          let hours = parseInt(match[1]);
-          const minutes = parseInt(match[2]);
-          
-          // Convert to 24-hour format for proper sorting
-          if (timeSlot.includes("PM") && hours < 12) {
-            hours += 12;
-          }
-          return hours * 60 + minutes;
-        };
-        
-        return getStartTime(a) - getStartTime(b);
+      // If both periods are in the official order, use that order
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
       }
       
-      // Otherwise use our predefined order
-      return indexA - indexB;
+      // If only one is in the official order, prioritize it
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      
+      // If neither is in the official order, sort alphabetically
+      return a.localeCompare(b);
     });
   }, [timetableData]);
 
@@ -174,6 +165,41 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
     
     return subjectColorMap.get(subjectId);
   };
+
+  // Function to get ordered timetable data for export
+  const getOrderedTimetableData = () => {
+    const orderedData: any = {};
+    
+    // Ensure days are in the correct order
+    OFFICIAL_DAYS_ORDER.forEach(day => {
+      if (filteredData[day]) {
+        orderedData[day] = {};
+        
+        // Ensure time slots are in the correct order
+        OFFICIAL_TIME_SLOTS_ORDER.forEach(period => {
+          if (filteredData[day][period]) {
+            orderedData[day][period] = filteredData[day][period];
+          }
+        });
+        
+        // Add any additional periods not in the official order
+        Object.keys(filteredData[day]).forEach(period => {
+          if (!OFFICIAL_TIME_SLOTS_ORDER.includes(period)) {
+            orderedData[day][period] = filteredData[day][period];
+          }
+        });
+      }
+    });
+    
+    return orderedData;
+  };
+
+  // Expose the ordered data for export functionality
+  React.useEffect(() => {
+    if (window) {
+      (window as any).getOrderedTimetableData = getOrderedTimetableData;
+    }
+  }, [filteredData]);
 
   // Always display with periods as rows and days as columns (inverted axis)
   return (
@@ -240,6 +266,26 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
                         {slot.type && (
                           <div className="text-xs text-muted-foreground">
                             Type: {slot.type}
+                          </div>
+                        )}
+                        {slot.lectures && (
+                          <div className="text-xs text-muted-foreground">
+                            Lectures: {slot.lectures}
+                          </div>
+                        )}
+                        {slot.tutorials && (
+                          <div className="text-xs text-muted-foreground">
+                            Tutorials: {slot.tutorials}
+                          </div>
+                        )}
+                        {slot.practical && (
+                          <div className="text-xs text-muted-foreground">
+                            Practical: {slot.practical}
+                          </div>
+                        )}
+                        {slot.credits && (
+                          <div className="text-xs text-muted-foreground">
+                            Credits: {slot.credits}
                           </div>
                         )}
                       </div>
