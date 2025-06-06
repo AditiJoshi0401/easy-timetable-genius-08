@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Calendar, LayoutGrid, Filter, Download, FileJson, FileSpreadsheet } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -262,6 +261,7 @@ const ViewTimetables = () => {
     handleLoadTimetable();
   };
 
+  // Export as Excel with proper ordering
   const exportAsExcel = () => {
     if (!selectedTimetable || !selectedTimetable.data) {
       toast({
@@ -277,32 +277,23 @@ const ViewTimetables = () => {
       
       // Use official ordering for days and time slots
       const officialDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const officialTimeSlots = [
-        "9:30 - 10:30",
-        "10:30 - 11:30", 
-        "11:30 - 12:30",
-        "12:30 - 1:30",
-        "1:30 - 2:30",
-        "2:30 - 3:30",
-        "3:30 - 4:30",
-        "4:30 - 5:30"
-      ];
+      const officialTimeSlots = TIME_SLOT_ORDER;
       
       // Filter to only include days that have data
       const days = officialDays.filter(day => selectedTimetable.data[day]);
       
       // Get all periods and sort them according to official order
-      const periodSet = new Set();
+      const periodSet = new Set<string>();
       days.forEach(day => {
         if (selectedTimetable.data[day]) {
-          Object.keys(selectedTimetable.data[day]).forEach(period => {
+          Object.keys(selectedTimetable.data[day]).forEach((period: string) => {
             periodSet.add(period);
           });
         }
       });
       
       // Sort periods according to official time slots order
-      const periods = Array.from(periodSet).sort((a: any, b: any) => {
+      const periods = Array.from(periodSet).sort((a: string, b: string) => {
         const indexA = officialTimeSlots.indexOf(a);
         const indexB = officialTimeSlots.indexOf(b);
         
@@ -316,7 +307,7 @@ const ViewTimetables = () => {
       
       const header = ["Period/Day", ...days];
       
-      const rows = periods.map(period => {
+      const rows = periods.map((period: string) => {
         const row: any[] = [period];
         
         days.forEach(day => {
@@ -437,6 +428,7 @@ const ViewTimetables = () => {
     }
   };
 
+  // Export as JSON with proper ordering
   const exportAsJson = () => {
     if (!selectedTimetable || !selectedTimetable.data) {
       toast({
@@ -449,18 +441,9 @@ const ViewTimetables = () => {
 
     // Create ordered timetable data
     const officialDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const officialTimeSlots = [
-      "9:30 - 10:30",
-      "10:30 - 11:30", 
-      "11:30 - 12:30",
-      "12:30 - 1:30",
-      "1:30 - 2:30",
-      "2:30 - 3:30",
-      "3:30 - 4:30",
-      "4:30 - 5:30"
-    ];
+    const officialTimeSlots = TIME_SLOT_ORDER;
 
-    const orderedTimetableData: any = {};
+    const orderedTimetableData: Record<string, Record<string, any>> = {};
     
     // Order days according to official order
     officialDays.forEach(day => {
@@ -468,14 +451,14 @@ const ViewTimetables = () => {
         orderedTimetableData[day] = {};
         
         // Order time slots according to official order
-        officialTimeSlots.forEach(timeSlot => {
+        officialTimeSlots.forEach((timeSlot: string) => {
           if (selectedTimetable.data[day][timeSlot]) {
             orderedTimetableData[day][timeSlot] = selectedTimetable.data[day][timeSlot];
           }
         });
         
         // Add any additional time slots not in official order
-        Object.keys(selectedTimetable.data[day]).forEach(timeSlot => {
+        Object.keys(selectedTimetable.data[day]).forEach((timeSlot: string) => {
           if (!officialTimeSlots.includes(timeSlot)) {
             orderedTimetableData[day][timeSlot] = selectedTimetable.data[day][timeSlot];
           }
@@ -577,7 +560,7 @@ const ViewTimetables = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="space-y-6">
-          {/* Filters Card */}
+          {/* Recent Timetables Card */}
           <Card>
             <CardHeader>
               <CardTitle>Recent Timetables</CardTitle>
