@@ -9,6 +9,9 @@ export interface Subject {
   credits: number;
   stream: string;
   year: string;
+  lectures: number;
+  tutorials: number;
+  practicals: number;
 }
 
 export interface Teacher {

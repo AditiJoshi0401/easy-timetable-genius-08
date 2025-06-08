@@ -44,6 +44,42 @@ export type Database = {
           },
         ]
       }
+      roles: {
+        Row: {
+          created_at: string
+          credits: number | null
+          description: string | null
+          id: string
+          lectures: number | null
+          name: string
+          practical: number | null
+          tutorials: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number | null
+          description?: string | null
+          id?: string
+          lectures?: number | null
+          name: string
+          practical?: number | null
+          tutorials?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number | null
+          description?: string | null
+          id?: string
+          lectures?: number | null
+          name?: string
+          practical?: number | null
+          tutorials?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       rooms: {
         Row: {
           capacity: number
@@ -98,17 +134,23 @@ export type Database = {
           created_at: string | null
           credits: number
           id: string
+          lectures: number | null
           name: string
+          practicals: number | null
           stream: string
+          tutorials: number | null
           year: string
         }
         Insert: {
           code: string
           created_at?: string | null
-          credits: number
+          credits?: number
           id?: string
+          lectures?: number | null
           name: string
+          practicals?: number | null
           stream: string
+          tutorials?: number | null
           year: string
         }
         Update: {
@@ -116,8 +158,11 @@ export type Database = {
           created_at?: string | null
           credits?: number
           id?: string
+          lectures?: number | null
           name?: string
+          practicals?: number | null
           stream?: string
+          tutorials?: number | null
           year?: string
         }
         Relationships: []
