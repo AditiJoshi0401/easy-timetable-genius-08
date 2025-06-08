@@ -37,8 +37,7 @@ const teacherFormSchema = z.object({
   email: z.string().email("Please enter a valid email"),
   specialization: z.string().min(3, "Specialization must be at least 3 characters"),
   subjects: z.array(z.string()).min(1, "At least one subject is required"),
-  isTA: z.boolean(),
-  role: z.string().optional(),
+  roles: z.array(z.string()).min(1, "At least one role is required"),
   cabin: z.string().optional(),
 });
 
@@ -69,6 +68,8 @@ const DataInput = () => {
   const [teacherEmailError, setTeacherEmailError] = useState("");
   const [roomNumberError, setRoomNumberError] = useState("");
   const [selectedStreamId, setSelectedStreamId] = useState("");
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
   // Subject form
   const subjectForm = useForm<FormSubject>({
@@ -93,8 +94,7 @@ const DataInput = () => {
       email: "",
       specialization: "",
       subjects: [],
-      isTA: false,
-      role: "",
+      roles: [],
       cabin: "",
     },
   });
@@ -234,6 +234,8 @@ const DataInput = () => {
         description: "The teacher has been added successfully."
       });
       teacherForm.reset();
+      setSelectedSubjects([]);
+      setSelectedRoles([]);
       setIsTeacherDialogOpen(false);
     },
     onError: (error) => {
@@ -256,6 +258,8 @@ const DataInput = () => {
         description: "The teacher has been updated successfully."
       });
       teacherForm.reset();
+      setSelectedSubjects([]);
+      setSelectedRoles([]);
       setIsTeacherDialogOpen(false);
       setIsEditing(false);
     },
@@ -371,6 +375,38 @@ const DataInput = () => {
     setSelectedStreamId(value);
     subjectForm.setValue('stream', value);
     subjectForm.setValue('year', "1"); // Reset year to 1 when stream changes
+  };
+
+  // Handle adding subject to teacher
+  const handleAddSubject = (subjectId: string) => {
+    if (!selectedSubjects.includes(subjectId)) {
+      const newSubjects = [...selectedSubjects, subjectId];
+      setSelectedSubjects(newSubjects);
+      teacherForm.setValue('subjects', newSubjects);
+    }
+  };
+
+  // Handle removing subject from teacher
+  const handleRemoveSubject = (subjectId: string) => {
+    const newSubjects = selectedSubjects.filter(id => id !== subjectId);
+    setSelectedSubjects(newSubjects);
+    teacherForm.setValue('subjects', newSubjects);
+  };
+
+  // Handle adding role to teacher
+  const handleAddRole = (roleId: string) => {
+    if (!selectedRoles.includes(roleId)) {
+      const newRoles = [...selectedRoles, roleId];
+      setSelectedRoles(newRoles);
+      teacherForm.setValue('roles', newRoles);
+    }
+  };
+
+  // Handle removing role from teacher
+  const handleRemoveRole = (roleId: string) => {
+    const newRoles = selectedRoles.filter(id => id !== roleId);
+    setSelectedRoles(newRoles);
+    teacherForm.setValue('roles', newRoles);
   };
 
   // Check for duplicate subject name or code
@@ -508,8 +544,7 @@ const DataInput = () => {
         email: data.email,
         specialization: data.specialization,
         subjects: data.subjects,
-        isTA: data.isTA,
-        role: data.role,
+        role: data.roles[0], // For now, use first role as primary role
         cabin: data.cabin
       };
       updateTeacherMutation.mutate({ id: data.id, teacher: teacherData });
@@ -520,8 +555,8 @@ const DataInput = () => {
         email: data.email,
         specialization: data.specialization,
         subjects: data.subjects,
-        isTA: data.isTA,
-        role: data.role,
+        ista: false, // Default value
+        role: data.roles[0], // For now, use first role as primary role
         cabin: data.cabin
       };
       addTeacherMutation.mutate(newTeacher);
@@ -530,7 +565,12 @@ const DataInput = () => {
 
   // Edit teacher
   const editTeacher = (teacher: Teacher) => {
-    teacherForm.reset(teacher);
+    teacherForm.reset({
+      ...teacher,
+      roles: teacher.role ? [teacher.role] : []
+    });
+    setSelectedSubjects(teacher.subjects || []);
+    setSelectedRoles(teacher.role ? [teacher.role] : []);
     setIsEditing(true);
     setIsTeacherDialogOpen(true);
   };
@@ -704,10 +744,11 @@ const DataInput = () => {
                 email: "",
                 specialization: "",
                 subjects: [],
-                isTA: false,
-                role: "",
+                roles: [],
                 cabin: ""
               });
+              setSelectedSubjects([]);
+              setSelectedRoles([]);
               setIsEditing(false);
               setIsTeacherDialogOpen(true);
             }} className="gap-2">
@@ -738,6 +779,8 @@ const DataInput = () => {
                 </p>
                 <Button onClick={() => {
                   teacherForm.reset();
+                  setSelectedSubjects([]);
+                  setSelectedRoles([]);
                   setIsEditing(false);
                   setIsTeacherDialogOpen(true);
                 }} className="gap-2">
@@ -757,7 +800,7 @@ const DataInput = () => {
                         Email: {teacher.email} • Specialization: {teacher.specialization}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        Role: {teacher.role || "N/A"} • TA: {teacher.isTA ? "Yes" : "No"} • Cabin: {teacher.cabin || "N/A"}
+                        Role: {teacher.role || "N/A"} • Cabin: {teacher.cabin || "N/A"}
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -1064,7 +1107,7 @@ const DataInput = () => {
 
       {/* Teacher Dialog */}
       <Dialog open={isTeacherDialogOpen} onOpenChange={setIsTeacherDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditing ? "Edit Teacher" : "Add New Teacher"}</DialogTitle>
             <DialogDescription>
@@ -1073,152 +1116,226 @@ const DataInput = () => {
           </DialogHeader>
           
           <Form {...teacherForm}>
-            <form onSubmit={teacherForm.handleSubmit(onTeacherSubmit)} className="space-y-4">
-              <FormField
-                control={teacherForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Teacher Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., John Doe" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The full name of the teacher
-                    </FormDescription>
-                    {teacherNameError && (
-                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>{teacherNameError}</span>
-                      </div>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={teacherForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="e.g., john@example.com" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The email address of the teacher
-                    </FormDescription>
-                    {teacherEmailError && (
-                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>{teacherEmailError}</span>
-                      </div>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={teacherForm.control}
-                name="specialization"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Specialization</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Computer Science" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The teacher's area of expertise
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={teacherForm.control}
-                name="subjects"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subjects</FormLabel>
-                    <FormControl>
-                      <select
-                        multiple
-                        className="flex h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        {...field}
-                        onChange={(e) => {
-                          const selectedOptions = Array.from(e.target.selectedOptions).map(option => option.value);
-                          field.onChange(selectedOptions);
-                        }}
-                      >
-                        {subjects.map(subject => (
-                          <option key={subject.id} value={subject.id}>
+            <form onSubmit={teacherForm.handleSubmit(onTeacherSubmit)} className="space-y-6">
+              {/* Basic Information Row */}
+              <div className="grid grid-cols-2 gap-6">
+                <FormField
+                  control={teacherForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Teacher Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., John Doe" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The full name of the teacher
+                      </FormDescription>
+                      {teacherNameError && (
+                        <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>{teacherNameError}</span>
+                        </div>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={teacherForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="e.g., john@example.com" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The email address of the teacher
+                      </FormDescription>
+                      {teacherEmailError && (
+                        <div className="text-sm text-destructive flex items-center gap-1 mt-1">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>{teacherEmailError}</span>
+                        </div>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Specialization and Cabin Row */}
+              <div className="grid grid-cols-2 gap-6">
+                <FormField
+                  control={teacherForm.control}
+                  name="specialization"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specialization</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Computer Science" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The teacher's area of expertise
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={teacherForm.control}
+                  name="cabin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cabin</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Room 101" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The cabin or office room of the teacher (optional)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Subjects Section */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-medium">Subjects</h3>
+                    <p className="text-sm text-muted-foreground">Assign subjects to this teacher</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select onValueChange={handleAddSubject}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue placeholder="Select a subject to add" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subjects
+                          .filter(subject => !selectedSubjects.includes(subject.id!))
+                          .map((subject) => (
+                            <SelectItem key={subject.id} value={subject.id!}>
+                              {subject.name} ({subject.code})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" size="sm" disabled>
+                      <PlusCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {selectedSubjects.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedSubjects.map((subjectId) => {
+                      const subject = subjects.find(s => s.id === subjectId);
+                      return subject ? (
+                        <div key={subjectId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                          <span className="text-sm font-medium">
                             {subject.name} ({subject.code})
-                          </option>
-                        ))}
-                      </select>
-                    </FormControl>
-                    <FormDescription>
-                      Select subjects taught by the teacher
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveSubject(subjectId)}
+                          >
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
                 )}
-              />
-              
-              <FormField
-                control={teacherForm.control}
-                name="isTA"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Is Teaching Assistant (TA)?</FormLabel>
-                    <FormControl>
-                      <input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+
+                <FormField
+                  control={teacherForm.control}
+                  name="subjects"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator />
+
+              {/* Roles Section */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-medium">Roles</h3>
+                    <p className="text-sm text-muted-foreground">Assign roles to this teacher</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select onValueChange={handleAddRole}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue placeholder="Select a role to add" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles
+                          .filter(role => !selectedRoles.includes(role.id!))
+                          .map((role) => (
+                            <SelectItem key={role.id} value={role.id!}>
+                              {role.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" size="sm" disabled>
+                      <PlusCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {selectedRoles.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedRoles.map((roleId) => {
+                      const role = roles.find(r => r.id === roleId);
+                      return role ? (
+                        <div key={roleId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                          <span className="text-sm font-medium">
+                            {role.name}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveRole(roleId)}
+                          >
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
                 )}
-              />
-              
-              <FormField
-                control={teacherForm.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Teacher, HOD, TA" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The role of the staff member (optional)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={teacherForm.control}
-                name="cabin"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cabin</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Room 101" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The cabin or office room of the teacher (optional)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+                <FormField
+                  control={teacherForm.control}
+                  name="roles"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => {
                   teacherForm.reset();
+                  setSelectedSubjects([]);
+                  setSelectedRoles([]);
                   setIsTeacherDialogOpen(false);
                   setIsEditing(false);
                   setTeacherNameError("");
