@@ -10,10 +10,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { fetchSubjects, fetchTeachers, fetchRooms, addSubject, updateSubject, deleteSubject, addTeacher, updateTeacher, deleteTeacher, addRoom, updateRoom, deleteRoom, Subject, Teacher, Room } from "@/services/supabaseService";
+import { fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchRoles, addSubject, updateSubject, deleteSubject, addTeacher, updateTeacher, deleteTeacher, addRoom, updateRoom, deleteRoom, Subject, Teacher, Room, Stream, Role } from "@/services/supabaseService";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 // Define schema for subject form
@@ -67,6 +68,7 @@ const DataInput = () => {
   const [teacherNameError, setTeacherNameError] = useState("");
   const [teacherEmailError, setTeacherEmailError] = useState("");
   const [roomNumberError, setRoomNumberError] = useState("");
+  const [selectedStreamId, setSelectedStreamId] = useState("");
 
   // Subject form
   const subjectForm = useForm<FormSubject>({
@@ -107,6 +109,16 @@ const DataInput = () => {
     },
   });
 
+  // Fetch streams
+  const { 
+    data: streams = [], 
+    isLoading: isLoadingStreams,
+    isError: isStreamsError
+  } = useQuery({
+    queryKey: ['streams'],
+    queryFn: fetchStreams
+  });
+
   // Fetch subjects
   const { 
     data: subjects = [], 
@@ -135,6 +147,16 @@ const DataInput = () => {
   } = useQuery({
     queryKey: ['rooms'],
     queryFn: fetchRooms
+  });
+
+  // Fetch roles
+  const { 
+    data: roles = [], 
+    isLoading: isLoadingRoles,
+    isError: isRolesError
+  } = useQuery({
+    queryKey: ['roles'],
+    queryFn: fetchRoles
   });
 
   // Add subject mutation
@@ -332,6 +354,18 @@ const DataInput = () => {
     }
   });
 
+  // Get available years for selected stream
+  const getAvailableYears = (streamId: string) => {
+    const stream = streams.find(s => s.id === streamId);
+    if (!stream) return [];
+    
+    const years = [];
+    for (let i = 1; i <= stream.years; i++) {
+      years.push(i.toString());
+    }
+    return years;
+  };
+
   // Check for duplicate subject name or code
   const checkDuplicateSubject = (data: FormSubject): boolean => {
     setSubjectNameError("");
@@ -407,6 +441,7 @@ const DataInput = () => {
   // Edit subject
   const editSubject = (subject: Subject) => {
     subjectForm.reset(subject);
+    setSelectedStreamId(subject.stream);
     setIsEditing(true);
     setIsSubjectDialogOpen(true);
   };
@@ -942,11 +977,25 @@ const DataInput = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Stream</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., CSE, ECE" {...field} />
-                      </FormControl>
+                      <Select 
+                        onValueChange={handleStreamChange} 
+                        value={selectedStreamId}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a stream" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {streams.map((stream) => (
+                            <SelectItem key={stream.id} value={stream.id!}>
+                              {stream.name} ({stream.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormDescription>
-                        The academic stream this subject belongs to
+                        Select the academic stream for this subject
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -959,19 +1008,26 @@ const DataInput = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Year</FormLabel>
-                      <FormControl>
-                        <select
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          {...field}
-                        >
-                          <option value="1">Year 1</option>
-                          <option value="2">Year 2</option>
-                          <option value="3">Year 3</option>
-                          <option value="4">Year 4</option>
-                        </select>
-                      </FormControl>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                        disabled={!selectedStreamId}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select year" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {getAvailableYears(selectedStreamId).map((year) => (
+                            <SelectItem key={year} value={year}>
+                              Year {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormDescription>
-                        The academic year this subject is taught in
+                        Select the academic year for this subject
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -984,6 +1040,7 @@ const DataInput = () => {
                   subjectForm.reset();
                   setIsSubjectDialogOpen(false);
                   setIsEditing(false);
+                  setSelectedStreamId("");
                   setSubjectNameError("");
                   setSubjectCodeError("");
                 }}>
