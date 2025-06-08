@@ -46,37 +46,19 @@ export type Database = {
       }
       roles: {
         Row: {
-          created_at: string
-          credits: number | null
           description: string | null
           id: string
-          lectures: number | null
           name: string
-          practical: number | null
-          tutorials: number | null
-          updated_at: string
         }
         Insert: {
-          created_at?: string
-          credits?: number | null
           description?: string | null
           id?: string
-          lectures?: number | null
           name: string
-          practical?: number | null
-          tutorials?: number | null
-          updated_at?: string
         }
         Update: {
-          created_at?: string
-          credits?: number | null
           description?: string | null
           id?: string
-          lectures?: number | null
           name?: string
-          practical?: number | null
-          tutorials?: number | null
-          updated_at?: string
         }
         Relationships: []
       }

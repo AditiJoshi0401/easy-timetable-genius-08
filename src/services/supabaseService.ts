@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { RoleType } from '@/models/Role';
 
 // Types
 export interface Subject {
@@ -21,7 +20,7 @@ export interface Teacher {
   specialization: string;
   subjects: string[];
   isTA: boolean;  // Interface uses isTA, but database uses ista
-  role?: RoleType;  // Added role property
+  role?: string;  // Updated to use string for role name from roles table
   cabin?: string;   // Added cabin property
 }
 
@@ -45,6 +44,12 @@ export interface Division {
   name: string;
   strength: number;
   year: number;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description?: string;
 }
 
 export interface Timetable {
@@ -201,7 +206,7 @@ export const fetchTeachers = async (): Promise<Teacher[]> => {
   return data.map(teacher => ({
     ...teacher,
     isTA: teacher.ista,
-    role: teacher.role as RoleType | undefined,
+    role: teacher.role || undefined,
   })) as Teacher[];
 };
 
@@ -227,7 +232,7 @@ export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher>
   return {
     ...data[0],
     isTA: data[0].ista,
-    role: data[0].role as RoleType | undefined,
+    role: data[0].role || undefined,
   } as Teacher;
 };
 
@@ -250,13 +255,51 @@ export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Prom
   return {
     ...data[0],
     isTA: data[0].ista,
-    role: data[0].role as RoleType | undefined,
+    role: data[0].role || undefined,
   } as Teacher;
 };
 
 export const deleteTeacher = async (id: string): Promise<boolean> => {
   const { error } = await supabase
     .from('teachers')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+  return true;
+};
+
+// Roles
+export const fetchRoles = async (): Promise<Role[]> => {
+  const { data, error } = await supabase
+    .from('roles')
+    .select('*')
+    .order('name');
+  if (error) throw error;
+  return data as Role[];
+};
+
+export const addRole = async (role: Omit<Role, 'id'>): Promise<Role> => {
+  const { data, error } = await supabase
+    .from('roles')
+    .insert([role])
+    .select();
+  if (error) throw error;
+  return data[0] as Role;
+};
+
+export const updateRole = async (id: string, role: Partial<Role>): Promise<Role> => {
+  const { data, error } = await supabase
+    .from('roles')
+    .update(role)
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0] as Role;
+};
+
+export const deleteRole = async (id: string): Promise<boolean> => {
+  const { error } = await supabase
+    .from('roles')
     .delete()
     .eq('id', id);
   if (error) throw error;

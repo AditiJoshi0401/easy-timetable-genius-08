@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Database, PlusCircle, Edit, Trash2, CheckCircle2, XCircle, BookOpen, Users, AlertCircle, UserRound } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -14,9 +13,8 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, For
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { fetchStreams, fetchDivisions, addStream, updateStream, deleteStream, addDivision, updateDivision, deleteDivision, Stream, Division } from "@/services/supabaseService";
+import { fetchStreams, fetchDivisions, addStream, updateStream, deleteStream, addDivision, updateDivision, deleteDivision, Stream, Division, fetchRoles, addRole, updateRole, deleteRole, Role } from "@/services/supabaseService";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Role, RoleType, addRoleDisplayName, getAllRoleTypes, getRoleDisplayName, removeRoleDisplayName, updateRoleDisplayName } from "@/models/Role";
 
 // Define schema for role form
 const roleFormSchema = z.object({
@@ -58,7 +56,6 @@ const StreamsManager = () => {
   const [streamCodeError, setStreamCodeError] = useState("");
   const [divisionNameError, setDivisionNameError] = useState("");
   const [roleNameError, setRoleNameError] = useState("");
-  const [roles, setRoles] = useState<FormRole[]>([]);
 
   // Stream form
   const streamForm = useForm<FormStream>({
@@ -110,102 +107,78 @@ const StreamsManager = () => {
     queryFn: fetchDivisions
   });
 
-  // Set default streamId for division form when streams are loaded
-  useEffect(() => {
-    if (streams.length > 0 && !divisionForm.getValues('streamId')) {
-      divisionForm.setValue('streamId', streams[0].id || "");
-    }
-  }, [streams, divisionForm]);
+  // Fetch roles from database
+  const { 
+    data: roles = [], 
+    isLoading: isLoadingRoles,
+    isError: isRolesError
+  } = useQuery({
+    queryKey: ['roles'],
+    queryFn: fetchRoles
+  });
 
-  // Role management
-  const handleRoleSubmit = (data: FormRole) => {
-    // Check for duplicate role name
-    if (checkDuplicateRole(data)) {
-      return;
-    }
-
-    if (isEditing && data.id) {
-      // Update existing role
-      const roleIndex = roles.findIndex(r => r.id === data.id);
-      if (roleIndex !== -1) {
-        const updatedRoles = [...roles];
-        updatedRoles[roleIndex] = data;
-        setRoles(updatedRoles);
-        updateRoleDisplayName(data.name, data.description || data.name);
-        toast({
-          title: "Role Updated",
-          description: "The role has been updated successfully."
-        });
-      }
-    } else {
-      // Add new role - ensure name is required
-      if (!data.name) {
-        toast({
-          title: "Invalid Role",
-          description: "Role name is required",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      const newRole: Role = {
-        id: crypto.randomUUID(),
-        name: data.name,
-        description: data.description
-      };
-      
-      setRoles([...roles, newRole]);
-      addRoleDisplayName(newRole);
+  // Role mutations
+  const addRoleMutation = useMutation({
+    mutationFn: (role: Omit<Role, 'id'>) => addRole(role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
       toast({
         title: "Role Added",
         description: "The role has been added successfully."
       });
+      roleForm.reset();
+      setIsRoleDialogOpen(false);
+    },
+    onError: (error) => {
+      console.error('Error adding role:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add role. Please try again.",
+        variant: "destructive"
+      });
     }
-    
-    roleForm.reset();
-    setIsRoleDialogOpen(false);
-    setIsEditing(false);
-    setRoleNameError("");
-  };
+  });
 
-  const editRole = (role: FormRole) => {
-    roleForm.reset(role);
-    setIsEditing(true);
-    setIsRoleDialogOpen(true);
-  };
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ id, role }: { id: string, role: Partial<Role> }) => updateRole(id, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      toast({
+        title: "Role Updated",
+        description: "The role has been updated successfully."
+      });
+      roleForm.reset();
+      setIsRoleDialogOpen(false);
+      setIsEditing(false);
+    },
+    onError: (error) => {
+      console.error('Error updating role:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update role. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
 
-  const deleteRole = (id: string) => {
-    const role = roles.find(r => r.id === id);
-    if (role) {
-      const updatedRoles = roles.filter(r => r.id !== id);
-      setRoles(updatedRoles);
-      removeRoleDisplayName(role.name);
+  const deleteRoleMutation = useMutation({
+    mutationFn: (id: string) => deleteRole(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
       toast({
         title: "Role Deleted",
         description: "The role has been deleted successfully."
       });
-    }
-  };
-
-  const checkDuplicateRole = (data: FormRole): boolean => {
-    setRoleNameError("");
-    
-    const nameExists = roles.some(role => 
-      role.name.toLowerCase() === data.name.toLowerCase() && 
-      (!data.id || role.id !== data.id)
-    );
-    
-    if (nameExists) {
-      setRoleNameError("A role with this name already exists");
+    },
+    onError: (error) => {
+      console.error('Error deleting role:', error);
       toast({
-        title: "Duplicate Role Name",
-        description: "A role with this name already exists. Please use a different name.",
+        title: "Error",
+        description: "Failed to delete role. Please try again.",
         variant: "destructive"
       });
     }
-    
-    return nameExists;
-  };
+  });
 
   // Add stream mutation
   const addStreamMutation = useMutation({
@@ -506,6 +479,72 @@ const StreamsManager = () => {
     return Array.from({ length: stream.years }, (_, i) => i + 1);
   };
 
+  // Role management
+  const handleRoleSubmit = (data: FormRole) => {
+    // Check for duplicate role name
+    if (checkDuplicateRole(data)) {
+      return;
+    }
+
+    if (isEditing && data.id) {
+      // Update existing role
+      const roleData: Partial<Role> = {
+        name: data.name,
+        description: data.description
+      };
+      updateRoleMutation.mutate({ id: data.id, role: roleData });
+    } else {
+      // Add new role
+      if (!data.name) {
+        toast({
+          title: "Invalid Role",
+          description: "Role name is required",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const newRole: Omit<Role, 'id'> = {
+        name: data.name,
+        description: data.description
+      };
+      
+      addRoleMutation.mutate(newRole);
+    }
+    
+    setRoleNameError("");
+  };
+
+  const editRole = (role: FormRole) => {
+    roleForm.reset(role);
+    setIsEditing(true);
+    setIsRoleDialogOpen(true);
+  };
+
+  const handleDeleteRole = (id: string) => {
+    deleteRoleMutation.mutate(id);
+  };
+
+  const checkDuplicateRole = (data: FormRole): boolean => {
+    setRoleNameError("");
+    
+    const nameExists = roles.some(role => 
+      role.name.toLowerCase() === data.name.toLowerCase() && 
+      (!data.id || role.id !== data.id)
+    );
+    
+    if (nameExists) {
+      setRoleNameError("A role with this name already exists");
+      toast({
+        title: "Duplicate Role Name",
+        description: "A role with this name already exists. Please use a different name.",
+        variant: "destructive"
+      });
+    }
+    
+    return nameExists;
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -736,7 +775,19 @@ const StreamsManager = () => {
             </Button>
           </div>
 
-          {roles.length === 0 ? (
+          {isLoadingRoles ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <p>Loading roles...</p>
+              </CardContent>
+            </Card>
+          ) : isRolesError ? (
+            <Card>
+              <CardContent className="py-10 text-center text-destructive">
+                <p>Error loading roles. Please try again.</p>
+              </CardContent>
+            </Card>
+          ) : roles.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center">
                 <UserRound className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -771,7 +822,7 @@ const StreamsManager = () => {
                       <Button variant="outline" size="sm" onClick={() => editRole(role)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => deleteRole(role.id!)}>
+                      <Button variant="outline" size="sm" onClick={() => handleDeleteRole(role.id!)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
