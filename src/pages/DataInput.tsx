@@ -366,6 +366,13 @@ const DataInput = () => {
     return years;
   };
 
+  // Handle stream change in subject form
+  const handleStreamChange = (value: string) => {
+    setSelectedStreamId(value);
+    subjectForm.setValue('stream', value);
+    subjectForm.setValue('year', "1"); // Reset year to 1 when stream changes
+  };
+
   // Check for duplicate subject name or code
   const checkDuplicateSubject = (data: FormSubject): boolean => {
     setSubjectNameError("");
