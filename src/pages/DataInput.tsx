@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Trash2, Save, Check, AlertCircle, Download, Upload, Clock } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Button } from "@/components/ui/button";
@@ -224,7 +224,7 @@ const DataInput = () => {
       name: teacher.name,
       email: teacher.email,
       specialization: teacher.specialization,
-      isTA: teacher.isTA,
+      isTA: teacher.ista,
       subjects: teacher.subjects || []
     });
   };
@@ -256,7 +256,7 @@ const DataInput = () => {
           name: teacherForm.name,
           email: teacherForm.email,
           specialization: teacherForm.specialization,
-          isTA: teacherForm.isTA,
+          ista: teacherForm.isTA,
           subjects: teacherForm.subjects
         });
         toast({
@@ -268,7 +268,7 @@ const DataInput = () => {
           name: teacherForm.name,
           email: teacherForm.email,
           specialization: teacherForm.specialization,
-          isTA: teacherForm.isTA,
+          ista: teacherForm.isTA,
           subjects: teacherForm.subjects
         });
         toast({
@@ -469,369 +469,498 @@ const DataInput = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <SectionHeading
-        title="Data Management"
-        description="Manage subjects, teachers, and rooms"
-        icon={<BookOpen className="h-6 w-6" />}
-      />
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Data Management</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Manage academic data including subjects, teachers, and rooms</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Calendar className="h-5 w-5 text-gray-500" />
+          <span className="text-sm text-gray-500">Academic Year 2024-25</span>
+        </div>
+      </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="subjects">Subjects</TabsTrigger>
-          <TabsTrigger value="teachers">Teachers</TabsTrigger>
-          <TabsTrigger value="rooms">Rooms</TabsTrigger>
+          <TabsTrigger value="subjects" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Subjects
+          </TabsTrigger>
+          <TabsTrigger value="teachers" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Teachers
+          </TabsTrigger>
+          <TabsTrigger value="rooms" className="flex items-center gap-2">
+            <Building className="h-4 w-4" />
+            Rooms
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="subjects" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Subjects</h3>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={exportSubjects} className="gap-2">
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
-              <Button variant="outline" onClick={importSubjects} className="gap-2">
-                <Upload className="h-4 w-4" />
-                Import
-              </Button>
-            </div>
-          </div>
+        <TabsContent value="subjects" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5" />
+                  Subject Management
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={exportSubjects} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Export
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={importSubjects} className="gap-2">
+                    <Upload className="h-4 w-4" />
+                    Import
+                  </Button>
+                </div>
+              </CardTitle>
+              <CardDescription>
+                Add, edit, and manage academic subjects with their credit structure
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="border rounded-lg overflow-hidden">
+                <div className="max-h-[400px] overflow-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subject</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Code</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stream</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Year</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">L</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">T</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">P</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Credits</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                      {subjects.map(subject => (
+                        <tr 
+                          key={subject.id} 
+                          className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                            selectedSubject?.id === subject.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                          }`}
+                          onClick={() => handleSubjectSelect(subject)}
+                        >
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="font-medium text-gray-900 dark:text-gray-100">{subject.name}</div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{subject.code}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                            {streams.find(s => s.id === subject.stream)?.name || subject.stream}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{subject.year}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{subject.lectures}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{subject.tutorials}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{subject.practicals}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-center font-medium text-gray-900 dark:text-gray-100">{subject.credits}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          <div className="overflow-auto max-h-[400px] border rounded-md">
-            <table className="w-full text-left">
-              <thead>
-                <tr>
-                  <th className="p-2 border-b">Name</th>
-                  <th className="p-2 border-b">Code</th>
-                  <th className="p-2 border-b">Stream</th>
-                  <th className="p-2 border-b">Year</th>
-                  <th className="p-2 border-b">L</th>
-                  <th className="p-2 border-b">T</th>
-                  <th className="p-2 border-b">P</th>
-                  <th className="p-2 border-b">Credits</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subjects.map(subject => (
-                  <tr 
-                    key={subject.id} 
-                    className={`cursor-pointer ${selectedSubject?.id === subject.id ? "bg-muted" : ""}`}
-                    onClick={() => handleSubjectSelect(subject)}
+              <Separator />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <Label htmlFor="subject-name">Subject Name *</Label>
+                  <Input 
+                    id="subject-name"
+                    value={subjectForm.name} 
+                    onChange={e => handleSubjectFormChange("name", e.target.value)}
+                    placeholder="Enter subject name"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="subject-code">Subject Code *</Label>
+                  <Input 
+                    id="subject-code"
+                    value={subjectForm.code} 
+                    onChange={e => handleSubjectFormChange("code", e.target.value)}
+                    placeholder="e.g., CS101"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="subject-stream">Stream *</Label>
+                  <Select 
+                    value={subjectForm.stream} 
+                    onValueChange={value => handleSubjectFormChange("stream", value)}
                   >
-                    <td className="p-2 border-b">{subject.name}</td>
-                    <td className="p-2 border-b">{subject.code}</td>
-                    <td className="p-2 border-b">{streams.find(s => s.id === subject.stream)?.name || subject.stream}</td>
-                    <td className="p-2 border-b">{subject.year}</td>
-                    <td className="p-2 border-b">{subject.lectures}</td>
-                    <td className="p-2 border-b">{subject.tutorials}</td>
-                    <td className="p-2 border-b">{subject.practicals}</td>
-                    <td className="p-2 border-b">{subject.credits}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Stream" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {streams.map(stream => (
+                        <SelectItem key={stream.id} value={stream.id}>{stream.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="subject-year">Year *</Label>
+                  <Select 
+                    value={subjectForm.year} 
+                    onValueChange={value => handleSubjectFormChange("year", value)}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">First Year</SelectItem>
+                      <SelectItem value="2">Second Year</SelectItem>
+                      <SelectItem value="3">Third Year</SelectItem>
+                      <SelectItem value="4">Fourth Year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="lectures">Lectures</Label>
+                  <Input 
+                    id="lectures"
+                    type="number" 
+                    min={0} 
+                    value={subjectForm.lectures} 
+                    onChange={e => handleSubjectFormChange("lectures", parseInt(e.target.value) || 0)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tutorials">Tutorials</Label>
+                  <Input 
+                    id="tutorials"
+                    type="number" 
+                    min={0} 
+                    value={subjectForm.tutorials} 
+                    onChange={e => handleSubjectFormChange("tutorials", parseInt(e.target.value) || 0)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="practicals">Practicals</Label>
+                  <Input 
+                    id="practicals"
+                    type="number" 
+                    min={0} 
+                    value={subjectForm.practicals} 
+                    onChange={e => handleSubjectFormChange("practicals", parseInt(e.target.value) || 0)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="credits">Credits</Label>
+                  <Input 
+                    id="credits"
+                    type="number" 
+                    min={0} 
+                    value={subjectForm.credits} 
+                    onChange={e => handleSubjectFormChange("credits", parseInt(e.target.value) || 0)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label>Name</Label>
-                <Input 
-                  value={subjectForm.name} 
-                  onChange={e => handleSubjectFormChange("name", e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label>Code</Label>
-                <Input 
-                  value={subjectForm.code} 
-                  onChange={e => handleSubjectFormChange("code", e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label>Stream</Label>
-                <Select 
-                  value={subjectForm.stream} 
-                  onValueChange={value => handleSubjectFormChange("stream", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Stream" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {streams.map(stream => (
-                      <SelectItem key={stream.id} value={stream.id}>{stream.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Year</Label>
-                <Input 
-                  type="number" 
-                  min={1} 
-                  value={subjectForm.year} 
-                  onChange={e => handleSubjectFormChange("year", e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label>Lectures</Label>
-                <Input 
-                  type="number" 
-                  min={0} 
-                  value={subjectForm.lectures} 
-                  onChange={e => handleSubjectFormChange("lectures", parseInt(e.target.value) || 0)} 
-                />
-              </div>
-              <div>
-                <Label>Tutorials</Label>
-                <Input 
-                  type="number" 
-                  min={0} 
-                  value={subjectForm.tutorials} 
-                  onChange={e => handleSubjectFormChange("tutorials", parseInt(e.target.value) || 0)} 
-                />
-              </div>
-              <div>
-                <Label>Practicals</Label>
-                <Input 
-                  type="number" 
-                  min={0} 
-                  value={subjectForm.practicals} 
-                  onChange={e => handleSubjectFormChange("practicals", parseInt(e.target.value) || 0)} 
-                />
-              </div>
-              <div>
-                <Label>Credits</Label>
-                <Input 
-                  type="number" 
-                  min={0} 
-                  value={subjectForm.credits} 
-                  onChange={e => handleSubjectFormChange("credits", parseInt(e.target.value) || 0)} 
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button onClick={saveSubject}>
-                {selectedSubject ? "Update Subject" : "Add Subject"}
-              </Button>
-              {selectedSubject && (
-                <Button variant="destructive" onClick={deleteSelectedSubject}>
-                  Delete Subject
+              <div className="flex gap-3 pt-4">
+                <Button onClick={saveSubject} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  {selectedSubject ? "Update Subject" : "Add Subject"}
                 </Button>
-              )}
-              <Button variant="outline" onClick={clearSubjectForm}>
-                Clear
-              </Button>
-            </div>
-          </div>
+                {selectedSubject && (
+                  <Button variant="destructive" onClick={deleteSelectedSubject} className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Delete Subject
+                  </Button>
+                )}
+                <Button variant="outline" onClick={clearSubjectForm}>
+                  Clear Form
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="teachers" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Teachers</h3>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={exportTeachers} className="gap-2">
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
-              <Button variant="outline" onClick={importTeachers} className="gap-2">
-                <Upload className="h-4 w-4" />
-                Import
-              </Button>
-            </div>
-          </div>
+        <TabsContent value="teachers" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Teacher Management
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={exportTeachers} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Export
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={importTeachers} className="gap-2">
+                    <Upload className="h-4 w-4" />
+                    Import
+                  </Button>
+                </div>
+              </CardTitle>
+              <CardDescription>
+                Manage teaching staff and their subject assignments
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="border rounded-lg overflow-hidden">
+                <div className="max-h-[400px] overflow-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Specialization</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subjects</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                      {teachers.map(teacher => (
+                        <tr 
+                          key={teacher.id} 
+                          className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                            selectedTeacher?.id === teacher.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                          }`}
+                          onClick={() => handleTeacherSelect(teacher)}
+                        >
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="font-medium text-gray-900 dark:text-gray-100">{teacher.name}</div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{teacher.email}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{teacher.specialization}</td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              teacher.ista 
+                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                                : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            }`}>
+                              {teacher.ista ? "Teaching Assistant" : "Professor"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-gray-600 dark:text-gray-400">
+                            <div className="max-w-xs truncate">
+                              {teacher.subjects?.map(subjId => subjects.find(s => s.id === subjId)?.name).filter(Boolean).join(", ") || "No subjects assigned"}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          <div className="overflow-auto max-h-[400px] border rounded-md">
-            <table className="w-full text-left">
-              <thead>
-                <tr>
-                  <th className="p-2 border-b">Name</th>
-                  <th className="p-2 border-b">Email</th>
-                  <th className="p-2 border-b">Specialization</th>
-                  <th className="p-2 border-b">TA</th>
-                  <th className="p-2 border-b">Subjects</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teachers.map(teacher => (
-                  <tr 
-                    key={teacher.id} 
-                    className={`cursor-pointer ${selectedTeacher?.id === teacher.id ? "bg-muted" : ""}`}
-                    onClick={() => handleTeacherSelect(teacher)}
+              <Separator />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="teacher-name">Name *</Label>
+                  <Input 
+                    id="teacher-name"
+                    value={teacherForm.name} 
+                    onChange={e => handleTeacherFormChange("name", e.target.value)}
+                    placeholder="Enter teacher name"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="teacher-email">Email *</Label>
+                  <Input 
+                    id="teacher-email"
+                    type="email" 
+                    value={teacherForm.email} 
+                    onChange={e => handleTeacherFormChange("email", e.target.value)}
+                    placeholder="teacher@example.com"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="teacher-specialization">Specialization *</Label>
+                  <Input 
+                    id="teacher-specialization"
+                    value={teacherForm.specialization} 
+                    onChange={e => handleTeacherFormChange("specialization", e.target.value)}
+                    placeholder="e.g., Computer Science"
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex items-center space-x-2 mt-6">
+                  <input 
+                    type="checkbox" 
+                    checked={teacherForm.isTA} 
+                    onChange={e => handleTeacherFormChange("isTA", e.target.checked)} 
+                    id="isTA"
+                    className="rounded border-gray-300"
+                  />
+                  <Label htmlFor="isTA">Teaching Assistant</Label>
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="teacher-subjects">Assigned Subjects</Label>
+                  <Select 
+                    value={teacherForm.subjects.join(",")} 
+                    onValueChange={value => handleTeacherFormChange("subjects", value ? value.split(",") : [])}
                   >
-                    <td className="p-2 border-b">{teacher.name}</td>
-                    <td className="p-2 border-b">{teacher.email}</td>
-                    <td className="p-2 border-b">{teacher.specialization}</td>
-                    <td className="p-2 border-b">{teacher.isTA ? "Yes" : "No"}</td>
-                    <td className="p-2 border-b">
-                      {teacher.subjects?.map(subjId => subjects.find(s => s.id === subjId)?.name).filter(Boolean).join(", ")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Subjects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map(subject => (
+                        <SelectItem key={subject.id} value={subject.id}>
+                          {subject.name} ({subject.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label>Name</Label>
-                <Input 
-                  value={teacherForm.name} 
-                  onChange={e => handleTeacherFormChange("name", e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input 
-                  type="email" 
-                  value={teacherForm.email} 
-                  onChange={e => handleTeacherFormChange("email", e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label>Specialization</Label>
-                <Input 
-                  value={teacherForm.specialization} 
-                  onChange={e => handleTeacherFormChange("specialization", e.target.value)} 
-                />
-              </div>
-              <div className="flex items-center space-x-2 mt-6">
-                <input 
-                  type="checkbox" 
-                  checked={teacherForm.isTA} 
-                  onChange={e => handleTeacherFormChange("isTA", e.target.checked)} 
-                  id="isTA"
-                />
-                <Label htmlFor="isTA">Teaching Assistant</Label>
-              </div>
-              <div className="md:col-span-3">
-                <Label>Subjects</Label>
-                <Select 
-                  value={teacherForm.subjects.join(",")} 
-                  onValueChange={value => handleTeacherFormChange("subjects", value ? value.split(",") : [])}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Subjects" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subjects.map(subject => (
-                      <SelectItem key={subject.id} value={subject.id}>
-                        {subject.name} ({subject.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button onClick={saveTeacher}>
-                {selectedTeacher ? "Update Teacher" : "Add Teacher"}
-              </Button>
-              {selectedTeacher && (
-                <Button variant="destructive" onClick={deleteSelectedTeacher}>
-                  Delete Teacher
+              <div className="flex gap-3 pt-4">
+                <Button onClick={saveTeacher} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  {selectedTeacher ? "Update Teacher" : "Add Teacher"}
                 </Button>
-              )}
-              <Button variant="outline" onClick={clearTeacherForm}>
-                Clear
-              </Button>
-            </div>
-          </div>
+                {selectedTeacher && (
+                  <Button variant="destructive" onClick={deleteSelectedTeacher} className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Delete Teacher
+                  </Button>
+                )}
+                <Button variant="outline" onClick={clearTeacherForm}>
+                  Clear Form
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="rooms" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Rooms</h3>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={exportRooms} className="gap-2">
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
-              <Button variant="outline" onClick={importRooms} className="gap-2">
-                <Upload className="h-4 w-4" />
-                Import
-              </Button>
-            </div>
-          </div>
+        <TabsContent value="rooms" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Building className="h-5 w-5" />
+                  Room Management
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={exportRooms} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Export
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={importRooms} className="gap-2">
+                    <Upload className="h-4 w-4" />
+                    Import
+                  </Button>
+                </div>
+              </CardTitle>
+              <CardDescription>
+                Manage classroom and laboratory facilities
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="border rounded-lg overflow-hidden">
+                <div className="max-h-[400px] overflow-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Room Number</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capacity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                      {rooms.map(room => (
+                        <tr 
+                          key={room.id} 
+                          className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                            selectedRoom?.id === room.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                          }`}
+                          onClick={() => handleRoomSelect(room)}
+                        >
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="font-medium text-gray-900 dark:text-gray-100">{room.number}</div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                              room.type === "lab" 
+                                ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                                : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                            }`}>
+                              {room.type === "lab" ? "Laboratory" : "Classroom"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-center font-medium text-gray-900 dark:text-gray-100">{room.capacity}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          <div className="overflow-auto max-h-[400px] border rounded-md">
-            <table className="w-full text-left">
-              <thead>
-                <tr>
-                  <th className="p-2 border-b">Number</th>
-                  <th className="p-2 border-b">Type</th>
-                  <th className="p-2 border-b">Capacity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rooms.map(room => (
-                  <tr 
-                    key={room.id} 
-                    className={`cursor-pointer ${selectedRoom?.id === room.id ? "bg-muted" : ""}`}
-                    onClick={() => handleRoomSelect(room)}
+              <Separator />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="room-number">Room Number *</Label>
+                  <Input 
+                    id="room-number"
+                    value={roomForm.number} 
+                    onChange={e => handleRoomFormChange("number", e.target.value)}
+                    placeholder="e.g., 101, Lab-A"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="room-type">Room Type *</Label>
+                  <Select 
+                    value={roomForm.type} 
+                    onValueChange={(value: "classroom" | "lab") => handleRoomFormChange("type", value)}
                   >
-                    <td className="p-2 border-b">{room.number}</td>
-                    <td className="p-2 border-b">{room.type}</td>
-                    <td className="p-2 border-b">{room.capacity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="classroom">Classroom</SelectItem>
+                      <SelectItem value="lab">Laboratory</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="room-capacity">Capacity *</Label>
+                  <Input 
+                    id="room-capacity"
+                    type="number" 
+                    min={1} 
+                    value={roomForm.capacity} 
+                    onChange={e => handleRoomFormChange("capacity", parseInt(e.target.value) || 0)}
+                    placeholder="e.g., 60"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label>Number</Label>
-                <Input 
-                  value={roomForm.number} 
-                  onChange={e => handleRoomFormChange("number", e.target.value)} 
-                />
-              </div>
-              <div>
-                <Label>Type</Label>
-                <Select 
-                  value={roomForm.type} 
-                  onValueChange={(value: "classroom" | "lab") => handleRoomFormChange("type", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="classroom">Classroom</SelectItem>
-                    <SelectItem value="lab">Lab</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Capacity</Label>
-                <Input 
-                  type="number" 
-                  min={1} 
-                  value={roomForm.capacity} 
-                  onChange={e => handleRoomFormChange("capacity", parseInt(e.target.value) || 0)} 
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button onClick={saveRoom}>
-                {selectedRoom ? "Update Room" : "Add Room"}
-              </Button>
-              {selectedRoom && (
-                <Button variant="destructive" onClick={deleteSelectedRoom}>
-                  Delete Room
+              <div className="flex gap-3 pt-4">
+                <Button onClick={saveRoom} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  {selectedRoom ? "Update Room" : "Add Room"}
                 </Button>
-              )}
-              <Button variant="outline" onClick={clearRoomForm}>
-                Clear
-              </Button>
-            </div>
-          </div>
+                {selectedRoom && (
+                  <Button variant="destructive" onClick={deleteSelectedRoom} className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Delete Room
+                  </Button>
+                )}
+                <Button variant="outline" onClick={clearRoomForm}>
+                  Clear Form
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
