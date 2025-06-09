@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Trash2, Save, Check, AlertCircle, Download, Upload, Clock } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -47,7 +48,6 @@ const TimetableEditor = () => {
   const [availableDrafts, setAvailableDrafts] = useState<Record<string, any>>({});
   const [autoSaveInterval, setAutoSaveInterval] = useState<number | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
-  const [subjectAllocation, setSubjectAllocation] = useState<Record<string, any>>({});
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const timeSlots = [
@@ -112,7 +112,7 @@ const TimetableEditor = () => {
   }, [subjects, stream, year, streams]);
 
   // Calculate subject allocation tracking using useMemo to prevent infinite loops
-  const subjectAllocation = useMemo(() => {
+  const currentSubjectAllocation = useMemo(() => {
     if (!showTimetable || Object.keys(timetableData).length === 0) {
       return {};
     }
@@ -1108,7 +1108,7 @@ const TimetableEditor = () => {
                     <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                       {filteredSubjects.length > 0 ? (
                         filteredSubjects.map((subject) => {
-                          const allocation = subjectAllocation[subject.id];
+                          const allocation = currentSubjectAllocation[subject.id];
                           if (!allocation) return null;
                           
                           return (
