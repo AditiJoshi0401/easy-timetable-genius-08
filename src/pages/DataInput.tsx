@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Trash2, Save, Check, AlertCircle, Download, Upload, Clock } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -50,6 +51,7 @@ const DataInput = () => {
   const [teacherForm, setTeacherForm] = useState({
     name: "",
     email: "",
+    specialization: "",
     isTA: false,
     subjects: [] as string[]
   });
@@ -59,7 +61,7 @@ const DataInput = () => {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [roomForm, setRoomForm] = useState({
     number: "",
-    type: "classroom",
+    type: "classroom" as "classroom" | "lab",
     capacity: 0
   });
 
@@ -75,31 +77,34 @@ const DataInput = () => {
   });
 
   // Fetch subjects
-  const { refetch: refetchSubjects } = useQuery({
+  const { data: subjectsData, refetch: refetchSubjects } = useQuery({
     queryKey: ['subjects'],
-    queryFn: fetchSubjects,
-    onSuccess: (data) => setSubjects(data)
+    queryFn: fetchSubjects
   });
 
   // Fetch teachers
-  const { refetch: refetchTeachers } = useQuery({
+  const { data: teachersData, refetch: refetchTeachers } = useQuery({
     queryKey: ['teachers'],
-    queryFn: fetchTeachers,
-    onSuccess: (data) => setTeachers(data)
+    queryFn: fetchTeachers
   });
 
   // Fetch rooms
-  const { refetch: refetchRooms } = useQuery({
+  const { data: roomsData, refetch: refetchRooms } = useQuery({
     queryKey: ['rooms'],
-    queryFn: fetchRooms,
-    onSuccess: (data) => setRooms(data)
+    queryFn: fetchRooms
   });
 
   useEffect(() => {
-    refetchSubjects();
-    refetchTeachers();
-    refetchRooms();
-  }, [refetchSubjects, refetchTeachers, refetchRooms]);
+    if (subjectsData) setSubjects(subjectsData);
+  }, [subjectsData]);
+
+  useEffect(() => {
+    if (teachersData) setTeachers(teachersData);
+  }, [teachersData]);
+
+  useEffect(() => {
+    if (roomsData) setRooms(roomsData);
+  }, [roomsData]);
 
   // Subject handlers
   const handleSubjectFormChange = (field: string, value: any) => {
@@ -150,7 +155,7 @@ const DataInput = () => {
           name: subjectForm.name,
           code: subjectForm.code,
           stream: subjectForm.stream,
-          year: parseInt(subjectForm.year),
+          year: subjectForm.year,
           lectures: subjectForm.lectures,
           tutorials: subjectForm.tutorials,
           practicals: subjectForm.practicals,
@@ -165,7 +170,7 @@ const DataInput = () => {
           name: subjectForm.name,
           code: subjectForm.code,
           stream: subjectForm.stream,
-          year: parseInt(subjectForm.year),
+          year: subjectForm.year,
           lectures: subjectForm.lectures,
           tutorials: subjectForm.tutorials,
           practicals: subjectForm.practicals,
@@ -218,6 +223,7 @@ const DataInput = () => {
     setTeacherForm({
       name: teacher.name,
       email: teacher.email,
+      specialization: teacher.specialization,
       isTA: teacher.isTA,
       subjects: teacher.subjects || []
     });
@@ -228,13 +234,14 @@ const DataInput = () => {
     setTeacherForm({
       name: "",
       email: "",
+      specialization: "",
       isTA: false,
       subjects: []
     });
   };
 
   const saveTeacher = async () => {
-    if (!teacherForm.name || !teacherForm.email) {
+    if (!teacherForm.name || !teacherForm.email || !teacherForm.specialization) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields for the teacher.",
@@ -248,6 +255,7 @@ const DataInput = () => {
         await updateTeacher(selectedTeacher.id, {
           name: teacherForm.name,
           email: teacherForm.email,
+          specialization: teacherForm.specialization,
           isTA: teacherForm.isTA,
           subjects: teacherForm.subjects
         });
@@ -259,6 +267,7 @@ const DataInput = () => {
         await addTeacher({
           name: teacherForm.name,
           email: teacherForm.email,
+          specialization: teacherForm.specialization,
           isTA: teacherForm.isTA,
           subjects: teacherForm.subjects
         });
@@ -640,6 +649,7 @@ const DataInput = () => {
                 <tr>
                   <th className="p-2 border-b">Name</th>
                   <th className="p-2 border-b">Email</th>
+                  <th className="p-2 border-b">Specialization</th>
                   <th className="p-2 border-b">TA</th>
                   <th className="p-2 border-b">Subjects</th>
                 </tr>
@@ -653,6 +663,7 @@ const DataInput = () => {
                   >
                     <td className="p-2 border-b">{teacher.name}</td>
                     <td className="p-2 border-b">{teacher.email}</td>
+                    <td className="p-2 border-b">{teacher.specialization}</td>
                     <td className="p-2 border-b">{teacher.isTA ? "Yes" : "No"}</td>
                     <td className="p-2 border-b">
                       {teacher.subjects?.map(subjId => subjects.find(s => s.id === subjId)?.name).filter(Boolean).join(", ")}
@@ -680,6 +691,13 @@ const DataInput = () => {
                   onChange={e => handleTeacherFormChange("email", e.target.value)} 
                 />
               </div>
+              <div>
+                <Label>Specialization</Label>
+                <Input 
+                  value={teacherForm.specialization} 
+                  onChange={e => handleTeacherFormChange("specialization", e.target.value)} 
+                />
+              </div>
               <div className="flex items-center space-x-2 mt-6">
                 <input 
                   type="checkbox" 
@@ -692,9 +710,8 @@ const DataInput = () => {
               <div className="md:col-span-3">
                 <Label>Subjects</Label>
                 <Select 
-                  multiple 
-                  value={teacherForm.subjects} 
-                  onValueChange={value => handleTeacherFormChange("subjects", value)}
+                  value={teacherForm.subjects.join(",")} 
+                  onValueChange={value => handleTeacherFormChange("subjects", value ? value.split(",") : [])}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select Subjects" />
@@ -779,7 +796,7 @@ const DataInput = () => {
                 <Label>Type</Label>
                 <Select 
                   value={roomForm.type} 
-                  onValueChange={value => handleRoomFormChange("type", value)}
+                  onValueChange={(value: "classroom" | "lab") => handleRoomFormChange("type", value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select Type" />

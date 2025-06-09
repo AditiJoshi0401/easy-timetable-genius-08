@@ -118,6 +118,121 @@ export const getAllTimetableDrafts = (): Record<string, { data: any, lastUpdated
   return drafts;
 };
 
+// Export/Import functions for data management
+export const exportSubjectsData = (subjects: Subject[]): void => {
+  const dataStr = JSON.stringify(subjects, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'subjects.json';
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+export const importSubjectsData = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const subjects = JSON.parse(e.target?.result as string);
+            // Handle import logic here
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        reject(new Error('No file selected'));
+      }
+    };
+    input.click();
+  });
+};
+
+export const exportTeachersData = (teachers: Teacher[]): void => {
+  const dataStr = JSON.stringify(teachers, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'teachers.json';
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+export const importTeachersData = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const teachers = JSON.parse(e.target?.result as string);
+            // Handle import logic here
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        reject(new Error('No file selected'));
+      }
+    };
+    input.click();
+  });
+};
+
+export const exportRoomsData = (rooms: Room[]): void => {
+  const dataStr = JSON.stringify(rooms, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'rooms.json';
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+export const importRoomsData = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const rooms = JSON.parse(e.target?.result as string);
+            // Handle import logic here
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        reject(new Error('No file selected'));
+      }
+    };
+    input.click();
+  });
+};
+
 // Helper to create a proper key-value mapping between composite ID and DB ID
 const timetableIdCache: Record<string, string> = {};
 
