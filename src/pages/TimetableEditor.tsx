@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Trash2, Save, Check, AlertCircle, Download, Upload, Clock } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Button } from "@/components/ui/button";
@@ -102,6 +102,48 @@ const TimetableEditor = () => {
     queryKey: ['allTimetables'],
     queryFn: fetchAllTimetables
   });
+
+  // Memoize filtered subjects to prevent infinite re-renders
+  const filteredSubjects = useMemo(() => {
+    return subjects.filter((subject) => {
+      if (!stream || !year) return true;
+      return subject.stream === streams.find(s => s.id === stream)?.code && subject.year === year;
+    });
+  }, [subjects, stream, year, streams]);
+
+  // Calculate subject allocation tracking using useMemo to prevent infinite loops
+  const subjectAllocation = useMemo(() => {
+    if (!showTimetable || Object.keys(timetableData).length === 0) {
+      return {};
+    }
+
+    const allocation: Record<string, any> = {};
+    
+    filteredSubjects.forEach(subject => {
+      allocation[subject.id] = {
+        lectures: { allocated: 0, total: subject.lectures || 0 },
+        tutorials: { allocated: 0, total: subject.tutorials || 0 },
+        practicals: { allocated: 0, total: subject.practicals || 0 }
+      };
+    });
+    
+    // Count allocated instances in timetable
+    Object.values(timetableData).forEach((dayData: any) => {
+      Object.values(dayData).forEach((slot: any) => {
+        if (slot && slot.subject && !slot.isSpecial && allocation[slot.subject.id]) {
+          if (slot.type === 'lecture') {
+            allocation[slot.subject.id].lectures.allocated++;
+          } else if (slot.type === 'tutorial') {
+            allocation[slot.subject.id].tutorials.allocated++;
+          } else if (slot.type === 'lab' && !slot.isPartOfLab) {
+            allocation[slot.subject.id].practicals.allocated++;
+          }
+        }
+      });
+    });
+    
+    return allocation;
+  }, [showTimetable, timetableData, filteredSubjects]);
 
   const loadAvailableDrafts = useCallback(() => {
     const drafts = getAllTimetableDrafts();
@@ -388,13 +430,13 @@ const TimetableEditor = () => {
       for (let i = 0; i < 2; i++) {
         const timeSlot = timeSlots[startIndex + i];
         const slot = timetableData[day]?.[timeSlot];
-        if (slot && slot.room.id === roomId) {
+        if (slot && slot.room && slot.room.id === roomId) {
           return false;
         }
       }
     } else {
       const slot = timetableData[day]?.[startTime];
-      if (slot && slot.room.id === roomId) {
+      if (slot && slot.room && slot.room.id === roomId) {
         return false;
       }
     }
@@ -516,11 +558,6 @@ const TimetableEditor = () => {
       description: `Removed subject from ${day} ${time}`
     });
   };
-
-  const filteredSubjects = subjects.filter((subject) => {
-    if (!stream || !year) return true;
-    return subject.stream === streams.find(s => s.id === stream)?.code && subject.year === year;
-  });
 
   const getTeachersForSubject = (subjectId: string) => {
     return teachers.filter(teacher => 
@@ -697,42 +734,6 @@ const TimetableEditor = () => {
       description: "The selected draft has been deleted."
     });
   };
-
-  // Calculate subject allocation tracking
-  const calculateSubjectAllocation = () => {
-    const allocation: Record<string, any> = {};
-    
-    filteredSubjects.forEach(subject => {
-      allocation[subject.id] = {
-        lectures: { allocated: 0, total: subject.lectures || 0 },
-        tutorials: { allocated: 0, total: subject.tutorials || 0 },
-        practicals: { allocated: 0, total: subject.practicals || 0 }
-      };
-    });
-    
-    // Count allocated instances in timetable
-    Object.values(timetableData).forEach((dayData: any) => {
-      Object.values(dayData).forEach((slot: any) => {
-        if (slot && slot.subject && allocation[slot.subject.id]) {
-          if (slot.type === 'lecture') {
-            allocation[slot.subject.id].lectures.allocated++;
-          } else if (slot.type === 'tutorial') {
-            allocation[slot.subject.id].tutorials.allocated++;
-          } else if (slot.type === 'lab' && !slot.isPartOfLab) {
-            allocation[slot.subject.id].practicals.allocated++;
-          }
-        }
-      });
-    });
-    
-    setSubjectAllocation(allocation);
-  };
-
-  useEffect(() => {
-    if (showTimetable && Object.keys(timetableData).length > 0) {
-      calculateSubjectAllocation();
-    }
-  }, [timetableData, filteredSubjects, showTimetable]);
 
   if (streamsLoading) {
     return (
@@ -967,7 +968,7 @@ const TimetableEditor = () => {
                                 <>
                                   <div className="flex justify-between items-start">
                                     <span className="text-xs font-medium">
-                                      {cellData.subject.name}
+                                      {cellData.subject?.name || 'Unknown Subject'}
                                     </span>
                                     {isEditing && (
                                       <button 
@@ -978,19 +979,31 @@ const TimetableEditor = () => {
                                       </button>
                                     )}
                                   </div>
-                                  <div className="mt-1 space-y-1">
-                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Users className="h-3 w-3" />
-                                      <span>{cellData.teacher.isTA ? "TA " : ""}{cellData.teacher.name}</span>
+                                  {cellData.isSpecial ? (
+                                    <div className="mt-1">
+                                      <div className={`text-xs px-2 py-1 rounded-md text-center font-medium ${
+                                        cellData.subject?.id === 'LUNCH' 
+                                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
+                                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                      }`}>
+                                        {cellData.subject?.name}
+                                      </div>
                                     </div>
-                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Building className="h-3 w-3" />
-                                      <span>{cellData.room.number}</span>
+                                  ) : (
+                                    <div className="mt-1 space-y-1">
+                                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <Users className="h-3 w-3" />
+                                        <span>{cellData.teacher?.isTA ? "TA " : ""}{cellData.teacher?.name}</span>
+                                      </div>
+                                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <Building className="h-3 w-3" />
+                                        <span>{cellData.room?.number}</span>
+                                      </div>
+                                      <div className="chip chip-primary text-[10px] py-0.5 px-1.5 mt-1">
+                                        {cellData.type}
+                                      </div>
                                     </div>
-                                    <div className="chip chip-primary text-[10px] py-0.5 px-1.5 mt-1">
-                                      {cellData.type}
-                                    </div>
-                                  </div>
+                                  )}
                                 </>
                               )}
                               {cellData.isPartOfLab && (
@@ -1063,21 +1076,21 @@ const TimetableEditor = () => {
                       <div className="space-y-2">
                         <div
                           key="LUNCH"
-                          className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors bg-blue-50"
+                          className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors bg-blue-50 dark:bg-blue-950"
                           draggable
                           onDragStart={() => handleDragStart({ id: 'LUNCH', name: 'LUNCH' }, 'special')}
                           onDragEnd={handleDragEnd}
                         >
-                          <div className="font-medium text-sm">LUNCH</div>
+                          <div className="font-medium text-sm text-blue-800 dark:text-blue-200">LUNCH</div>
                         </div>
                         <div
                           key="OFFICE_HOURS"
-                          className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors bg-blue-50"
+                          className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors bg-green-50 dark:bg-green-950"
                           draggable
                           onDragStart={() => handleDragStart({ id: 'OFFICE_HOURS', name: 'OFFICE HOURS' }, 'special')}
                           onDragEnd={handleDragEnd}
                         >
-                          <div className="font-medium text-sm">OFFICE HOURS</div>
+                          <div className="font-medium text-sm text-green-800 dark:text-green-200">OFFICE HOURS</div>
                         </div>
                       </div>
                     </div>
