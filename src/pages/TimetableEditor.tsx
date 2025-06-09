@@ -47,6 +47,7 @@ const TimetableEditor = () => {
   const [availableDrafts, setAvailableDrafts] = useState<Record<string, any>>({});
   const [autoSaveInterval, setAutoSaveInterval] = useState<number | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [subjectAllocation, setSubjectAllocation] = useState<Record<string, any>>({});
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const timeSlots = [
@@ -341,19 +342,39 @@ const TimetableEditor = () => {
   const handleDrop = (e: React.DragEvent, day: string, time: string) => {
     e.preventDefault();
     
-    if (draggingItem && draggingItem.itemType === 'subject') {
-      setSelectedSlot({ day, time });
-      
-      const subjectTeachers = assignedTeachers[draggingItem.id] || [];
-      const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
-      
-      setSlotDetails({
-        subject: draggingItem.id,
-        teacher: defaultTeacher,
-        room: "",
-        type: "lecture"
-      });
-      setSlotDetailsOpen(true);
+    if (draggingItem) {
+      if (draggingItem.itemType === 'subject') {
+        setSelectedSlot({ day, time });
+        
+        const subjectTeachers = assignedTeachers[draggingItem.id] || [];
+        const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
+        
+        setSlotDetails({
+          subject: draggingItem.id,
+          teacher: defaultTeacher,
+          room: "",
+          type: "lecture"
+        });
+        setSlotDetailsOpen(true);
+      } else if (draggingItem.itemType === 'special') {
+        // Handle special items like LUNCH and OFFICE HOURS
+        const newTimetableData = { ...timetableData };
+        newTimetableData[day][time] = {
+          subject: { id: draggingItem.id, name: draggingItem.name },
+          teacher: null,
+          room: null,
+          type: draggingItem.id.toLowerCase(),
+          isSpecial: true
+        };
+        
+        setTimetableData(newTimetableData);
+        manualSaveDraft();
+        
+        toast({
+          title: "Added",
+          description: `Added ${draggingItem.name} to ${day} ${time}`
+        });
+      }
     }
   };
 
@@ -677,6 +698,42 @@ const TimetableEditor = () => {
     });
   };
 
+  // Calculate subject allocation tracking
+  const calculateSubjectAllocation = () => {
+    const allocation: Record<string, any> = {};
+    
+    filteredSubjects.forEach(subject => {
+      allocation[subject.id] = {
+        lectures: { allocated: 0, total: subject.lectures || 0 },
+        tutorials: { allocated: 0, total: subject.tutorials || 0 },
+        practicals: { allocated: 0, total: subject.practicals || 0 }
+      };
+    });
+    
+    // Count allocated instances in timetable
+    Object.values(timetableData).forEach((dayData: any) => {
+      Object.values(dayData).forEach((slot: any) => {
+        if (slot && slot.subject && allocation[slot.subject.id]) {
+          if (slot.type === 'lecture') {
+            allocation[slot.subject.id].lectures.allocated++;
+          } else if (slot.type === 'tutorial') {
+            allocation[slot.subject.id].tutorials.allocated++;
+          } else if (slot.type === 'lab' && !slot.isPartOfLab) {
+            allocation[slot.subject.id].practicals.allocated++;
+          }
+        }
+      });
+    });
+    
+    setSubjectAllocation(allocation);
+  };
+
+  useEffect(() => {
+    if (showTimetable && Object.keys(timetableData).length > 0) {
+      calculateSubjectAllocation();
+    }
+  }, [timetableData, filteredSubjects, showTimetable]);
+
   if (streamsLoading) {
     return (
       <div className="space-y-6">
@@ -865,7 +922,7 @@ const TimetableEditor = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
             <div className="xl:col-span-3 overflow-auto">
               <div className="bg-card rounded-lg border shadow-subtle overflow-hidden">
                 <div className="grid grid-cols-[100px_repeat(5,1fr)] border-b">
@@ -958,122 +1015,127 @@ const TimetableEditor = () => {
             </div>
             
             {isEditing && (
-              <div className="xl:col-span-1">
+              <div className="xl:col-span-2 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 gap-4">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Drag & Drop</CardTitle>
+                    <CardTitle className="text-base">Subjects</CardTitle>
                     <CardDescription>
-                      Drag items to the timetable
+                      Drag subjects to the timetable
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Tabs defaultValue="subjects">
-                      <TabsList className="w-full grid grid-cols-3">
-                        <TabsTrigger value="subjects" className="text-xs">Subjects</TabsTrigger>
-                        <TabsTrigger value="teachers" className="text-xs">Teachers</TabsTrigger>
-                        <TabsTrigger value="rooms" className="text-xs">Rooms</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="subjects" className="mt-4">
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                          {isLoadingSubjects ? (
-                            <div className="flex justify-center py-4">
-                              <p className="text-muted-foreground">Loading subjects...</p>
-                            </div>
-                          ) : filteredSubjects.length > 0 ? (
-                            filteredSubjects.map((subject) => (
-                              <div
-                                key={subject.id}
-                                className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors"
-                                draggable
-                                onDragStart={() => handleDragStart(subject, 'subject')}
-                                onDragEnd={handleDragEnd}
-                              >
-                                <div className="font-medium text-sm">{subject.name}</div>
-                                <div className="text-xs text-muted-foreground">{subject.code}</div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-6">
-                              <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
-                                <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {subjects.length === 0 ? 
-                                  "No subjects available. Please add subjects in Data Management." :
-                                  "No subjects available for the selected stream and year."}
-                              </p>
-                            </div>
-                          )}
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                      {isLoadingSubjects ? (
+                        <div className="flex justify-center py-4">
+                          <p className="text-muted-foreground">Loading subjects...</p>
                         </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="teachers" className="mt-4">
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                          {isLoadingTeachers ? (
-                            <div className="flex justify-center py-4">
-                              <p className="text-muted-foreground">Loading teachers...</p>
-                            </div>
-                          ) : teachers.length > 0 ? (
-                            teachers.map((teacher) => (
-                              <div
-                                key={teacher.id}
-                                className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors"
-                                draggable
-                                onDragStart={() => handleDragStart(teacher, 'teacher')}
-                                onDragEnd={handleDragEnd}
-                              >
-                                <div className="font-medium text-sm">{teacher.isTA ? "TA " : ""}{teacher.name}</div>
-                                <div className="text-xs text-muted-foreground">{teacher.specialization}</div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-6">
-                              <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
-                                <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                No teachers available. Please add teachers in Data Management.
-                              </p>
-                            </div>
-                          )}
+                      ) : filteredSubjects.length > 0 ? (
+                        filteredSubjects.map((subject) => (
+                          <div
+                            key={subject.id}
+                            className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors"
+                            draggable
+                            onDragStart={() => handleDragStart(subject, 'subject')}
+                            onDragEnd={handleDragEnd}
+                          >
+                            <div className="font-medium text-sm">{subject.name}</div>
+                            <div className="text-xs text-muted-foreground">{subject.code}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-6">
+                          <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
+                            <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {subjects.length === 0 ? 
+                              "No subjects available. Please add subjects in Data Management." :
+                              "No subjects available for the selected stream and year."}
+                          </p>
                         </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="rooms" className="mt-4">
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                          {isLoadingRooms ? (
-                            <div className="flex justify-center py-4">
-                              <p className="text-muted-foreground">Loading rooms...</p>
-                            </div>
-                          ) : rooms.length > 0 ? (
-                            rooms.map((room) => (
-                              <div
-                                key={room.id}
-                                className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors"
-                                draggable
-                                onDragStart={() => handleDragStart(room, 'room')}
-                                onDragEnd={handleDragEnd}
-                              >
-                                <div className="font-medium text-sm">{room.number}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {room.type.charAt(0).toUpperCase() + room.type.slice(1)}
+                      )}
+                    </div>
+                    
+                    {/* Special Items */}
+                    <Separator className="my-4" />
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Special</p>
+                      <div className="space-y-2">
+                        <div
+                          key="LUNCH"
+                          className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors bg-blue-50"
+                          draggable
+                          onDragStart={() => handleDragStart({ id: 'LUNCH', name: 'LUNCH' }, 'special')}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <div className="font-medium text-sm">LUNCH</div>
+                        </div>
+                        <div
+                          key="OFFICE_HOURS"
+                          className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors bg-blue-50"
+                          draggable
+                          onDragStart={() => handleDragStart({ id: 'OFFICE_HOURS', name: 'OFFICE HOURS' }, 'special')}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <div className="font-medium text-sm">OFFICE HOURS</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">L-T-P-C Status</CardTitle>
+                    <CardDescription>
+                      Allocation status for subjects
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                      {filteredSubjects.length > 0 ? (
+                        filteredSubjects.map((subject) => {
+                          const allocation = subjectAllocation[subject.id];
+                          if (!allocation) return null;
+                          
+                          return (
+                            <div key={subject.id} className="p-2 border rounded-md bg-muted/20">
+                              <div className="font-medium text-sm mb-2">{subject.name}</div>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between">
+                                  <span>Lectures:</span>
+                                  <span className={allocation.lectures.allocated > allocation.lectures.total ? 'text-red-600' : 'text-green-600'}>
+                                    {allocation.lectures.allocated}/{allocation.lectures.total}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Tutorials:</span>
+                                  <span className={allocation.tutorials.allocated > allocation.tutorials.total ? 'text-red-600' : 'text-green-600'}>
+                                    {allocation.tutorials.allocated}/{allocation.tutorials.total}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Practicals:</span>
+                                  <span className={allocation.practicals.allocated > allocation.practicals.total ? 'text-red-600' : 'text-green-600'}>
+                                    {allocation.practicals.allocated}/{allocation.practicals.total}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between font-medium">
+                                  <span>Credits:</span>
+                                  <span>{subject.credits}</span>
                                 </div>
                               </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-6">
-                              <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
-                                <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                No rooms available. Please add rooms in Data Management.
-                              </p>
                             </div>
-                          )}
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-6">
+                          <p className="text-sm text-muted-foreground">
+                            No subjects to track
+                          </p>
                         </div>
-                      </TabsContent>
-                    </Tabs>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </div>

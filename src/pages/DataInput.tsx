@@ -1,1451 +1,1390 @@
-import { useState, useEffect } from "react";
-import { Database, PlusCircle, Edit, Trash2, CheckCircle2, XCircle, BookOpen, Users, AlertCircle } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Calendar, LayoutGrid, Users, BookOpen, Building, Plus, Trash2, Save, Check, AlertCircle, Download, Upload, Clock } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchRoles, addSubject, updateSubject, deleteSubject, addTeacher, updateTeacher, deleteTeacher, addRoom, updateRoom, deleteRoom, Subject, Teacher, Room, Stream, Role } from "@/services/supabaseService";
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from "react-router-dom";
+import { 
+  fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchDivisions, fetchAllTimetables,
+  addTimetable, fetchTimetable, updateTimetable, isTeacherAvailable, isRoomAvailable,
+  saveTimetableDraft, getTimetableDraft, removeTimetableDraft, getAllTimetableDrafts,
+  Subject, Teacher, Room, Stream, Division, Timetable
+} from "@/services/supabaseService";
+import { useQuery } from "@tanstack/react-query";
 
-// Define schema for subject form
-const subjectFormSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(3, "Name must be at least 3 characters"),
-  code: z.string().min(2, "Code must be at least 2 characters"),
-  credits: z.coerce.number().min(1, "At least 1 credit").max(10, "Maximum 10 credits"),
-  lectures: z.coerce.number().min(0, "Lectures cannot be negative").max(10, "Maximum 10 lectures per week"),
-  tutorials: z.coerce.number().min(0, "Tutorials cannot be negative").max(10, "Maximum 10 tutorials per week"),
-  practicals: z.coerce.number().min(0, "Practicals cannot be negative").max(10, "Maximum 10 practicals per week"),
-  stream: z.string().min(1, "Stream is required"),
-  year: z.string().min(1, "Year is required")
-});
-
-// Define schema for teacher form
-const teacherFormSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(3, "Name must be at least 3 characters"),
-  email: z.string().email("Please enter a valid email"),
-  specialization: z.string().min(3, "Specialization must be at least 3 characters"),
-  subjects: z.array(z.string()).min(1, "At least one subject is required"),
-  roles: z.array(z.string()).min(1, "At least one role is required"),
-  cabin: z.string().optional(),
-});
-
-// Define schema for room form
-const roomFormSchema = z.object({
-  id: z.string().optional(),
-  number: z.string().min(1, "Room number is required"),
-  capacity: z.coerce.number().min(1, "At least 1 person capacity"),
-  type: z.enum(["classroom", "lab"] as const, {
-    required_error: "Please select a room type",
-  }),
-});
-
-type FormSubject = z.infer<typeof subjectFormSchema>;
-type FormTeacher = z.infer<typeof teacherFormSchema>;
-type FormRoom = z.infer<typeof roomFormSchema>;
-
-const DataInput = () => {
+const TimetableEditor = () => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [isSubjectDialogOpen, setIsSubjectDialogOpen] = useState(false);
-  const [isTeacherDialogOpen, setIsTeacherDialogOpen] = useState(false);
-  const [isRoomDialogOpen, setIsRoomDialogOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [subjectNameError, setSubjectNameError] = useState("");
-  const [subjectCodeError, setSubjectCodeError] = useState("");
-  const [teacherNameError, setTeacherNameError] = useState("");
-  const [teacherEmailError, setTeacherEmailError] = useState("");
-  const [roomNumberError, setRoomNumberError] = useState("");
-  const [selectedStreamId, setSelectedStreamId] = useState("");
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-
-  // Subject form
-  const subjectForm = useForm<FormSubject>({
-    resolver: zodResolver(subjectFormSchema),
-    defaultValues: {
-      name: "",
-      code: "",
-      credits: 3,
-      lectures: 3,
-      tutorials: 1,
-      practicals: 0,
-      stream: "",
-      year: "1",
-    },
+  const navigate = useNavigate();
+  const [stream, setStream] = useState("");
+  const [year, setYear] = useState("");
+  const [division, setDivision] = useState("");
+  const [showTimetable, setShowTimetable] = useState(false);
+  const [timetableData, setTimetableData] = useState<any>({});
+  const [isEditing, setIsEditing] = useState(true);
+  const [draggingItem, setDraggingItem] = useState<any>(null);
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [slotDetailsOpen, setSlotDetailsOpen] = useState(false);
+  const [slotDetails, setSlotDetails] = useState<any>({
+    subject: "",
+    teacher: "",
+    room: "",
+    type: "lecture"
   });
+  const [assignedTeachers, setAssignedTeachers] = useState<any>({});
+  const [years, setYears] = useState<any[]>([]);
+  const [divisions, setDivisions] = useState<any[]>([]);
+  const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importData, setImportData] = useState("");
+  const [showDraftsDialog, setShowDraftsDialog] = useState(false);
+  const [availableDrafts, setAvailableDrafts] = useState<Record<string, any>>({});
+  const [autoSaveInterval, setAutoSaveInterval] = useState<number | null>(null);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [subjectAllocation, setSubjectAllocation] = useState<Record<string, any>>({});
 
-  // Teacher form
-  const teacherForm = useForm<FormTeacher>({
-    resolver: zodResolver(teacherFormSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      specialization: "",
-      subjects: [],
-      roles: [],
-      cabin: "",
-    },
-  });
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const timeSlots = [
+    "9:30 - 10:30", 
+    "10:30 - 11:30", 
+    "11:30 - 12:30", 
+    "12:30 - 1:30", 
+    "1:30 - 2:30", 
+    "2:30 - 3:30", 
+    "3:30 - 4:30", 
+    "4:30 - 5:30"
+  ];
 
-  // Room form
-  const roomForm = useForm<FormRoom>({
-    resolver: zodResolver(roomFormSchema),
-    defaultValues: {
-      number: "",
-      capacity: 60,
-      type: "classroom",
-    },
-  });
-
-  // Fetch streams
-  const { 
-    data: streams = [], 
-    isLoading: isLoadingStreams,
-    isError: isStreamsError
-  } = useQuery({
-    queryKey: ['streams'],
-    queryFn: fetchStreams
-  });
-
-  // Fetch subjects
-  const { 
-    data: subjects = [], 
-    isLoading: isLoadingSubjects,
-    isError: isSubjectsError
-  } = useQuery({
+  const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: fetchSubjects
   });
 
-  // Fetch teachers
-  const { 
-    data: teachers = [], 
-    isLoading: isLoadingTeachers,
-    isError: isTeachersError
-  } = useQuery({
+  const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery({
     queryKey: ['teachers'],
     queryFn: fetchTeachers
   });
 
-  // Fetch rooms
-  const { 
-    data: rooms = [], 
-    isLoading: isLoadingRooms,
-    isError: isRoomsError
-  } = useQuery({
+  const { data: rooms = [], isLoading: isLoadingRooms } = useQuery({
     queryKey: ['rooms'],
     queryFn: fetchRooms
   });
 
-  // Fetch roles
-  const { 
-    data: roles = [], 
-    isLoading: isLoadingRoles,
-    isError: isRolesError
-  } = useQuery({
-    queryKey: ['roles'],
-    queryFn: fetchRoles
+  const { data: streams = [], isLoading: streamsLoading } = useQuery({
+    queryKey: ['streams'],
+    queryFn: fetchStreams,
+    meta: {
+      onSuccess: (data) => {
+        if (!data || data.length === 0) {
+          setNoStreamsDataExists(true);
+        } else {
+          setNoStreamsDataExists(false);
+        }
+      },
+      onError: () => {
+        setNoStreamsDataExists(true);
+      }
+    }
   });
 
-  // Add subject mutation
-  const addSubjectMutation = useMutation({
-    mutationFn: (subject: Omit<Subject, 'id'>) => addSubject(subject),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+  const { data: allDivisions = [] } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: fetchDivisions
+  });
+
+  const { data: existingTimetables = [], refetch: refetchTimetables } = useQuery({
+    queryKey: ['allTimetables'],
+    queryFn: fetchAllTimetables
+  });
+
+  // Calculate subject allocation tracking
+  const calculateSubjectAllocation = () => {
+    const allocation: Record<string, any> = {};
+    
+    filteredSubjects.forEach(subject => {
+      allocation[subject.id] = {
+        lectures: { allocated: 0, total: subject.lectures || 0 },
+        tutorials: { allocated: 0, total: subject.tutorials || 0 },
+        practicals: { allocated: 0, total: subject.practicals || 0 }
+      };
+    });
+    
+    // Count allocated instances in timetable
+    Object.values(timetableData).forEach((dayData: any) => {
+      Object.values(dayData).forEach((slot: any) => {
+        if (slot && slot.subject && allocation[slot.subject.id]) {
+          if (slot.type === 'lecture') {
+            allocation[slot.subject.id].lectures.allocated++;
+          } else if (slot.type === 'tutorial') {
+            allocation[slot.subject.id].tutorials.allocated++;
+          } else if (slot.type === 'lab' && !slot.isPartOfLab) {
+            allocation[slot.subject.id].practicals.allocated++;
+          }
+        }
+      });
+    });
+    
+    setSubjectAllocation(allocation);
+  };
+
+  useEffect(() => {
+    if (showTimetable && Object.keys(timetableData).length > 0) {
+      calculateSubjectAllocation();
+    }
+  }, [timetableData, filteredSubjects, showTimetable]);
+
+  const loadAvailableDrafts = useCallback(() => {
+    const drafts = getAllTimetableDrafts();
+    setAvailableDrafts(drafts);
+    return drafts;
+  }, []);
+
+  useEffect(() => {
+    loadAvailableDrafts();
+  }, [loadAvailableDrafts]);
+
+  useEffect(() => {
+    if (showTimetable && stream && year && division) {
+      const timetableKey = `${stream}_${year}_${division}`;
+      
+      const interval = window.setInterval(() => {
+        if (Object.keys(timetableData).length > 0) {
+          saveTimetableDraft(timetableKey, timetableData);
+          setLastSaved(new Date().toLocaleTimeString());
+          console.log("Auto-saved timetable draft", timetableKey);
+        }
+      }, 30000);
+      
+      setAutoSaveInterval(interval);
+      
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
+    }
+  }, [showTimetable, stream, year, division, timetableData]);
+
+  const manualSaveDraft = useCallback(() => {
+    if (showTimetable && stream && year && division) {
+      const timetableKey = `${stream}_${year}_${division}`;
+      saveTimetableDraft(timetableKey, timetableData);
+      setLastSaved(new Date().toLocaleTimeString());
+      toast({
+        title: "Draft Saved",
+        description: "Your work has been saved locally"
+      });
+    }
+  }, [showTimetable, stream, year, division, timetableData, toast]);
+
+  useEffect(() => {
+    if (streams && streams.length > 0) {
+      setNoStreamsDataExists(false);
+    } else {
+      setNoStreamsDataExists(true);
+    }
+  }, [streams]);
+
+  useEffect(() => {
+    if (stream) {
+      const selectedStreamData = streams.find(s => s.id === stream);
+      if (selectedStreamData) {
+        const yearCount = selectedStreamData.years;
+        const yearsArray = Array.from({ length: yearCount }, (_, i) => ({
+          id: (i + 1).toString(),
+          name: `Year ${i + 1}`
+        }));
+        setYears(yearsArray);
+        setYear("");
+        setDivision("");
+      } else {
+        setYears([]);
+      }
+    } else {
+      setYears([]);
+    }
+  }, [stream, streams]);
+
+  useEffect(() => {
+    if (stream && year) {
+      const filteredDivisions = allDivisions.filter(d => 
+        d.streamId === stream && d.year.toString() === year
+      );
+      setDivisions(filteredDivisions);
+      setDivision("");
+    } else {
+      setDivisions([]);
+    }
+  }, [stream, year, allDivisions]);
+
+  useEffect(() => {
+    const subjectTeacherMap: Record<string, string[]> = {};
+    
+    teachers.forEach(teacher => {
+      if (teacher.subjects && Array.isArray(teacher.subjects)) {
+        teacher.subjects.forEach((subjectId: string) => {
+          if (!subjectTeacherMap[subjectId]) {
+            subjectTeacherMap[subjectId] = [];
+          }
+          subjectTeacherMap[subjectId].push(teacher.id);
+        });
+      }
+    });
+    
+    setAssignedTeachers(subjectTeacherMap);
+  }, [teachers]);
+
+  const handleNavigateToStreamsManager = () => {
+    navigate("/streams-manager");
+  };
+
+  const initializeTimetable = () => {
+    const newTimetable: any = {};
+    
+    days.forEach(day => {
+      newTimetable[day] = {};
+      timeSlots.forEach(slot => {
+        newTimetable[day][slot] = null;
+      });
+    });
+    
+    return newTimetable;
+  };
+
+  const handleGenerateTimetable = () => {
+    if (!stream || !year || !division) {
+      toast({
+        title: "Missing Information",
+        description: "Please select stream, year, and division.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const timetableKey = `${stream}_${year}_${division}`;
+    
+    const draft = getTimetableDraft(timetableKey);
+    if (draft) {
+      setTimetableData(draft.data);
+      setShowTimetable(true);
+      setLastSaved(new Date(draft.lastUpdated).toLocaleTimeString());
+      
+      toast({
+        title: "Draft Loaded",
+        description: `Loaded your saved draft from ${new Date(draft.lastUpdated).toLocaleString()}`,
+      });
+      return;
+    }
+    
+    fetchTimetable(timetableKey)
+      .then(existingTimetable => {
+        if (existingTimetable) {
+          setTimetableData(existingTimetable.data);
+          setShowTimetable(true);
+          
+          toast({
+            title: "Timetable Loaded",
+            description: `Loaded timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}.`,
+          });
+        } else {
+          setTimetableData(initializeTimetable());
+          setShowTimetable(true);
+          
+          toast({
+            title: "New Timetable Created",
+            description: `Created a new timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}. Start adding subjects!`,
+          });
+        }
+      })
+      .catch(error => {
+        console.error("Error fetching timetable:", error);
+        setTimetableData(initializeTimetable());
+        setShowTimetable(true);
+        
+        toast({
+          title: "New Timetable Created",
+          description: `Created a new timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}. Start adding subjects!`,
+        });
+      });
+  };
+
+  const saveTimetable = async () => {
+    try {
+      if (!stream || !year || !division) {
+        toast({
+          title: "Missing Information",
+          description: "Stream, year, and division information is missing.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const timetableKey = `${stream}_${year}_${division}`;
+      const timetableMetadata = {
+        id: timetableKey,
+        name: `${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)} Timetable`,
+        division_id: division,
+        data: timetableData,
+      };
+      
+      const existingTimetable = await fetchTimetable(timetableKey);
+      
+      if (existingTimetable) {
+        await updateTimetable(timetableKey, { data: timetableData });
+        toast({
+          title: "Timetable Updated",
+          description: "Your timetable has been updated successfully in the database."
+        });
+      } else {
+        await addTimetable(timetableMetadata);
+        toast({
+          title: "Timetable Saved",
+          description: "Your timetable has been saved successfully to the database."
+        });
+      }
+      
+      removeTimetableDraft(timetableKey);
+      setLastSaved(null);
+      setIsEditing(false);
+      await refetchTimetables();
+    } catch (error) {
+      console.error('Error saving timetable:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save timetable to the database. Your work is still saved locally.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDragStart = (item: any, type: string) => {
+    setDraggingItem({ ...item, itemType: type });
+  };
+  
+  const handleDragEnd = () => {
+    setDraggingItem(null);
+  };
+  
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+  
+  const handleDrop = (e: React.DragEvent, day: string, time: string) => {
+    e.preventDefault();
+    
+    if (draggingItem) {
+      if (draggingItem.itemType === 'subject') {
+        setSelectedSlot({ day, time });
+        
+        const subjectTeachers = assignedTeachers[draggingItem.id] || [];
+        const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
+        
+        setSlotDetails({
+          subject: draggingItem.id,
+          teacher: defaultTeacher,
+          room: "",
+          type: "lecture"
+        });
+        setSlotDetailsOpen(true);
+      } else if (draggingItem.itemType === 'special') {
+        // Handle special items like LUNCH and OFFICE HOURS
+        const newTimetableData = { ...timetableData };
+        newTimetableData[day][time] = {
+          subject: { id: draggingItem.id, name: draggingItem.name },
+          teacher: null,
+          room: null,
+          type: draggingItem.id.toLowerCase(),
+          isSpecial: true
+        };
+        
+        setTimetableData(newTimetableData);
+        manualSaveDraft();
+        
+        toast({
+          title: "Added",
+          description: `Added ${draggingItem.name} to ${day} ${time}`
+        });
+      }
+    }
+  };
+
+  const checkRoomAvailability = (roomId: string, day: string, startTime: string, type: string) => {
+    if (type === "lab") {
+      const startIndex = timeSlots.indexOf(startTime);
+      if (startIndex === -1 || startIndex > timeSlots.length - 2) {
+        return false;
+      }
+      
+      for (let i = 0; i < 2; i++) {
+        const timeSlot = timeSlots[startIndex + i];
+        const slot = timetableData[day]?.[timeSlot];
+        if (slot && slot.room.id === roomId) {
+          return false;
+        }
+      }
+    } else {
+      const slot = timetableData[day]?.[startTime];
+      if (slot && slot.room.id === roomId) {
+        return false;
+      }
+    }
+    
+    return isRoomAvailable(roomId, day, startTime, existingTimetables);
+  };
+
+  const getAvailableRooms = (day: string, time: string, type: string) => {
+    return rooms.filter(room => {
+      if (type === "lab" && room.type !== "lab") return false;
+      if (type === "lecture" && room.type !== "classroom") return false;
+      
+      return checkRoomAvailability(room.id, day, time, type);
+    });
+  };
+
+  const addSubjectToTimetable = () => {
+    if (!selectedSlot || !slotDetails.subject || !slotDetails.teacher || !slotDetails.room) {
+      toast({
+        title: "Missing Information",
+        description: "Please select subject, teacher, and room.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const { day, time } = selectedSlot;
+    
+    const subject = subjects.find(s => s.id === slotDetails.subject);
+    const teacher = teachers.find(t => t.id === slotDetails.teacher);
+    const room = rooms.find(r => r.id === slotDetails.room);
+    
+    const newTimetableData = { ...timetableData };
+    
+    if (slotDetails.type === "lab") {
+      const startIndex = timeSlots.indexOf(time);
+      if (startIndex === -1 || startIndex > timeSlots.length - 2) {
+        toast({
+          title: "Can't Add Lab",
+          description: "Labs need 2 consecutive hours. There aren't enough time slots remaining in the day.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      for (let i = 0; i < 2; i++) {
+        const timeSlot = timeSlots[startIndex + i];
+        newTimetableData[day][timeSlot] = {
+          subject: subject,
+          teacher: teacher,
+          room: room,
+          type: slotDetails.type,
+          isPartOfLab: i > 0
+        };
+      }
+      
+      toast({
+        title: "Lab Added",
+        description: `Added ${subject?.name} lab to ${day} starting at ${time}`
+      });
+    } else {
+      newTimetableData[day][time] = {
+        subject: subject,
+        teacher: teacher,
+        room: room,
+        type: slotDetails.type
+      };
+      
       toast({
         title: "Subject Added",
-        description: "The subject has been added successfully."
-      });
-      subjectForm.reset();
-      setIsSubjectDialogOpen(false);
-    },
-    onError: (error) => {
-      console.error('Error adding subject:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add subject. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Update subject mutation
-  const updateSubjectMutation = useMutation({
-    mutationFn: ({ id, subject }: { id: string, subject: Partial<Subject> }) => updateSubject(id, subject),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      toast({
-        title: "Subject Updated",
-        description: "The subject has been updated successfully."
-      });
-      subjectForm.reset();
-      setIsSubjectDialogOpen(false);
-      setIsEditing(false);
-    },
-    onError: (error) => {
-      console.error('Error updating subject:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update subject. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Delete subject mutation
-  const deleteSubjectMutation = useMutation({
-    mutationFn: (id: string) => deleteSubject(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjects'] });
-      toast({
-        title: "Subject Deleted",
-        description: "The subject has been deleted successfully."
-      });
-    },
-    onError: (error) => {
-      console.error('Error deleting subject:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete subject. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Add teacher mutation
-  const addTeacherMutation = useMutation({
-    mutationFn: (teacher: Omit<Teacher, 'id'>) => addTeacher(teacher),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teachers'] });
-      toast({
-        title: "Teacher Added",
-        description: "The teacher has been added successfully."
-      });
-      teacherForm.reset();
-      setSelectedSubjects([]);
-      setSelectedRoles([]);
-      setIsTeacherDialogOpen(false);
-    },
-    onError: (error) => {
-      console.error('Error adding teacher:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add teacher. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Update teacher mutation
-  const updateTeacherMutation = useMutation({
-    mutationFn: ({ id, teacher }: { id: string, teacher: Partial<Teacher> }) => updateTeacher(id, teacher),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teachers'] });
-      toast({
-        title: "Teacher Updated",
-        description: "The teacher has been updated successfully."
-      });
-      teacherForm.reset();
-      setSelectedSubjects([]);
-      setSelectedRoles([]);
-      setIsTeacherDialogOpen(false);
-      setIsEditing(false);
-    },
-    onError: (error) => {
-      console.error('Error updating teacher:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update teacher. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Delete teacher mutation
-  const deleteTeacherMutation = useMutation({
-    mutationFn: (id: string) => deleteTeacher(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teachers'] });
-      toast({
-        title: "Teacher Deleted",
-        description: "The teacher has been deleted successfully."
-      });
-    },
-    onError: (error) => {
-      console.error('Error deleting teacher:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete teacher. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Add room mutation
-  const addRoomMutation = useMutation({
-    mutationFn: (room: Omit<Room, 'id'>) => addRoom(room),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rooms'] });
-      toast({
-        title: "Room Added",
-        description: "The room has been added successfully."
-      });
-      roomForm.reset();
-      setIsRoomDialogOpen(false);
-    },
-    onError: (error) => {
-      console.error('Error adding room:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add room. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Update room mutation
-  const updateRoomMutation = useMutation({
-    mutationFn: ({ id, room }: { id: string, room: Partial<Room> }) => updateRoom(id, room),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rooms'] });
-      toast({
-        title: "Room Updated",
-        description: "The room has been updated successfully."
-      });
-      roomForm.reset();
-      setIsRoomDialogOpen(false);
-      setIsEditing(false);
-    },
-    onError: (error) => {
-      console.error('Error updating room:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update room. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Delete room mutation
-  const deleteRoomMutation = useMutation({
-    mutationFn: (id: string) => deleteRoom(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['rooms'] });
-      toast({
-        title: "Room Deleted",
-        description: "The room has been deleted successfully."
-      });
-    },
-    onError: (error) => {
-      console.error('Error deleting room:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete room. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Get available years for selected stream
-  const getAvailableYears = (streamId: string) => {
-    const stream = streams.find(s => s.id === streamId);
-    if (!stream) return [];
-    
-    const years = [];
-    for (let i = 1; i <= stream.years; i++) {
-      years.push(i.toString());
-    }
-    return years;
-  };
-
-  // Handle stream change in subject form
-  const handleStreamChange = (value: string) => {
-    setSelectedStreamId(value);
-    subjectForm.setValue('stream', value);
-    subjectForm.setValue('year', "1"); // Reset year to 1 when stream changes
-  };
-
-  // Handle adding subject to teacher
-  const handleAddSubject = (subjectId: string) => {
-    if (!selectedSubjects.includes(subjectId)) {
-      const newSubjects = [...selectedSubjects, subjectId];
-      setSelectedSubjects(newSubjects);
-      teacherForm.setValue('subjects', newSubjects);
-    }
-  };
-
-  // Handle removing subject from teacher
-  const handleRemoveSubject = (subjectId: string) => {
-    const newSubjects = selectedSubjects.filter(id => id !== subjectId);
-    setSelectedSubjects(newSubjects);
-    teacherForm.setValue('subjects', newSubjects);
-  };
-
-  // Handle adding role to teacher
-  const handleAddRole = (roleId: string) => {
-    if (!selectedRoles.includes(roleId)) {
-      const newRoles = [...selectedRoles, roleId];
-      setSelectedRoles(newRoles);
-      teacherForm.setValue('roles', newRoles);
-    }
-  };
-
-  // Handle removing role from teacher
-  const handleRemoveRole = (roleId: string) => {
-    const newRoles = selectedRoles.filter(id => id !== roleId);
-    setSelectedRoles(newRoles);
-    teacherForm.setValue('roles', newRoles);
-  };
-
-  // Check for duplicate subject name or code
-  const checkDuplicateSubject = (data: FormSubject): boolean => {
-    setSubjectNameError("");
-    setSubjectCodeError("");
-    
-    const nameExists = subjects.some(subject => 
-      subject.name.toLowerCase() === data.name.toLowerCase() && 
-      (!data.id || subject.id !== data.id)
-    );
-    
-    const codeExists = subjects.some(subject => 
-      subject.code.toLowerCase() === data.code.toLowerCase() && 
-      (!data.id || subject.id !== data.id)
-    );
-    
-    if (nameExists) {
-      setSubjectNameError("A subject with this name already exists");
-      toast({
-        title: "Duplicate Subject Name",
-        description: "A subject with this name already exists. Please use a different name.",
-        variant: "destructive"
+        description: `Added ${subject?.name} to ${day} ${time}`
       });
     }
     
-    if (codeExists) {
-      setSubjectCodeError("A subject with this code already exists");
-      toast({
-        title: "Duplicate Subject Code",
-        description: "A subject with this code already exists. Please use a different code.",
-        variant: "destructive"
-      });
-    }
-    
-    return nameExists || codeExists;
+    setTimetableData(newTimetableData);
+    manualSaveDraft();
+    setSlotDetailsOpen(false);
   };
 
-  // Handle subject form submission
-  const onSubjectSubmit = (data: FormSubject) => {
-    // Check for duplicates
-    if (checkDuplicateSubject(data)) {
-      return;
-    }
+  const removeSubjectFromTimetable = (day: string, time: string) => {
+    const newTimetableData = { ...timetableData };
+    const currentSlot = newTimetableData[day][time];
     
-    if (isEditing && data.id) {
-      // Update existing subject
-      const subjectData: Partial<Subject> = {
-        name: data.name,
-        code: data.code,
-        credits: data.credits,
-        lectures: data.lectures,
-        tutorials: data.tutorials,
-        practicals: data.practicals,
-        stream: data.stream,
-        year: data.year
-      };
-      updateSubjectMutation.mutate({ id: data.id, subject: subjectData });
+    if (currentSlot && currentSlot.type === "lab") {
+      const startIndex = timeSlots.indexOf(time);
+      
+      let labStartIndex = startIndex;
+      while (labStartIndex > 0 && newTimetableData[day][timeSlots[labStartIndex - 1]]?.isPartOfLab) {
+        labStartIndex--;
+      }
+      
+      for (let i = 0; i < 2; i++) {
+        if (labStartIndex + i < timeSlots.length) {
+          newTimetableData[day][timeSlots[labStartIndex + i]] = null;
+        }
+      }
+    } else if (currentSlot && currentSlot.isPartOfLab) {
+      const index = timeSlots.indexOf(time);
+      let labStartIndex = index;
+      
+      while (labStartIndex > 0 && newTimetableData[day][timeSlots[labStartIndex - 1]]?.isPartOfLab) {
+        labStartIndex--;
+      }
+      
+      for (let i = 0; i < 2; i++) {
+        if (labStartIndex + i < timeSlots.length) {
+          newTimetableData[day][timeSlots[labStartIndex + i]] = null;
+        }
+      }
     } else {
-      // Add new subject
-      const newSubject: Omit<Subject, 'id'> = {
-        name: data.name,
-        code: data.code,
-        credits: data.credits,
-        lectures: data.lectures,
-        tutorials: data.tutorials,
-        practicals: data.practicals,
-        stream: data.stream,
-        year: data.year
-      };
-      addSubjectMutation.mutate(newSubject);
-    }
-  };
-
-  // Edit subject
-  const editSubject = (subject: Subject) => {
-    subjectForm.reset(subject);
-    setSelectedStreamId(subject.stream);
-    setIsEditing(true);
-    setIsSubjectDialogOpen(true);
-  };
-
-  // Delete subject
-  const handleDeleteSubject = (id: string) => {
-    deleteSubjectMutation.mutate(id);
-  };
-
-  // Check for duplicate teacher email or name
-  const checkDuplicateTeacher = (data: FormTeacher): boolean => {
-    setTeacherNameError("");
-    setTeacherEmailError("");
-    
-    const nameExists = teachers.some(teacher => 
-      teacher.name.toLowerCase() === data.name.toLowerCase() && 
-      (!data.id || teacher.id !== data.id)
-    );
-    
-    const emailExists = teachers.some(teacher => 
-      teacher.email.toLowerCase() === data.email.toLowerCase() && 
-      (!data.id || teacher.id !== data.id)
-    );
-    
-    if (nameExists) {
-      setTeacherNameError("A teacher with this name already exists");
-      toast({
-        title: "Duplicate Teacher Name",
-        description: "A teacher with this name already exists. Please use a different name.",
-        variant: "destructive"
-      });
+      newTimetableData[day][time] = null;
     }
     
-    if (emailExists) {
-      setTeacherEmailError("A teacher with this email already exists");
-      toast({
-        title: "Duplicate Teacher Email",
-        description: "A teacher with this email already exists. Please use a different email.",
-        variant: "destructive"
-      });
-    }
+    setTimetableData(newTimetableData);
+    manualSaveDraft();
     
-    return nameExists || emailExists;
-  };
-
-  // Handle teacher form submission
-  const onTeacherSubmit = (data: FormTeacher) => {
-    // Check for duplicates
-    if (checkDuplicateTeacher(data)) {
-      return;
-    }
-    
-    if (isEditing && data.id) {
-      // Update existing teacher
-      const teacherData: Partial<Teacher> = {
-        name: data.name,
-        email: data.email,
-        specialization: data.specialization,
-        subjects: data.subjects,
-        role: data.roles[0], // For now, use first role as primary role
-        cabin: data.cabin
-      };
-      updateTeacherMutation.mutate({ id: data.id, teacher: teacherData });
-    } else {
-      // Add new teacher
-      const newTeacher: Omit<Teacher, 'id'> = {
-        name: data.name,
-        email: data.email,
-        specialization: data.specialization,
-        subjects: data.subjects,
-        ista: false, // Default value
-        role: data.roles[0], // For now, use first role as primary role
-        cabin: data.cabin
-      };
-      addTeacherMutation.mutate(newTeacher);
-    }
-  };
-
-  // Edit teacher
-  const editTeacher = (teacher: Teacher) => {
-    teacherForm.reset({
-      ...teacher,
-      roles: teacher.role ? [teacher.role] : []
+    toast({
+      title: "Subject Removed",
+      description: `Removed subject from ${day} ${time}`
     });
-    setSelectedSubjects(teacher.subjects || []);
-    setSelectedRoles(teacher.role ? [teacher.role] : []);
-    setIsEditing(true);
-    setIsTeacherDialogOpen(true);
   };
 
-  // Delete teacher
-  const handleDeleteTeacher = (id: string) => {
-    deleteTeacherMutation.mutate(id);
-  };
+  const filteredSubjects = subjects.filter((subject) => {
+    if (!stream || !year) return true;
+    return subject.stream === streams.find(s => s.id === stream)?.code && subject.year === year;
+  });
 
-  // Check for duplicate room number
-  const checkDuplicateRoom = (data: FormRoom): boolean => {
-    setRoomNumberError("");
-    
-    const numberExists = rooms.some(room => 
-      room.number.toLowerCase() === data.number.toLowerCase() && 
-      (!data.id || room.id !== data.id)
+  const getTeachersForSubject = (subjectId: string) => {
+    return teachers.filter(teacher => 
+      teacher.subjects && Array.isArray(teacher.subjects) && teacher.subjects.includes(subjectId)
     );
+  };
+
+  const checkTeacherAvailability = (teacherId: string, day: string, time: string, currentSlotId?: string): boolean => {
+    for (const dayKey in timetableData) {
+      if (dayKey !== day) continue;
+      
+      for (const timeKey in timetableData[dayKey]) {
+        if (timeKey === time && currentSlotId) continue;
+        
+        const slot = timetableData[dayKey][timeKey];
+        if (slot && slot.teacher && slot.teacher.id === teacherId) {
+          if (timeKey === time) {
+            return false;
+          }
+        }
+      }
+    }
     
-    if (numberExists) {
-      setRoomNumberError("A room with this number already exists");
+    return isTeacherAvailable(teacherId, day, time, existingTimetables);
+  };
+
+  const getStreamName = (streamId: string) => {
+    const streamObj = streams.find(s => s.id === streamId);
+    return streamObj ? streamObj.name : streamId;
+  };
+
+  const getYearName = (yearId: string) => {
+    return `Year ${yearId}`;
+  };
+
+  const getDivisionName = (divisionId: string) => {
+    const divisionObj = allDivisions.find(d => d.id === divisionId);
+    return divisionObj ? divisionObj.name : divisionId;
+  };
+
+  const exportTimetable = () => {
+    if (!timetableData || Object.keys(timetableData).length === 0) {
       toast({
-        title: "Duplicate Room Number",
-        description: "A room with this number already exists. Please use a different number.",
+        title: "Nothing to Export",
+        description: "There is no timetable data to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const exportData = {
+      stream,
+      year,
+      division,
+      streamName: getStreamName(stream),
+      yearName: getYearName(year),
+      divisionName: getDivisionName(division),
+      timetableData
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `timetable_${getStreamName(stream)}_${getYearName(year)}_${getDivisionName(division)}.json`;
+    
+    const linkElement = document.createElement("a");
+    linkElement.setAttribute("href", dataUri);
+    linkElement.setAttribute("download", exportFileDefaultName);
+    linkElement.click();
+    
+    toast({
+      title: "Timetable Exported",
+      description: "Your timetable has been exported successfully."
+    });
+  };
+
+  const handleImport = () => {
+    setImportDialogOpen(true);
+  };
+
+  const processImport = () => {
+    try {
+      if (!importData) {
+        toast({
+          title: "No Data",
+          description: "Please paste timetable JSON data.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const parsed = JSON.parse(importData);
+      
+      if (!parsed.timetableData || !parsed.stream || !parsed.year || !parsed.division) {
+        toast({
+          title: "Invalid Format",
+          description: "The imported data is not in the correct format.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setStream(parsed.stream);
+      setYear(parsed.year);
+      setDivision(parsed.division);
+      setTimetableData(parsed.timetableData);
+      setShowTimetable(true);
+      setImportDialogOpen(false);
+      setImportData("");
+      manualSaveDraft();
+      
+      toast({
+        title: "Timetable Imported",
+        description: "Your timetable has been imported successfully."
+      });
+    } catch (error) {
+      console.error("Import error:", error);
+      toast({
+        title: "Import Failed",
+        description: "Failed to import the timetable. Please check the JSON format.",
         variant: "destructive"
       });
     }
-    
-    return numberExists;
   };
 
-  // Handle room form submission
-  const onRoomSubmit = (data: FormRoom) => {
-    // Check for duplicates
-    if (checkDuplicateRoom(data)) {
-      return;
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result;
+      if (typeof result === 'string') {
+        setImportData(result);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const showAvailableDrafts = () => {
+    loadAvailableDrafts();
+    setShowDraftsDialog(true);
+  };
+
+  const loadDraft = (key: string) => {
+    const keyParts = key.split('_');
+    if (keyParts.length === 3) {
+      const [streamId, yearId, divisionId] = keyParts;
+      
+      setStream(streamId);
+      setYear(yearId);
+      setDivision(divisionId);
+      
+      const draft = getTimetableDraft(key);
+      if (draft) {
+        setTimetableData(draft.data);
+        setShowTimetable(true);
+        setShowDraftsDialog(false);
+        
+        toast({
+          title: "Draft Loaded",
+          description: `Loaded your saved draft from ${new Date(draft.lastUpdated).toLocaleString()}`,
+        });
+      }
     }
+  };
+
+  const deleteDraft = (key: string) => {
+    removeTimetableDraft(key);
+    loadAvailableDrafts();
     
-    if (isEditing && data.id) {
-      // Update existing room
-      const roomData: Partial<Room> = {
-        number: data.number,
-        capacity: data.capacity,
-        type: data.type
-      };
-      updateRoomMutation.mutate({ id: data.id, room: roomData });
-    } else {
-      // Add new room
-      const newRoom: Omit<Room, 'id'> = {
-        number: data.number,
-        capacity: data.capacity,
-        type: data.type
-      };
-      addRoomMutation.mutate(newRoom);
-    }
+    toast({
+      title: "Draft Deleted",
+      description: "The selected draft has been deleted."
+    });
   };
 
-  // Edit room
-  const editRoom = (room: Room) => {
-    roomForm.reset(room);
-    setIsEditing(true);
-    setIsRoomDialogOpen(true);
-  };
+  // Special items for drag and drop
+  const specialItems = [
+    { id: 'LUNCH', name: 'LUNCH', itemType: 'special' },
+    { id: 'OFFICE_HOURS', name: 'OFFICE HOURS', itemType: 'special' }
+  ];
 
-  // Delete room
-  const handleDeleteRoom = (id: string) => {
-    deleteRoomMutation.mutate(id);
-  };
+  if (streamsLoading) {
+    return (
+      <div className="space-y-6">
+        <SectionHeading
+          title="Timetable Editor"
+          description="Create and customize college timetables"
+          icon={<Calendar className="h-6 w-6" />}
+        />
+        <div className="flex items-center justify-center h-64">
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (noStreamsDataExists) {
+    return (
+      <div className="space-y-6">
+        <SectionHeading
+          title="Timetable Editor"
+          description="Create and customize college timetables"
+          icon={<Calendar className="h-6 w-6" />}
+        />
+
+        <Card className="animate-scale-in">
+          <CardHeader>
+            <CardTitle>No Streams and Divisions Found</CardTitle>
+            <CardDescription>
+              You need to set up streams and divisions before creating timetables
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Before creating timetables, you need to set up your academic structure by defining
+              streams, years, and divisions.
+            </p>
+            <Button onClick={handleNavigateToStreamsManager}>
+              Set Up Streams & Divisions
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="Data Management"
-        description="Manage your institution's core data"
-        icon={<Database className="h-6 w-6" />}
+        title="Timetable Editor"
+        description="Create and customize college timetables"
+        icon={<Calendar className="h-6 w-6" />}
       />
 
-      <Tabs defaultValue="subjects" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="subjects">Subjects</TabsTrigger>
-          <TabsTrigger value="teachers">Teachers</TabsTrigger>
-          <TabsTrigger value="rooms">Rooms</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="subjects" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-medium">Academic Subjects</h2>
-            <Button onClick={() => {
-              subjectForm.reset({
-                name: "",
-                code: "",
-                credits: 3,
-                lectures: 3,
-                tutorials: 1,
-                practicals: 0,
-                stream: "",
-                year: "1"
-              });
-              setIsEditing(false);
-              setIsSubjectDialogOpen(true);
-            }} className="gap-2">
-              <PlusCircle className="h-4 w-4" />
-              Add Subject
-            </Button>
-          </div>
-
-          {isLoadingSubjects ? (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <p>Loading subjects...</p>
-              </CardContent>
-            </Card>
-          ) : isSubjectsError ? (
-            <Card>
-              <CardContent className="py-10 text-center text-destructive">
-                <p>Error loading subjects. Please try again.</p>
-              </CardContent>
-            </Card>
-          ) : subjects.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <BookOpen className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                <h3 className="text-lg font-medium">No Subjects Added</h3>
-                <p className="text-muted-foreground mt-1 mb-4">
-                  Start by adding your first academic subject
-                </p>
-                <Button onClick={() => {
-                  subjectForm.reset();
-                  setIsEditing(false);
-                  setIsSubjectDialogOpen(true);
-                }} className="gap-2">
-                  <PlusCircle className="h-4 w-4" />
-                  Add Subject
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {subjects.map((subject) => (
-                <Card key={subject.id} className="hover:shadow-sm transition-shadow">
-                  <CardContent className="p-4 flex justify-between items-center">
-                    <div>
-                      <h3 className="font-medium">{subject.name}</h3>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        Code: {subject.code} • Credits: {subject.credits} • Stream: {subject.stream} • Year: {subject.year}
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        LTPC: L{subject.lectures || 0}-T{subject.tutorials || 0}-P{subject.practicals || 0}-C{subject.credits}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => editSubject(subject)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteSubject(subject.id!)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="teachers" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-medium">Teachers</h2>
-            <Button onClick={() => {
-              teacherForm.reset({
-                name: "",
-                email: "",
-                specialization: "",
-                subjects: [],
-                roles: [],
-                cabin: ""
-              });
-              setSelectedSubjects([]);
-              setSelectedRoles([]);
-              setIsEditing(false);
-              setIsTeacherDialogOpen(true);
-            }} className="gap-2">
-              <PlusCircle className="h-4 w-4" />
-              Add Teacher
-            </Button>
-          </div>
-
-          {isLoadingTeachers ? (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <p>Loading teachers...</p>
-              </CardContent>
-            </Card>
-          ) : isTeachersError ? (
-            <Card>
-              <CardContent className="py-10 text-center text-destructive">
-                <p>Error loading teachers. Please try again.</p>
-              </CardContent>
-            </Card>
-          ) : teachers.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                <h3 className="text-lg font-medium">No Teachers Added</h3>
-                <p className="text-muted-foreground mt-1 mb-4">
-                  Start by adding your first teacher
-                </p>
-                <Button onClick={() => {
-                  teacherForm.reset();
-                  setSelectedSubjects([]);
-                  setSelectedRoles([]);
-                  setIsEditing(false);
-                  setIsTeacherDialogOpen(true);
-                }} className="gap-2">
-                  <PlusCircle className="h-4 w-4" />
-                  Add Teacher
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {teachers.map((teacher) => (
-                <Card key={teacher.id} className="hover:shadow-sm transition-shadow">
-                  <CardContent className="p-4 flex justify-between items-center">
-                    <div>
-                      <h3 className="font-medium">{teacher.name}</h3>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        Email: {teacher.email} • Specialization: {teacher.specialization}
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        Role: {teacher.role || "N/A"} • Cabin: {teacher.cabin || "N/A"}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => editTeacher(teacher)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteTeacher(teacher.id!)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="rooms" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-medium">Rooms</h2>
-            <Button onClick={() => {
-              roomForm.reset({
-                number: "",
-                capacity: 60,
-                type: "classroom"
-              });
-              setIsEditing(false);
-              setIsRoomDialogOpen(true);
-            }} className="gap-2">
-              <PlusCircle className="h-4 w-4" />
-              Add Room
-            </Button>
-          </div>
-
-          {isLoadingRooms ? (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <p>Loading rooms...</p>
-              </CardContent>
-            </Card>
-          ) : isRoomsError ? (
-            <Card>
-              <CardContent className="py-10 text-center text-destructive">
-                <p>Error loading rooms. Please try again.</p>
-              </CardContent>
-            </Card>
-          ) : rooms.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                <h3 className="text-lg font-medium">No Rooms Added</h3>
-                <p className="text-muted-foreground mt-1 mb-4">
-                  Start by adding your first room
-                </p>
-                <Button onClick={() => {
-                  roomForm.reset();
-                  setIsEditing(false);
-                  setIsRoomDialogOpen(true);
-                }} className="gap-2">
-                  <PlusCircle className="h-4 w-4" />
-                  Add Room
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {rooms.map((room) => (
-                <Card key={room.id} className="hover:shadow-sm transition-shadow">
-                  <CardContent className="p-4 flex justify-between items-center">
-                    <div>
-                      <h3 className="font-medium">Room {room.number}</h3>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        Capacity: {room.capacity} • Type: {room.type}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => editRoom(room)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteRoom(room.id!)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Subject Dialog */}
-      <Dialog open={isSubjectDialogOpen} onOpenChange={setIsSubjectDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Subject" : "Add New Subject"}</DialogTitle>
-            <DialogDescription>
-              {isEditing ? "Modify the subject details below" : "Enter the details for the new academic subject"}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...subjectForm}>
-            <form onSubmit={subjectForm.handleSubmit(onSubjectSubmit)} className="space-y-4">
-              <FormField
-                control={subjectForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subject Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Data Structures and Algorithms" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The full name of the subject
-                    </FormDescription>
-                    {subjectNameError && (
-                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>{subjectNameError}</span>
-                      </div>
+      {!showTimetable ? (
+        <Card className="animate-scale-in">
+          <CardHeader>
+            <CardTitle>Start New Timetable</CardTitle>
+            <CardDescription>
+              Select the stream, year, and division to create a new timetable
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Stream</Label>
+                <Select value={stream} onValueChange={setStream}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Stream" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {streams.length > 0 ? (
+                      streams.map(stream => (
+                        <SelectItem key={stream.id} value={stream.id}>
+                          {stream.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-streams-available-1" disabled>
+                        No streams available
+                      </SelectItem>
                     )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  </SelectContent>
+                </Select>
+              </div>
               
-              <FormField
-                control={subjectForm.control}
-                name="code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subject Code</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., CSE301" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      A unique code to identify the subject
-                    </FormDescription>
-                    {subjectCodeError && (
-                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>{subjectCodeError}</span>
-                      </div>
+              <div className="space-y-2">
+                <Label>Year</Label>
+                <Select value={year} onValueChange={setYear} disabled={!stream || years.length === 0}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.length > 0 ? (
+                      years.map((year: any) => (
+                        <SelectItem key={year.id} value={year.id}>
+                          {year.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-years-available-1" disabled>
+                        {stream ? "No years available for this stream" : "Select a stream first"}
+                      </SelectItem>
                     )}
-                    <FormMessage />
-                  </FormItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Division</Label>
+                <Select value={division} onValueChange={setDivision} disabled={!year || divisions.length === 0}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Division" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {divisions.length > 0 ? (
+                      divisions.map((division: any) => (
+                        <SelectItem key={division.id} value={division.id}>
+                          {division.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-divisions-available-1" disabled>
+                        {year ? "No divisions available for this year" : "Select a year first"}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="flex justify-between mt-6">
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleNavigateToStreamsManager}>
+                  Manage Streams & Divisions
+                </Button>
+                <Button variant="outline" onClick={handleImport} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Import
+                </Button>
+                {Object.keys(availableDrafts).length > 0 && (
+                  <Button variant="outline" onClick={showAvailableDrafts} className="gap-2">
+                    <Clock className="h-4 w-4" />
+                    Load Draft
+                  </Button>
                 )}
-              />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={subjectForm.control}
-                  name="lectures"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lectures (per week)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min={0} max={10} {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Number of lecture hours per week
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={subjectForm.control}
-                  name="tutorials"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tutorials (per week)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min={0} max={10} {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Number of tutorial hours per week
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={subjectForm.control}
-                  name="practicals"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Practicals (per week)</FormLabel>
-                      <FormControl>
-                        <Input type="number" min={0} max={10} {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Number of practical sessions (2 hours each)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={subjectForm.control}
-                  name="credits"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Credits</FormLabel>
-                      <FormControl>
-                        <Input type="number" min={1} max={10} {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Total credits for the subject
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={subjectForm.control}
-                  name="stream"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Stream</FormLabel>
-                      <Select 
-                        onValueChange={handleStreamChange} 
-                        value={selectedStreamId}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a stream" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {streams.map((stream) => (
-                            <SelectItem key={stream.id} value={stream.id!}>
-                              {stream.name} ({stream.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Select the academic stream for this subject
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={subjectForm.control}
-                  name="year"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Year</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value}
-                        disabled={!selectedStreamId}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select year" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {getAvailableYears(selectedStreamId).map((year) => (
-                            <SelectItem key={year} value={year}>
-                              Year {year}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Select the academic year for this subject
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => {
-                  subjectForm.reset();
-                  setIsSubjectDialogOpen(false);
-                  setIsEditing(false);
-                  setSelectedStreamId("");
-                  setSubjectNameError("");
-                  setSubjectCodeError("");
-                }}>
-                  Cancel
+              <Button onClick={handleGenerateTimetable} className="gap-2" disabled={!stream || !year || !division}>
+                <Plus className="h-4 w-4" /> 
+                Create Timetable
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-medium">
+                {getStreamName(stream)} {getYearName(year)} {getDivisionName(division)} Timetable
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {isEditing ? 'Editing mode' : 'View mode'} • 
+                {lastSaved && <span> Last auto-saved at {lastSaved}</span>}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={exportTimetable} className="gap-2">
+                <Download className="h-4 w-4" />
+                Export
+              </Button>
+              <Button variant="outline" onClick={manualSaveDraft} className="gap-2">
+                <Save className="h-4 w-4" />
+                Save Draft
+              </Button>
+              {isEditing ? (
+                <Button onClick={saveTimetable} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  Save to Database
                 </Button>
-                <Button type="submit">
-                  {isEditing ? "Save Changes" : "Add Subject"}
+              ) : (
+                <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
+                  <Check className="h-4 w-4" />
+                  Edit Timetable
                 </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Teacher Dialog */}
-      <Dialog open={isTeacherDialogOpen} onOpenChange={setIsTeacherDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Teacher" : "Add New Teacher"}</DialogTitle>
-            <DialogDescription>
-              {isEditing ? "Modify the teacher details below" : "Enter the details for the new teacher"}
-            </DialogDescription>
-          </DialogHeader>
+              )}
+            </div>
+          </div>
           
-          <Form {...teacherForm}>
-            <form onSubmit={teacherForm.handleSubmit(onTeacherSubmit)} className="space-y-6">
-              {/* Basic Information Row */}
-              <div className="grid grid-cols-2 gap-6">
-                <FormField
-                  control={teacherForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Teacher Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., John Doe" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The full name of the teacher
-                      </FormDescription>
-                      {teacherNameError && (
-                        <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                          <AlertCircle className="h-3 w-3" />
-                          <span>{teacherNameError}</span>
-                        </div>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={teacherForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="e.g., john@example.com" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The email address of the teacher
-                      </FormDescription>
-                      {teacherEmailError && (
-                        <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                          <AlertCircle className="h-3 w-3" />
-                          <span>{teacherEmailError}</span>
-                        </div>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Specialization and Cabin Row */}
-              <div className="grid grid-cols-2 gap-6">
-                <FormField
-                  control={teacherForm.control}
-                  name="specialization"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Specialization</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Computer Science" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The teacher's area of expertise
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={teacherForm.control}
-                  name="cabin"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cabin</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Room 101" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The cabin or office room of the teacher (optional)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <Separator />
-
-              {/* Subjects Section */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-lg font-medium">Subjects</h3>
-                    <p className="text-sm text-muted-foreground">Assign subjects to this teacher</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select onValueChange={handleAddSubject}>
-                      <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Select a subject to add" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subjects
-                          .filter(subject => !selectedSubjects.includes(subject.id!))
-                          .map((subject) => (
-                            <SelectItem key={subject.id} value={subject.id!}>
-                              {subject.name} ({subject.code})
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" size="sm" disabled>
-                      <PlusCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+            <div className="xl:col-span-3 overflow-auto">
+              <div className="bg-card rounded-lg border shadow-subtle overflow-hidden">
+                <div className="grid grid-cols-[100px_repeat(5,1fr)] border-b">
+                  <div className="p-3 font-medium text-sm bg-muted/30 border-r">Time / Day</div>
+                  {days.map((day) => (
+                    <div key={day} className="p-3 font-medium text-sm border-r last:border-r-0 text-center">
+                      {day}
+                    </div>
+                  ))}
                 </div>
-
-                {selectedSubjects.length > 0 && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedSubjects.map((subjectId) => {
-                      const subject = subjects.find(s => s.id === subjectId);
-                      return subject ? (
-                        <div key={subjectId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                          <span className="text-sm font-medium">
+                
+                {timeSlots.map((time) => (
+                  <div key={time} className="grid grid-cols-[100px_repeat(5,1fr)] border-b last:border-b-0">
+                    <div className="p-3 text-xs font-medium bg-muted/30 border-r flex items-center">
+                      {time}
+                    </div>
+                    {days.map((day) => {
+                      const cellData = timetableData[day]?.[time];
+                      
+                      return (
+                        <div
+                          key={`${day}-${time}`}
+                          className={`p-2 border-r last:border-r-0 min-h-[80px] ${
+                            cellData ? (cellData.isPartOfLab ? 'timetable-cell-occupied bg-primary/20' : 'timetable-cell-occupied') : 'timetable-cell'
+                          }`}
+                          onDragOver={isEditing ? handleDragOver : undefined}
+                          onDrop={isEditing ? (e) => handleDrop(e, day, time) : undefined}
+                          onClick={isEditing && !cellData ? () => {
+                            setSelectedSlot({ day, time });
+                            setSlotDetails({
+                              subject: "",
+                              teacher: "",
+                              room: "",
+                              type: "lecture"
+                            });
+                            setSlotDetailsOpen(true);
+                          } : undefined}
+                        >
+                          {cellData ? (
+                            <div className="h-full flex flex-col">
+                              {!cellData.isPartOfLab && (
+                                <>
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-xs font-medium">
+                                      {cellData.subject.name}
+                                    </span>
+                                    {isEditing && (
+                                      <button 
+                                        onClick={() => removeSubjectFromTimetable(day, time)}
+                                        className="text-muted-foreground hover:text-destructive"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 space-y-1">
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Users className="h-3 w-3" />
+                                      <span>{cellData.teacher?.isTA ? "TA " : ""}{cellData.teacher?.name}</span>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Building className="h-3 w-3" />
+                                      <span>{cellData.room?.number}</span>
+                                    </div>
+                                    <div className="chip chip-primary text-[10px] py-0.5 px-1.5 mt-1">
+                                      {cellData.type}
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                              {cellData.isPartOfLab && (
+                                <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                                  - Part of the lab above -
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            isEditing && (
+                              <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+                                {draggingItem ? "Drop here" : "Click to add"}
+                              </div>
+                            )
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {isEditing && (
+              <div className="xl:col-span-2 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-1 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Subjects</CardTitle>
+                    <CardDescription>
+                      Drag subjects to the timetable
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                      {isLoadingSubjects ? (
+                        <div className="flex justify-center py-4">
+                          <p className="text-muted-foreground">Loading subjects...</p>
+                        </div>
+                      ) : filteredSubjects.length > 0 ? (
+                        filteredSubjects.map((subject) => (
+                          <div
+                            key={subject.id}
+                            className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors"
+                            draggable
+                            onDragStart={() => handleDragStart(subject, 'subject')}
+                            onDragEnd={handleDragEnd}
+                          >
+                            <div className="font-medium text-sm">{subject.name}</div>
+                            <div className="text-xs text-muted-foreground">{subject.code}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-6">
+                          <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
+                            <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {subjects.length === 0 ? 
+                              "No subjects available. Please add subjects in Data Management." :
+                              "No subjects available for the selected stream and year."}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Special Items */}
+                    <Separator className="my-4" />
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Special</p>
+                      {specialItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors bg-blue-50"
+                          draggable
+                          onDragStart={() => handleDragStart(item, 'special')}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <div className="font-medium text-sm">{item.name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">L-T-P-C Status</CardTitle>
+                    <CardDescription>
+                      Allocation status for subjects
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                      {filteredSubjects.length > 0 ? (
+                        filteredSubjects.map((subject) => {
+                          const allocation = subjectAllocation[subject.id];
+                          if (!allocation) return null;
+                          
+                          return (
+                            <div key={subject.id} className="p-2 border rounded-md bg-muted/20">
+                              <div className="font-medium text-sm mb-2">{subject.name}</div>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between">
+                                  <span>Lectures:</span>
+                                  <span className={allocation.lectures.allocated > allocation.lectures.total ? 'text-red-600' : 'text-green-600'}>
+                                    {allocation.lectures.allocated}/{allocation.lectures.total}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Tutorials:</span>
+                                  <span className={allocation.tutorials.allocated > allocation.tutorials.total ? 'text-red-600' : 'text-green-600'}>
+                                    {allocation.tutorials.allocated}/{allocation.tutorials.total}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Practicals:</span>
+                                  <span className={allocation.practicals.allocated > allocation.practicals.total ? 'text-red-600' : 'text-green-600'}>
+                                    {allocation.practicals.allocated}/{allocation.practicals.total}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between font-medium">
+                                  <span>Credits:</span>
+                                  <span>{subject.credits}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-6">
+                          <p className="text-sm text-muted-foreground">
+                            No subjects to track
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+          
+          <Dialog open={slotDetailsOpen} onOpenChange={setSlotDetailsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Subject to Timetable</DialogTitle>
+                <DialogDescription>
+                  {selectedSlot && `Adding to ${selectedSlot.day} at ${selectedSlot.time}`}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Subject</Label>
+                  <Select 
+                    value={slotDetails.subject} 
+                    onValueChange={value => setSlotDetails({ ...slotDetails, subject: value, teacher: "" })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Subject" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingSubjects ? (
+                        <SelectItem value="loading-subjects-1" disabled>Loading subjects...</SelectItem>
+                      ) : filteredSubjects.length > 0 ? (
+                        filteredSubjects.map(subject => (
+                          <SelectItem key={subject.id} value={subject.id}>
                             {subject.name} ({subject.code})
-                          </span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveSubject(subjectId)}
-                          >
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-
-                <FormField
-                  control={teacherForm.control}
-                  name="subjects"
-                  render={({ field }) => (
-                    <FormItem className="hidden">
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <Separator />
-
-              {/* Roles Section */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-lg font-medium">Roles</h3>
-                    <p className="text-sm text-muted-foreground">Assign roles to this teacher</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select onValueChange={handleAddRole}>
-                      <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Select a role to add" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles
-                          .filter(role => !selectedRoles.includes(role.id!))
-                          .map((role) => (
-                            <SelectItem key={role.id} value={role.id!}>
-                              {role.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" size="sm" disabled>
-                      <PlusCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-subjects-available-2" disabled>
+                          {subjects.length === 0 ? 
+                            "No subjects available. Please add subjects in Data Management." :
+                            "No subjects available for the selected stream and year."}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                {selectedRoles.length > 0 && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedRoles.map((roleId) => {
-                      const role = roles.find(r => r.id === roleId);
-                      return role ? (
-                        <div key={roleId} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                          <span className="text-sm font-medium">
-                            {role.name}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveRole(roleId)}
-                          >
-                            <XCircle className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-
-                <FormField
-                  control={teacherForm.control}
-                  name="roles"
-                  render={({ field }) => (
-                    <FormItem className="hidden">
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                
+                <div className="space-y-2">
+                  <Label>Teacher</Label>
+                  <Select 
+                    value={slotDetails.teacher} 
+                    onValueChange={value => setSlotDetails({ ...slotDetails, teacher: value })}
+                    disabled={!slotDetails.subject}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Teacher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!slotDetails.subject ? (
+                        <SelectItem value="select-subject-first-1" disabled>
+                          Select a subject first
+                        </SelectItem>
+                      ) : isLoadingTeachers ? (
+                        <SelectItem value="loading-teachers-1" disabled>Loading teachers...</SelectItem>
+                      ) : (
+                        (() => {
+                          const subjectTeachers = getTeachersForSubject(slotDetails.subject);
+                          return subjectTeachers.length > 0 ? (
+                            subjectTeachers.map(teacher => {
+                              const isAvailable = selectedSlot ? 
+                                checkTeacherAvailability(teacher.id, selectedSlot.day, selectedSlot.time) : 
+                                true;
+                              
+                              return (
+                                <SelectItem 
+                                  key={teacher.id} 
+                                  value={teacher.id} 
+                                  disabled={!isAvailable}
+                                  className={!isAvailable ? "bg-red-100" : ""}
+                                >
+                                  {teacher.isTA ? "TA " : ""}{teacher.name}
+                                  {!isAvailable && " (Not Available)"}
+                                </SelectItem>
+                              );
+                            })
+                          ) : (
+                            <SelectItem value="no-teachers-available-1" disabled>
+                              No teachers assigned to this subject
+                            </SelectItem>
+                          );
+                        })()
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Session Type</Label>
+                  <Select 
+                    value={slotDetails.type} 
+                    onValueChange={value => setSlotDetails({ ...slotDetails, type: value, room: "" })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lecture">Lecture</SelectItem>
+                      <SelectItem value="tutorial">Tutorial</SelectItem>
+                      <SelectItem value="lab">Lab (2 hours)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Room</Label>
+                  <Select 
+                    value={slotDetails.room} 
+                    onValueChange={value => setSlotDetails({ ...slotDetails, room: value })}
+                    disabled={!selectedSlot}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Room" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!selectedSlot ? (
+                        <SelectItem value="no-slot-selected-1" disabled>
+                          No time slot selected
+                        </SelectItem>
+                      ) : isLoadingRooms ? (
+                        <SelectItem value="loading-rooms-1" disabled>Loading rooms...</SelectItem>
+                      ) : (
+                        (() => {
+                          const availableRooms = getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type);
+                          return availableRooms.length > 0 ? (
+                            availableRooms.map(room => (
+                              <SelectItem key={room.id} value={room.id}>
+                                {room.number} (Capacity: {room.capacity})
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-rooms-available-1" disabled>
+                              No available rooms for this time and type
+                            </SelectItem>
+                          );
+                        })()
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => {
-                  teacherForm.reset();
-                  setSelectedSubjects([]);
-                  setSelectedRoles([]);
-                  setIsTeacherDialogOpen(false);
-                  setIsEditing(false);
-                  setTeacherNameError("");
-                  setTeacherEmailError("");
-                }}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {isEditing ? "Save Changes" : "Add Teacher"}
+                <Button variant="outline" onClick={() => setSlotDetailsOpen(false)}>Cancel</Button>
+                <Button 
+                  onClick={addSubjectToTimetable}
+                  disabled={!slotDetails.subject || !slotDetails.teacher || !slotDetails.room}
+                >
+                  Add to Timetable
                 </Button>
               </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Room Dialog */}
-      <Dialog open={isRoomDialogOpen} onOpenChange={setIsRoomDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Room" : "Add New Room"}</DialogTitle>
-            <DialogDescription>
-              {isEditing ? "Modify the room details below" : "Enter the details for the new room"}
-            </DialogDescription>
-          </DialogHeader>
+            </DialogContent>
+          </Dialog>
           
-          <Form {...roomForm}>
-            <form onSubmit={roomForm.handleSubmit(onRoomSubmit)} className="space-y-4">
-              <FormField
-                control={roomForm.control}
-                name="number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Room Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., 101" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      The room number or identifier
-                    </FormDescription>
-                    {roomNumberError && (
-                      <div className="text-sm text-destructive flex items-center gap-1 mt-1">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>{roomNumberError}</span>
-                      </div>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Import Timetable</DialogTitle>
+                <DialogDescription>
+                  Import an existing timetable from JSON file or paste JSON data
+                </DialogDescription>
+              </DialogHeader>
               
-              <FormField
-                control={roomForm.control}
-                name="capacity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Capacity</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Maximum number of people the room can accommodate
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={roomForm.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Room Type</FormLabel>
-                    <FormControl>
-                      <select
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        {...field}
-                      >
-                        <option value="classroom">Classroom</option>
-                        <option value="lab">Lab</option>
-                      </select>
-                    </FormControl>
-                    <FormDescription>
-                      Select the type of room
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Upload JSON File</Label>
+                  <Input type="file" accept=".json" onChange={handleFileImport} />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Or Paste JSON Data</Label>
+                  <textarea 
+                    className="w-full min-h-[150px] p-2 border rounded-md"
+                    value={importData}
+                    onChange={(e) => setImportData(e.target.value)}
+                    placeholder="Paste your timetable JSON data here..."
+                  />
+                </div>
+              </div>
               
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => {
-                  roomForm.reset();
-                  setIsRoomDialogOpen(false);
-                  setIsEditing(false);
-                  setRoomNumberError("");
-                }}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {isEditing ? "Save Changes" : "Add Room"}
-                </Button>
+                <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
+                <Button onClick={processImport}>Import Timetable</Button>
               </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={showDraftsDialog} onOpenChange={setShowDraftsDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Available Drafts</DialogTitle>
+                <DialogDescription>
+                  Continue working on your saved drafts
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4 max-h-[400px] overflow-y-auto">
+                {Object.entries(availableDrafts).length > 0 ? (
+                  Object.entries(availableDrafts).map(([key, draft]) => {
+                    const keyParts = key.split('_');
+                    if (keyParts.length === 3) {
+                      const [streamId, yearId, divisionId] = keyParts;
+                      const streamName = getStreamName(streamId);
+                      const yearName = getYearName(yearId);
+                      const divisionName = getDivisionName(divisionId);
+                      
+                      return (
+                        <Card key={key} className="mb-4">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">{streamName} {yearName} {divisionName}</CardTitle>
+                            <CardDescription>
+                              Last saved: {new Date(draft.lastUpdated).toLocaleString()}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardFooter className="pt-2 flex justify-between">
+                            <Button variant="outline" onClick={() => deleteDraft(key)} className="text-destructive">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </Button>
+                            <Button onClick={() => loadDraft(key)}>
+                              <Clock className="h-4 w-4 mr-2" />
+                              Continue Editing
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      );
+                    }
+                    return null;
+                  })
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-muted-foreground">No saved drafts available</p>
+                  </div>
+                )}
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDraftsDialog(false)}>Close</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
     </div>
   );
 };
 
-export default DataInput;
+export default TimetableEditor;
