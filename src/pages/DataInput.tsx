@@ -103,6 +103,12 @@ const TimetableEditor = () => {
     queryFn: fetchAllTimetables
   });
 
+  // Define filteredSubjects here, before it's used
+  const filteredSubjects = subjects.filter((subject) => {
+    if (!stream || !year) return true;
+    return subject.stream === streams.find(s => s.id === stream)?.code && subject.year === year;
+  });
+
   // Calculate subject allocation tracking
   const calculateSubjectAllocation = () => {
     const allocation: Record<string, any> = {};
@@ -552,11 +558,6 @@ const TimetableEditor = () => {
       description: `Removed subject from ${day} ${time}`
     });
   };
-
-  const filteredSubjects = subjects.filter((subject) => {
-    if (!stream || !year) return true;
-    return subject.stream === streams.find(s => s.id === stream)?.code && subject.year === year;
-  });
 
   const getTeachersForSubject = (subjectId: string) => {
     return teachers.filter(teacher => 
