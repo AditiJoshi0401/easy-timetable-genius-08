@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Calendar, LayoutGrid, Users, BookOpen, Building, Trash2, Save, Check, AlertCircle, Download, Upload, Clock } from "lucide-react";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -53,7 +52,7 @@ const DataInput = () => {
     name: "",
     email: "",
     specialization: "",
-    roles: [] as string[],
+    role: "",
     subjects: [] as string[]
   });
   const [teacherWarning, setTeacherWarning] = useState<string>("");
@@ -81,18 +80,22 @@ const DataInput = () => {
     queryFn: fetchDivisions
   });
 
-  // Fetch roles
+  // Fetch roles from database
   const { data: roles = [] } = useQuery({
     queryKey: ['roles'],
     queryFn: async () => {
-      // This should be implemented in supabaseService
-      return [
-        { id: 'professor', name: 'Professor' },
-        { id: 'assistant-professor', name: 'Assistant Professor' },
-        { id: 'associate-professor', name: 'Associate Professor' },
-        { id: 'teaching-assistant', name: 'Teaching Assistant' },
-        { id: 'lecturer', name: 'Lecturer' }
-      ];
+      // Fetch roles from the database
+      const { data, error } = await supabase
+        .from('roles')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching roles:', error);
+        return [];
+      }
+      
+      return data || [];
     }
   });
 
@@ -278,7 +281,7 @@ const DataInput = () => {
       name: teacher.name,
       email: teacher.email,
       specialization: teacher.specialization,
-      roles: teacher.role ? [teacher.role] : [],
+      role: teacher.role || "",
       subjects: teacher.subjects || []
     });
   };
@@ -289,19 +292,10 @@ const DataInput = () => {
       name: "",
       email: "",
       specialization: "",
-      roles: [],
+      role: "",
       subjects: []
     });
     setTeacherWarning("");
-  };
-
-  const handleRoleToggle = (roleId: string) => {
-    setTeacherForm(prev => ({
-      ...prev,
-      roles: prev.roles.includes(roleId)
-        ? prev.roles.filter(r => r !== roleId)
-        : [...prev.roles, roleId]
-    }));
   };
 
   const handleSubjectToggle = (subjectId: string) => {
@@ -329,8 +323,9 @@ const DataInput = () => {
           name: teacherForm.name,
           email: teacherForm.email,
           specialization: teacherForm.specialization,
-          role: teacherForm.roles[0] || null,
-          subjects: teacherForm.subjects
+          role: teacherForm.role || null,
+          subjects: teacherForm.subjects,
+          ista: false // Add the required isTA property
         });
         toast({
           title: "Teacher Updated",
@@ -341,8 +336,9 @@ const DataInput = () => {
           name: teacherForm.name,
           email: teacherForm.email,
           specialization: teacherForm.specialization,
-          role: teacherForm.roles[0] || null,
-          subjects: teacherForm.subjects
+          role: teacherForm.role || null,
+          subjects: teacherForm.subjects,
+          ista: false // Add the required isTA property
         });
         toast({
           title: "Teacher Added",
@@ -827,7 +823,7 @@ const DataInput = () => {
 
               <Separator />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="teacher-name">Name *</Label>
                   <Input 
@@ -859,27 +855,25 @@ const DataInput = () => {
                     className="mt-1"
                   />
                 </div>
+                <div>
+                  <Label htmlFor="teacher-role">Role</Label>
+                  <Select 
+                    value={teacherForm.role} 
+                    onValueChange={value => handleTeacherFormChange("role", value)}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map(role => (
+                        <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <Label>Roles</Label>
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {roles.map(role => (
-                      <div key={role.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`role-${role.id}`}
-                          checked={teacherForm.roles.includes(role.id)}
-                          onCheckedChange={() => handleRoleToggle(role.id)}
-                        />
-                        <Label htmlFor={`role-${role.id}`} className="text-sm font-normal">
-                          {role.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 <div>
                   <Label>Assigned Subjects</Label>
                   <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
