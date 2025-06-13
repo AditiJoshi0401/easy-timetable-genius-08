@@ -6,7 +6,7 @@ export interface Subject {
   name: string;
   code: string;
   credits: number;
-  stream: string;
+  stream: string;  // Now stores stream code directly instead of UUID
   year: string;
   lectures: number;
   tutorials: number;
@@ -20,8 +20,8 @@ export interface Teacher {
   specialization: string;
   subjects: string[];
   isTA: boolean;  // Interface uses isTA, but database uses ista
-  role?: string;  // Updated to use string for role name from roles table
-  cabin?: string;   // Added cabin property
+  roles?: string[];  // Changed to array of role names instead of single role ID
+  cabin?: string;
 }
 
 export interface Room {
@@ -317,23 +317,23 @@ export const fetchTeachers = async (): Promise<Teacher[]> => {
     .select('*');
   if (error) throw error;
   
-  // Map ista to isTA to match our interface
+  // Map ista to isTA and roles array to match our interface
   return data.map(teacher => ({
     ...teacher,
     isTA: teacher.ista,
-    role: teacher.role || undefined,
+    roles: teacher.roles || [],
   })) as Teacher[];
 };
 
 export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher> => {
-  // Convert isTA to ista for database
+  // Convert isTA to ista and roles array for database
   const dbTeacher = {
     name: teacher.name,
     email: teacher.email,
     specialization: teacher.specialization,
     subjects: teacher.subjects,
     ista: teacher.isTA,
-    role: teacher.role,
+    roles: teacher.roles || [],
     cabin: teacher.cabin
   };
   
@@ -347,16 +347,19 @@ export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher>
   return {
     ...data[0],
     isTA: data[0].ista,
-    role: data[0].role || undefined,
+    roles: data[0].roles || [],
   } as Teacher;
 };
 
 export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Promise<Teacher> => {
-  // Convert isTA to ista for database if it exists
+  // Convert isTA to ista and roles array for database if they exist
   const dbTeacher: any = { ...teacher };
   if ('isTA' in teacher) {
     dbTeacher.ista = teacher.isTA;
     delete dbTeacher.isTA;
+  }
+  if ('roles' in teacher) {
+    dbTeacher.roles = teacher.roles || [];
   }
   
   const { data, error } = await supabase
@@ -370,7 +373,7 @@ export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Prom
   return {
     ...data[0],
     isTA: data[0].ista,
-    role: data[0].role || undefined,
+    roles: data[0].roles || [],
   } as Teacher;
 };
 

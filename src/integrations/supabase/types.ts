@@ -157,7 +157,7 @@ export type Database = {
           id: string
           ista: boolean
           name: string
-          role: string | null
+          roles: string[]
           specialization: string
           subjects: string[]
         }
@@ -168,7 +168,7 @@ export type Database = {
           id?: string
           ista?: boolean
           name: string
-          role?: string | null
+          roles?: string[]
           specialization: string
           subjects: string[]
         }
@@ -179,7 +179,7 @@ export type Database = {
           id?: string
           ista?: boolean
           name?: string
-          role?: string | null
+          roles?: string[]
           specialization?: string
           subjects?: string[]
         }

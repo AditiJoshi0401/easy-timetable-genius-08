@@ -53,7 +53,7 @@ const DataInput = () => {
     name: "",
     email: "",
     specialization: "",
-    role: "",
+    roles: [] as string[],  // Changed from role to roles array
     subjects: [] as string[]
   });
   const [teacherWarning, setTeacherWarning] = useState<string>("");
@@ -133,7 +133,7 @@ const DataInput = () => {
   // Update available years when stream is selected
   useEffect(() => {
     if (subjectForm.stream) {
-      const selectedStream = streams.find(s => s.id === subjectForm.stream);
+      const selectedStream = streams.find(s => s.code === subjectForm.stream);  // Changed to use code
       if (selectedStream) {
         const years = Array.from({ length: selectedStream.years }, (_, i) => i + 1);
         setAvailableYears(years);
@@ -174,7 +174,7 @@ const DataInput = () => {
     setSubjectForm({
       name: subject.name,
       code: subject.code,
-      stream: subject.stream,
+      stream: subject.stream,  // Now directly the stream code
       year: subject.year.toString(),
       lectures: subject.lectures,
       tutorials: subject.tutorials,
@@ -282,7 +282,7 @@ const DataInput = () => {
       name: teacher.name,
       email: teacher.email,
       specialization: teacher.specialization,
-      role: teacher.role || "",
+      roles: teacher.roles || [],  // Changed to use roles array
       subjects: teacher.subjects || []
     });
   };
@@ -293,10 +293,19 @@ const DataInput = () => {
       name: "",
       email: "",
       specialization: "",
-      role: "",
+      roles: [],  // Changed to roles array
       subjects: []
     });
     setTeacherWarning("");
+  };
+
+  const handleRoleToggle = (roleName: string) => {
+    setTeacherForm(prev => ({
+      ...prev,
+      roles: prev.roles.includes(roleName)
+        ? prev.roles.filter(r => r !== roleName)
+        : [...prev.roles, roleName]
+    }));
   };
 
   const handleSubjectToggle = (subjectId: string) => {
@@ -324,9 +333,9 @@ const DataInput = () => {
           name: teacherForm.name,
           email: teacherForm.email,
           specialization: teacherForm.specialization,
-          role: teacherForm.role || null,
+          roles: teacherForm.roles,  // Now using roles array
           subjects: teacherForm.subjects,
-          isTA: false // Fixed property name
+          isTA: false
         });
         toast({
           title: "Teacher Updated",
@@ -337,9 +346,9 @@ const DataInput = () => {
           name: teacherForm.name,
           email: teacherForm.email,
           specialization: teacherForm.specialization,
-          role: teacherForm.role || null,
+          roles: teacherForm.roles,  // Now using roles array
           subjects: teacherForm.subjects,
-          isTA: false // Fixed property name
+          isTA: false
         });
         toast({
           title: "Teacher Added",
@@ -668,7 +677,7 @@ const DataInput = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {streams.map(stream => (
-                        <SelectItem key={stream.id} value={stream.id}>{stream.name}</SelectItem>
+                        <SelectItem key={stream.id} value={stream.code}>{stream.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -787,7 +796,7 @@ const DataInput = () => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Specialization</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Roles</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subjects</th>
                       </tr>
                     </thead>
@@ -806,9 +815,16 @@ const DataInput = () => {
                           <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{teacher.email}</td>
                           <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{teacher.specialization}</td>
                           <td className="px-4 py-4 whitespace-nowrap">
-                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              {roles.find(r => r.id === teacher.role)?.name || teacher.role || "No Role"}
-                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {teacher.roles && teacher.roles.length > 0 
+                                ? teacher.roles.map(role => (
+                                    <span key={role} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                      {role}
+                                    </span>
+                                  ))
+                                : <span className="text-gray-500">No roles</span>
+                              }
+                            </div>
                           </td>
                           <td className="px-4 py-4 text-gray-600 dark:text-gray-400">
                             <div className="max-w-xs truncate">
@@ -876,6 +892,39 @@ const DataInput = () => {
 
               <div className="space-y-4">
                 <div>
+                  <Label>Assigned Roles</Label>
+                  <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
+                    {roles.length === 0 ? (
+                      <p className="text-sm text-gray-500">No roles available</p>
+                    ) : (
+                      roles.map(role => (
+                        <div key={role.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`role-${role.id}`}
+                            checked={teacherForm.roles.includes(role.name)}
+                            onCheckedChange={() => handleRoleToggle(role.name)}
+                          />
+                          <Label htmlFor={`role-${role.id}`} className="text-sm font-normal">
+                            {role.name}
+                            {role.description && (
+                              <span className="text-gray-500 ml-2">({role.description})</span>
+                            )}
+                          </Label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {teacherWarning && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                        <p className="text-sm text-yellow-700">{teacherWarning}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div>
                   <Label>Assigned Subjects</Label>
                   <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
                     {subjects.length === 0 ? (
@@ -895,14 +944,6 @@ const DataInput = () => {
                       ))
                     )}
                   </div>
-                  {teacherWarning && (
-                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-yellow-600" />
-                        <p className="text-sm text-yellow-700">{teacherWarning}</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
