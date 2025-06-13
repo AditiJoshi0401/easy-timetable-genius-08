@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   fetchSubjects, fetchTeachers, fetchRooms, fetchStreams, fetchDivisions,
   addSubject, updateSubject, deleteSubject,
@@ -325,7 +326,7 @@ const DataInput = () => {
           specialization: teacherForm.specialization,
           role: teacherForm.role || null,
           subjects: teacherForm.subjects,
-          ista: false // Add the required isTA property
+          isTA: false // Fixed property name
         });
         toast({
           title: "Teacher Updated",
@@ -338,7 +339,7 @@ const DataInput = () => {
           specialization: teacherForm.specialization,
           role: teacherForm.role || null,
           subjects: teacherForm.subjects,
-          ista: false // Add the required isTA property
+          isTA: false // Fixed property name
         });
         toast({
           title: "Teacher Added",
