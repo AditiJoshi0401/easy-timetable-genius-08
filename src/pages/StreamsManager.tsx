@@ -28,7 +28,7 @@ const streamFormSchema = z.object({
   id: z.string().optional(),
   code: z.string().min(2, "Code must be at least 2 characters"),
   name: z.string().min(3, "Name must be at least 3 characters"),
-  years: z.coerce.number().min(1, "At least 1 year").max(6, "Maximum 6 years"),
+  semesters: z.coerce.number().min(1, "At least 1 semester").max(12, "Maximum 12 semesters"),
 });
 
 // Define schema for division form
@@ -37,7 +37,7 @@ const divisionFormSchema = z.object({
   streamId: z.string(),
   name: z.string().min(1, "Division name is required"),
   strength: z.coerce.number().min(1, "At least 1 student required"),
-  year: z.coerce.number().min(1, "Year is required")
+  semester: z.coerce.number().min(1, "Semester is required")
 });
 
 type FormStream = z.infer<typeof streamFormSchema>;
@@ -51,7 +51,7 @@ const StreamsManager = () => {
   const [isDivisionDialogOpen, setIsDivisionDialogOpen] = useState(false);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number>(1);
+  const [selectedSemester, setSelectedSemester] = useState<number>(1);
   const [streamNameError, setStreamNameError] = useState("");
   const [streamCodeError, setStreamCodeError] = useState("");
   const [divisionNameError, setDivisionNameError] = useState("");
@@ -63,7 +63,7 @@ const StreamsManager = () => {
     defaultValues: {
       code: "",
       name: "",
-      years: 4,
+      semesters: 8,
     },
   });
 
@@ -74,7 +74,7 @@ const StreamsManager = () => {
       streamId: "",
       name: "",
       strength: 60,
-      year: 1
+      semester: 1
     },
   });
 
@@ -346,22 +346,22 @@ const StreamsManager = () => {
     return nameExists || codeExists;
   };
 
-  // Check for duplicate division name within same stream and year
+  // Check for duplicate division name within same stream and semester
   const checkDuplicateDivision = (data: FormDivision): boolean => {
     setDivisionNameError("");
     
     const nameExists = divisions.some(division => 
       division.name.toLowerCase() === data.name.toLowerCase() && 
       division.streamId === data.streamId &&
-      division.year === data.year &&
+      division.semester === data.semester &&
       (!data.id || division.id !== data.id)
     );
     
     if (nameExists) {
-      setDivisionNameError("A division with this name already exists for this stream and year");
+      setDivisionNameError("A division with this name already exists for this stream and semester");
       toast({
         title: "Duplicate Division",
-        description: "A division with this name already exists for this stream and year. Please use a different name.",
+        description: "A division with this name already exists for this stream and semester. Please use a different name.",
         variant: "destructive"
       });
     }
@@ -381,7 +381,7 @@ const StreamsManager = () => {
       const streamData: Partial<Stream> = {
         code: data.code,
         name: data.name,
-        years: data.years
+        semesters: data.semesters
       };
       updateStreamMutation.mutate({ id: data.id, stream: streamData });
     } else {
@@ -389,7 +389,7 @@ const StreamsManager = () => {
       const newStream: Omit<Stream, 'id'> = {
         code: data.code,
         name: data.name,
-        years: data.years
+        semesters: data.semesters
       };
       addStreamMutation.mutate(newStream);
     }
@@ -408,7 +408,7 @@ const StreamsManager = () => {
         name: data.name,
         streamId: data.streamId,
         strength: data.strength,
-        year: data.year
+        semester: data.semester
       };
       updateDivisionMutation.mutate({ id: data.id, division: divisionData });
     } else {
@@ -417,7 +417,7 @@ const StreamsManager = () => {
         name: data.name,
         streamId: data.streamId,
         strength: data.strength,
-        year: data.year
+        semester: data.semester
       };
       addDivisionMutation.mutate(newDivision);
     }
@@ -459,24 +459,24 @@ const StreamsManager = () => {
     setIsDivisionDialogOpen(true);
   };
 
-  // Get maximum year from all streams
-  const getMaxYears = () => {
+  // Get maximum semesters from all streams
+  const getMaxSemesters = () => {
     if (streams.length === 0) return 1;
-    return Math.max(...streams.map(s => s.years));
+    return Math.max(...streams.map(s => s.semesters));
   };
 
-  // Handle tab change and default year selection
+  // Handle tab change and default semester selection
   const handleTabChange = (value: string) => {
-    if (value === "divisions" && getMaxYears() >= 1) {
-      setSelectedYear(1);  // Set to first year by default when switching to divisions
+    if (value === "divisions" && getMaxSemesters() >= 1) {
+      setSelectedSemester(1);  // Set to first semester by default when switching to divisions
     }
   };
 
-  // Get available years for the selected stream when adding a division
-  const getAvailableYearsForStream = (streamId: string) => {
+  // Get available semesters for the selected stream when adding a division
+  const getAvailableSemestersForStream = (streamId: string) => {
     const stream = streams.find(s => s.id === streamId);
-    if (!stream) return [1]; // Default to at least year 1
-    return Array.from({ length: stream.years }, (_, i) => i + 1);
+    if (!stream) return [1]; // Default to at least semester 1
+    return Array.from({ length: stream.semesters }, (_, i) => i + 1);
   };
 
   // Role management
@@ -567,7 +567,7 @@ const StreamsManager = () => {
               streamForm.reset({
                 code: "",
                 name: "",
-                years: 4
+                semesters: 8
               });
               setIsEditing(false);
               setIsStreamDialogOpen(true);
@@ -615,7 +615,7 @@ const StreamsManager = () => {
                     <div>
                       <h3 className="font-medium">{stream.name}</h3>
                       <div className="text-sm text-muted-foreground mt-1">
-                        Code: {stream.code} • Years: {stream.years}
+                        Code: {stream.code} • Semesters: {stream.semesters}
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -644,7 +644,7 @@ const StreamsManager = () => {
                     streamId: defaultStreamId,
                     name: "",
                     strength: 60,
-                    year: 1
+                    semester: 1
                   });
                   setIsEditing(false);
                   setIsDivisionDialogOpen(true);
@@ -702,7 +702,7 @@ const StreamsManager = () => {
                     streamId: defaultStreamId,
                     name: "",
                     strength: 60,
-                    year: 1
+                    semester: 1
                   });
                   setIsEditing(false);
                   setIsDivisionDialogOpen(true);
@@ -715,22 +715,22 @@ const StreamsManager = () => {
           ) : (
             <>
               <div className="flex gap-2 mb-4">
-                <Label className="flex items-center mr-2">Filter by Year:</Label>
-                {Array.from({ length: getMaxYears() }, (_, i) => (
+                <Label className="flex items-center mr-2">Filter by Semester:</Label>
+                {Array.from({ length: getMaxSemesters() }, (_, i) => (
                   <Button 
                     key={i} 
-                    variant={selectedYear === i + 1 ? "default" : "outline"} 
+                    variant={selectedSemester === i + 1 ? "default" : "outline"} 
                     size="sm"
-                    onClick={() => setSelectedYear(i + 1)}
+                    onClick={() => setSelectedSemester(i + 1)}
                   >
-                    Year {i + 1}
+                    Semester {i + 1}
                   </Button>
                 ))}
               </div>
             
               <div className="grid gap-4">
                 {divisions
-                  .filter(division => division.year === selectedYear)
+                  .filter(division => division.semester === selectedSemester)
                   .map((division) => {
                     const stream = streams.find(s => s.id === division.streamId);
                     return (
@@ -739,7 +739,7 @@ const StreamsManager = () => {
                           <div>
                             <h3 className="font-medium">Division {division.name}</h3>
                             <div className="text-sm text-muted-foreground mt-1">
-                              {stream?.name} • Year {division.year} • {division.strength} students
+                              {stream?.name} • Semester {division.semester} • {division.strength} students
                             </div>
                           </div>
                           <div className="flex gap-2">
@@ -894,15 +894,15 @@ const StreamsManager = () => {
               
               <FormField
                 control={streamForm.control}
-                name="years"
+                name="semesters"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Number of Years</FormLabel>
+                    <FormLabel>Number of Semesters</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} max={6} {...field} />
+                      <Input type="number" min={1} max={12} {...field} />
                     </FormControl>
                     <FormDescription>
-                      The duration of this academic program in years
+                      The duration of this academic program in semesters
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -952,11 +952,11 @@ const StreamsManager = () => {
                         {...field}
                         onChange={(e) => {
                           field.onChange(e);
-                          // Reset year selection when changing stream
+                          // Reset semester selection when changing stream
                           const streamId = e.target.value;
                           const stream = streams.find(s => s.id === streamId);
-                          if (stream && stream.years > 0) {
-                            divisionForm.setValue('year', 1);
+                          if (stream && stream.semesters > 0) {
+                            divisionForm.setValue('semester', 1);
                           }
                         }}
                       >
@@ -1000,10 +1000,10 @@ const StreamsManager = () => {
               
               <FormField
                 control={divisionForm.control}
-                name="year"
+                name="semester"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Year</FormLabel>
+                    <FormLabel>Semester</FormLabel>
                     <FormControl>
                       <select
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1011,15 +1011,15 @@ const StreamsManager = () => {
                         value={field.value}
                         onChange={(e) => field.onChange(parseInt(e.target.value, 10))}
                       >
-                        {getAvailableYearsForStream(divisionForm.getValues('streamId')).map(year => (
-                          <option key={year} value={year}>
-                            Year {year}
+                        {getAvailableSemestersForStream(divisionForm.getValues('streamId')).map(semester => (
+                          <option key={semester} value={semester}>
+                            Semester {semester}
                           </option>
                         ))}
                       </select>
                     </FormControl>
                     <FormDescription>
-                      The academic year this division belongs to
+                      The academic semester this division belongs to
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
