@@ -54,6 +54,7 @@ const TimetableEditor = () => {
   const [isLoadingTimetable, setIsLoadingTimetable] = useState(false);
   const [hasSavedChanges, setHasSavedChanges] = useState(true);
   const [lastSaved, setLastSaved] = useState<string>("");
+  const [showTimetableEditor, setShowTimetableEditor] = useState(false);
 
   // Fetch queries
   const { data: streams } = useQuery({
@@ -208,6 +209,7 @@ const TimetableEditor = () => {
         });
       }
       
+      setShowTimetableEditor(true);
       setHasSavedChanges(true);
     } catch (error) {
       console.error("Error creating/loading timetable:", error);
@@ -220,13 +222,6 @@ const TimetableEditor = () => {
       setIsLoadingTimetable(false);
     }
   };
-
-  // Load timetable on selection change
-  useEffect(() => {
-    if (selectedStream && selectedSemester && selectedDivision) {
-      createTimetable();
-    }
-  }, [selectedStream, selectedSemester, selectedDivision]);
 
   // Save timetable data
   const saveTimetable = async () => {
@@ -292,6 +287,7 @@ const TimetableEditor = () => {
     try {
       await deleteTimetableMutation.mutateAsync(timetableKey);
       setTimetableData({});
+      setShowTimetableEditor(false);
       toast({
         title: "Timetable Deleted",
         description: "Timetable has been successfully deleted.",
@@ -420,8 +416,10 @@ const TimetableEditor = () => {
       }
     };
   
-    checkConflicts();
-  }, [timetableData, selectedStream, selectedSemester, selectedDivision]);
+    if (showTimetableEditor) {
+      checkConflicts();
+    }
+  }, [timetableData, selectedStream, selectedSemester, selectedDivision, showTimetableEditor]);
 
   // Download timetable
   const downloadTimetable = () => {
@@ -441,8 +439,6 @@ const TimetableEditor = () => {
       });
     }
   };
-
-  const canEdit = selectedStream && selectedSemester && selectedDivision;
 
   return (
     <div className="space-y-6">
@@ -469,6 +465,7 @@ const TimetableEditor = () => {
                   setSelectedDivision("");
                   setTimetableData({});
                   setConflictWarnings([]);
+                  setShowTimetableEditor(false);
                 }}
               >
                 <SelectTrigger>
@@ -493,6 +490,7 @@ const TimetableEditor = () => {
                   setSelectedDivision("");
                   setTimetableData({});
                   setConflictWarnings([]);
+                  setShowTimetableEditor(false);
                 }}
                 disabled={!selectedStream}
               >
@@ -517,6 +515,7 @@ const TimetableEditor = () => {
                   setSelectedDivision(value);
                   setTimetableData({});
                   setConflictWarnings([]);
+                  setShowTimetableEditor(false);
                 }}
                 disabled={!selectedSemester}
               >
@@ -534,67 +533,21 @@ const TimetableEditor = () => {
             </div>
           </div>
 
-          {canEdit && (
-            <div className="flex justify-between items-center pt-4 border-t">
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={resetTimetable}
-                  disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Reset Timetable
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={deleteTimetableData}
-                  disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
-                >
-                  <Trash2 className="h-4 w-4 mr-2 text-destructive" />
-                  Delete Timetable
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {hasSavedChanges ? `Last saved at ${lastSaved}` : "Unsaved Changes"}
-                </span>
-                <Button 
-                  size="sm" 
-                  onClick={saveTimetable}
-                  disabled={isLoadingTimetable || hasSavedChanges}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Timetable
-                </Button>
-                <Button 
-                  variant="secondary" 
-                  size="sm" 
-                  onClick={downloadTimetable}
-                  disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {conflictWarnings.length > 0 && (
-            <div className="text-sm text-orange-500 pt-2 border-t">
-              {conflictWarnings.map((warning, index) => (
-                <div key={index}>
-                  Warning: {warning.message} (Day: {warning.day}, Time: {warning.time})
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="flex justify-center pt-4 border-t">
+            <Button 
+              onClick={createTimetable}
+              disabled={!selectedStream || !selectedSemester || !selectedDivision || isLoadingTimetable}
+              className="min-w-32"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {isLoadingTimetable ? "Loading..." : "Create Timetable"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       {/* Main Editing Interface */}
-      {canEdit && (
+      {showTimetableEditor && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar with draggable items */}
           <div className="lg:col-span-1 space-y-4">
@@ -660,7 +613,49 @@ const TimetableEditor = () => {
           <div className="lg:col-span-3">
             <Card>
               <CardHeader>
-                <CardTitle>Timetable Grid</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Timetable Grid</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {hasSavedChanges ? (lastSaved ? `Last saved at ${lastSaved}` : "No changes") : "Unsaved Changes"}
+                    </span>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={resetTimetable}
+                      disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Reset
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={deleteTimetableData}
+                      disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={saveTimetable}
+                      disabled={isLoadingTimetable || hasSavedChanges}
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save
+                    </Button>
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={downloadTimetable}
+                      disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <div className="min-w-full">
@@ -731,8 +726,24 @@ const TimetableEditor = () => {
         </div>
       )}
 
+      {/* Conflict Warnings */}
+      {conflictWarnings.length > 0 && showTimetableEditor && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-orange-600">Conflict Warnings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {conflictWarnings.map((warning, index) => (
+              <div key={index} className="text-sm text-orange-600 mb-2">
+                <strong>{warning.day} at {warning.time}:</strong> {warning.message}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Timetable Display for Reference */}
-      {canEdit && Object.keys(timetableData).length > 0 && (
+      {showTimetableEditor && Object.keys(timetableData).length > 0 && (
         <div className="py-4" ref={timetableRef}>
           <Card>
             <CardHeader>
