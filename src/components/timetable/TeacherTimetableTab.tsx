@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +14,7 @@ interface Teacher {
   name: string;
   email: string;
   ista: boolean;
-  roles?: string[];
+  role?: RoleType;
   specialization: string;
   subjects: any[];
   cabin?: string;
@@ -67,9 +68,9 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
         if (selectedRole) {
           filteredTeachers = filteredTeachers.filter(teacher => {
             if (selectedRole === 'TA') {
-              return teacher.ista || (teacher.roles && teacher.roles.includes('TA'));
-            } else if (teacher.roles && teacher.roles.length > 0) {
-              return teacher.roles.includes(selectedRole);
+              return teacher.ista || (teacher.role as RoleType) === 'TA';
+            } else if (teacher.role) {
+              return (teacher.role as RoleType) === selectedRole;
             } else {
               return selectedRole === 'Teacher' && !teacher.ista;
             }
@@ -123,8 +124,8 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
 
   const renderTeacherOption = (teacher: Teacher) => {
     let displayRole = '';
-    if (teacher.roles && teacher.roles.length > 0) {
-      displayRole = teacher.roles.join(', ');
+    if (teacher.role) {
+      displayRole = getRoleDisplayName(teacher.role as RoleType);
     } else {
       displayRole = teacher.ista ? 'Teaching Assistant' : 'Teacher';
     }
