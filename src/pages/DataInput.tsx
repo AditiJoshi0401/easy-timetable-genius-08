@@ -53,7 +53,7 @@ const DataInput = () => {
     name: "",
     email: "",
     specialization: "",
-    roles: [] as string[],  // Changed from role to roles array
+    roles: [] as string[],
     subjects: [] as string[]
   });
   const [teacherWarning, setTeacherWarning] = useState<string>("");
@@ -85,7 +85,6 @@ const DataInput = () => {
   const { data: roles = [] } = useQuery({
     queryKey: ['roles'],
     queryFn: async () => {
-      // Fetch roles from the database
       const { data, error } = await supabase
         .from('roles')
         .select('*')
@@ -133,7 +132,7 @@ const DataInput = () => {
   // Update available years when stream is selected
   useEffect(() => {
     if (subjectForm.stream) {
-      const selectedStream = streams.find(s => s.code === subjectForm.stream);  // Changed to use code
+      const selectedStream = streams.find(s => s.code === subjectForm.stream);
       if (selectedStream) {
         const years = Array.from({ length: selectedStream.years }, (_, i) => i + 1);
         setAvailableYears(years);
@@ -174,7 +173,7 @@ const DataInput = () => {
     setSubjectForm({
       name: subject.name,
       code: subject.code,
-      stream: subject.stream,  // Now directly the stream code
+      stream: subject.stream,
       year: subject.year.toString(),
       lectures: subject.lectures,
       tutorials: subject.tutorials,
@@ -282,7 +281,7 @@ const DataInput = () => {
       name: teacher.name,
       email: teacher.email,
       specialization: teacher.specialization,
-      roles: teacher.roles || [],  // Changed to use roles array
+      roles: teacher.roles || [],
       subjects: teacher.subjects || []
     });
   };
@@ -293,7 +292,7 @@ const DataInput = () => {
       name: "",
       email: "",
       specialization: "",
-      roles: [],  // Changed to roles array
+      roles: [],
       subjects: []
     });
     setTeacherWarning("");
@@ -333,7 +332,7 @@ const DataInput = () => {
           name: teacherForm.name,
           email: teacherForm.email,
           specialization: teacherForm.specialization,
-          roles: teacherForm.roles,  // Now using roles array
+          roles: teacherForm.roles,
           subjects: teacherForm.subjects,
           isTA: false
         });
@@ -346,7 +345,7 @@ const DataInput = () => {
           name: teacherForm.name,
           email: teacherForm.email,
           specialization: teacherForm.specialization,
-          roles: teacherForm.roles,  // Now using roles array
+          roles: teacherForm.roles,
           subjects: teacherForm.subjects,
           isTA: false
         });
@@ -817,9 +816,9 @@ const DataInput = () => {
                           <td className="px-4 py-4 whitespace-nowrap">
                             <div className="flex flex-wrap gap-1">
                               {teacher.roles && teacher.roles.length > 0 
-                                ? teacher.roles.map(role => (
-                                    <span key={role} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                      {role}
+                                ? teacher.roles.map(roleName => (
+                                    <span key={roleName} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                      {roleName}
                                     </span>
                                   ))
                                 : <span className="text-gray-500">No roles</span>
@@ -873,27 +872,8 @@ const DataInput = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="teacher-role">Role</Label>
-                  <Select 
-                    value={teacherForm.role} 
-                    onValueChange={value => handleTeacherFormChange("role", value)}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select Role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map(role => (
-                        <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <Label>Assigned Roles</Label>
-                  <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
+                  <Label>Roles</Label>
+                  <div className="mt-1 border rounded-md p-3 space-y-2 max-h-32 overflow-y-auto">
                     {roles.length === 0 ? (
                       <p className="text-sm text-gray-500">No roles available</p>
                     ) : (
@@ -914,19 +894,13 @@ const DataInput = () => {
                       ))
                     )}
                   </div>
-                  {teacherWarning && (
-                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-yellow-600" />
-                        <p className="text-sm text-yellow-700">{teacherWarning}</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
-                
+              </div>
+
+              <div className="space-y-4">
                 <div>
                   <Label>Assigned Subjects</Label>
-                  <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
+                  <div className="mt-2 border rounded-md p-3 space-y-2 max-h-48 overflow-y-auto">
                     {subjects.length === 0 ? (
                       <p className="text-sm text-gray-500">No subjects available</p>
                     ) : (
@@ -938,12 +912,20 @@ const DataInput = () => {
                             onCheckedChange={() => handleSubjectToggle(subject.id)}
                           />
                           <Label htmlFor={`subject-${subject.id}`} className="text-sm font-normal">
-                            {subject.name} ({subject.code}) - {streams.find(s => s.id === subject.stream)?.name} Year {subject.year}
+                            {subject.name} ({subject.code}) - {streams.find(s => s.code === subject.stream)?.name} Year {subject.year}
                           </Label>
                         </div>
                       ))
                     )}
                   </div>
+                  {teacherWarning && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                        <p className="text-sm text-yellow-700">{teacherWarning}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
