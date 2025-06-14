@@ -183,7 +183,6 @@ const ViewTimetables = () => {
             </CardHeader>
             <CardContent>
               <TeacherTimetableTab
-                teachers={teachers}
                 selectedTimetable={selectedTeacherTimetable}
                 onApplyFilters={handleApplyTeacherFilters}
               />
@@ -198,7 +197,6 @@ const ViewTimetables = () => {
             </CardHeader>
             <CardContent>
               <RoomTimetableTab
-                rooms={rooms}
                 selectedTimetable={selectedRoomTimetable}
                 onApplyFilters={handleApplyRoomFilters}
               />

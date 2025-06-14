@@ -7,31 +7,38 @@ import { Input } from "@/components/ui/input";
 import TimetableDisplay from "@/components/timetable/TimetableDisplay";
 import { supabase } from "@/integrations/supabase/client";
 import { checkForDuplicates } from "@/utils/dataValidation";
-
-interface Room {
-  id: string;
-  number: string;
-  type: string;
-  capacity: number;
-}
+import { Room } from "@/services/supabaseService";
 
 interface RoomTimetableTabProps {
-  rooms: Room[];
   selectedTimetable: any;
   onApplyFilters: () => Promise<void>;
 }
 
 const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
-  rooms,
   selectedTimetable,
   onApplyFilters
 }) => {
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [roomTypes, setRoomTypes] = useState<string[]>([]);
   const [selectedRoomType, setSelectedRoomType] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [filteredRoomData, setFilteredRoomData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const { data, error } = await supabase.from('rooms').select('*');
+        if (error) throw error;
+        setRooms(data as Room[] || []);
+      } catch (error: any) {
+        console.error('Error fetching rooms:', error.message);
+      }
+    };
+
+    fetchRooms();
+  }, []);
 
   useEffect(() => {
     if (rooms && rooms.length > 0) {

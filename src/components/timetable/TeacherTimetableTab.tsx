@@ -8,33 +8,18 @@ import TimetableDisplay from "@/components/timetable/TimetableDisplay";
 import { RoleType, getAllRoleTypes, getRoleDisplayName, getTeacherLectureCount } from "@/models/Role";
 import { supabase } from "@/integrations/supabase/client";
 import { checkForDuplicates } from "@/utils/dataValidation";
-
-interface Teacher {
-  id: string;
-  name: string;
-  email: string;
-  ista: boolean;
-  roles?: string[];
-  specialization: string;
-  subjects: any[];
-  cabin?: string;
-  lectures?: number;
-  tutorials?: number;
-  practical?: number;
-  credits?: number;
-}
+import { Teacher } from "@/services/supabaseService";
 
 interface TeacherTimetableTabProps {
-  teachers: Teacher[];
   selectedTimetable: any;
   onApplyFilters: () => Promise<void>;
 }
 
 const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
-  teachers,
   selectedTimetable,
   onApplyFilters
 }) => {
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [streams, setStreams] = useState<any[]>([]);
   const [streamForFilter, setStreamForFilter] = useState("");
   const [semesterForFilter, setSemesterForFilter] = useState("");
@@ -45,17 +30,31 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
   const [filteredTeacherData, setFilteredTeacherData] = useState<any>(null);
 
   useEffect(() => {
-    const fetchStreams = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase.from('streams').select('*');
-        if (error) throw error;
-        setStreams(data || []);
+        // Fetch teachers
+        const { data: teachersData, error: teachersError } = await supabase.from('teachers').select('*');
+        if (teachersError) throw teachersError;
+        
+        // Map database fields to interface fields
+        const mappedTeachers = teachersData?.map(teacher => ({
+          ...teacher,
+          isTA: teacher.ista,
+          roles: teacher.roles || [],
+        })) as Teacher[];
+        
+        setTeachers(mappedTeachers || []);
+
+        // Fetch streams
+        const { data: streamsData, error: streamsError } = await supabase.from('streams').select('*');
+        if (streamsError) throw streamsError;
+        setStreams(streamsData || []);
       } catch (error: any) {
-        console.error('Error fetching streams:', error.message);
+        console.error('Error fetching data:', error.message);
       }
     };
 
-    fetchStreams();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -80,11 +79,11 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
     if (selectedRole) {
       filtered = filtered.filter(teacher => {
         if (selectedRole === 'TA') {
-          return teacher.ista || (teacher.roles && teacher.roles.includes('Teaching Assistant'));
+          return teacher.isTA || (teacher.roles && teacher.roles.includes('Teaching Assistant'));
         } else if (teacher.roles && teacher.roles.length > 0) {
           return teacher.roles.some(role => role === selectedRole);
         } else {
-          return selectedRole === 'Teacher' && !teacher.ista;
+          return selectedRole === 'Teacher' && !teacher.isTA;
         }
       });
     }
@@ -132,7 +131,7 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
     if (teacher.roles && teacher.roles.length > 0) {
       displayRole = teacher.roles.join(', ');
     } else {
-      displayRole = teacher.ista ? 'Teaching Assistant' : 'Teacher';
+      displayRole = teacher.isTA ? 'Teaching Assistant' : 'Teacher';
     }
     
     // Get lecture count for this teacher
