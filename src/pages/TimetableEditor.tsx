@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Trash2, Download, Save, RefreshCw, Clock } from 'lucide-react';
+import { Trash2, Download, Save, RefreshCw, Clock, Plus } from 'lucide-react';
 import { fetchStreams, fetchDivisions, fetchSubjects, fetchTeachers, fetchRooms, 
          fetchTimetable, addTimetable, updateTimetable, deleteTimetable,
          saveTimetableDraft, getTimetableDraft, removeTimetableDraft,
@@ -54,6 +54,7 @@ const TimetableEditor = () => {
   const [isLoadingTimetable, setIsLoadingTimetable] = useState(false);
   const [hasSavedChanges, setHasSavedChanges] = useState(true);
   const [lastSaved, setLastSaved] = useState<string>("");
+  const [isEditingMode, setIsEditingMode] = useState(false);
 
   // Fetch queries
   const { data: streams } = useQuery({
@@ -133,6 +134,7 @@ const TimetableEditor = () => {
         description: "The timetable has been deleted successfully."
       });
       setTimetableData({});
+      setIsEditingMode(false);
       removeTimetableDraft(generateTimetableKey());
     },
     onError: (error) => {
@@ -174,10 +176,14 @@ const TimetableEditor = () => {
     return `${streamCode}-SEM${selectedSemester}-${divisionName}`;
   };
 
-  // Load timetable data
-  const loadTimetable = async (divisionId: string) => {
-    if (!selectedStream || !selectedSemester || !divisionId) {
-      console.warn("Missing stream, semester, or division to load timetable.");
+  // Create new timetable
+  const createTimetable = async () => {
+    if (!selectedStream || !selectedSemester || !selectedDivision) {
+      toast({
+        title: "Missing Information",
+        description: "Please select stream, semester, and division.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -185,37 +191,36 @@ const TimetableEditor = () => {
     const timetableKey = generateTimetableKey();
 
     try {
-      // First, try to load the timetable from the database
+      // Check if timetable already exists
       let timetable = await fetchTimetable(timetableKey);
 
-      if (!timetable) {
-        // If not found in the database, try to load the draft from localStorage
-        const draft = getTimetableDraft(timetableKey);
-        if (draft) {
-          setTimetableData(draft.data);
-          toast({
-            title: "Draft Loaded",
-            description: "Loaded timetable draft from local storage.",
-          });
-        } else {
-          // If no timetable in DB and no draft in localStorage, initialize a new empty timetable
-          setTimetableData({});
-        }
-      } else {
-        // If timetable found in DB, load it
+      if (timetable) {
+        // Load existing timetable
         setTimetableData(timetable.data);
+        toast({
+          title: "Timetable Loaded",
+          description: "Existing timetable loaded for editing.",
+        });
+      } else {
+        // Create new empty timetable
+        setTimetableData({});
+        toast({
+          title: "New Timetable",
+          description: "New timetable created. Start adding subjects, teachers, and rooms.",
+        });
       }
+      
+      setIsEditingMode(true);
+      setHasSavedChanges(true);
     } catch (error) {
-      console.error("Error loading timetable:", error);
+      console.error("Error creating/loading timetable:", error);
       toast({
-        title: "Error Loading Timetable",
-        description: "Failed to load timetable. Please try again.",
+        title: "Error",
+        description: "Failed to create/load timetable. Please try again.",
         variant: "destructive",
       });
-      setTimetableData({});
     } finally {
       setIsLoadingTimetable(false);
-      setHasSavedChanges(true);
     }
   };
 
@@ -246,8 +251,8 @@ const TimetableEditor = () => {
       } else {
         // If it doesn't exist, create a new timetable
         const newTimetable: Omit<Timetable, 'created_at' | 'updated_at'> = {
-          id: timetableKey, // Using composite key as ID
-          name: timetableKey, // Add the missing name property
+          id: timetableKey,
+          name: timetableKey,
           division_id: selectedDivision,
           data: timetableDataToSave,
         };
@@ -283,6 +288,7 @@ const TimetableEditor = () => {
     try {
       await deleteTimetableMutation.mutateAsync(timetableKey);
       setTimetableData({});
+      setIsEditingMode(false);
       toast({
         title: "Timetable Deleted",
         description: "Timetable has been successfully deleted.",
@@ -308,11 +314,11 @@ const TimetableEditor = () => {
 
   // Auto-save draft to localStorage
   useEffect(() => {
-    if (selectedStream && selectedSemester && selectedDivision && !hasSavedChanges) {
+    if (selectedStream && selectedSemester && selectedDivision && !hasSavedChanges && isEditingMode) {
       const timetableKey = generateTimetableKey();
       saveTimetableDraft(timetableKey, timetableData);
     }
-  }, [timetableData, selectedStream, selectedSemester, selectedDivision, hasSavedChanges]);
+  }, [timetableData, selectedStream, selectedSemester, selectedDivision, hasSavedChanges, isEditingMode]);
 
   // Drag and drop handlers
   const handleDragStart = (item: any, type: 'subject' | 'teacher' | 'room') => {
@@ -357,7 +363,7 @@ const TimetableEditor = () => {
   // Conflict checking
   useEffect(() => {
     const checkConflicts = async () => {
-      if (!selectedStream || !selectedSemester || !selectedDivision || !timetableData) {
+      if (!selectedStream || !selectedSemester || !selectedDivision || !timetableData || !isEditingMode) {
         return;
       }
   
@@ -412,7 +418,7 @@ const TimetableEditor = () => {
     };
   
     checkConflicts();
-  }, [timetableData, selectedStream, selectedSemester, selectedDivision]);
+  }, [timetableData, selectedStream, selectedSemester, selectedDivision, isEditingMode]);
 
   // Download timetable
   const downloadTimetable = () => {
@@ -422,7 +428,7 @@ const TimetableEditor = () => {
       const file = new Blob([content], { type: 'text/html' });
       element.href = URL.createObjectURL(file);
       element.download = "timetable.html";
-      document.body.appendChild(element); // Required for this to work in FireFox
+      document.body.appendChild(element);
       element.click();
     } else {
       toast({
@@ -457,6 +463,7 @@ const TimetableEditor = () => {
                   setSelectedDivision("");
                   setTimetableData({});
                   setConflictWarnings([]);
+                  setIsEditingMode(false);
                 }}
               >
                 <SelectTrigger>
@@ -481,6 +488,7 @@ const TimetableEditor = () => {
                   setSelectedDivision("");
                   setTimetableData({});
                   setConflictWarnings([]);
+                  setIsEditingMode(false);
                 }}
                 disabled={!selectedStream}
               >
@@ -503,7 +511,9 @@ const TimetableEditor = () => {
                 value={selectedDivision} 
                 onValueChange={(value) => {
                   setSelectedDivision(value);
-                  loadTimetable(value);
+                  setIsEditingMode(false);
+                  setTimetableData({});
+                  setConflictWarnings([]);
                 }}
                 disabled={!selectedSemester}
               >
@@ -521,195 +531,206 @@ const TimetableEditor = () => {
             </div>
           </div>
 
-          <div className="flex justify-between">
-            <div className="flex items-center gap-2">
+          {!isEditingMode ? (
+            <div className="flex justify-center">
               <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={resetTimetable}
-                disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                onClick={createTimetable}
+                disabled={!selectedStream || !selectedSemester || !selectedDivision || isLoadingTimetable}
+                className="w-full max-w-md"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Reset Timetable
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={deleteTimetableData}
-                disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
-              >
-                <Trash2 className="h-4 w-4 mr-2 text-destructive" />
-                Delete Timetable
+                <Plus className="h-4 w-4 mr-2" />
+                {isLoadingTimetable ? "Loading..." : "Create Timetable"}
               </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {hasSavedChanges ? `Last saved at ${lastSaved}` : "Unsaved Changes"}
-              </span>
-              <Button 
-                size="sm" 
-                onClick={saveTimetable}
-                disabled={isLoadingTimetable || hasSavedChanges || !selectedDivision}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save Timetable
-              </Button>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={downloadTimetable}
-                disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-            </div>
-          </div>
-
-          {conflictWarnings.length > 0 && (
-            <div className="text-sm text-orange-500">
-              {conflictWarnings.map((warning, index) => (
-                <div key={index}>
-                  Warning: {warning.message} (Day: {warning.day}, Time: {warning.time})
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={resetTimetable}
+                    disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reset Timetable
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={deleteTimetableData}
+                    disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                    Delete Timetable
+                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    {hasSavedChanges ? `Last saved at ${lastSaved}` : "Unsaved Changes"}
+                  </span>
+                  <Button 
+                    size="sm" 
+                    onClick={saveTimetable}
+                    disabled={isLoadingTimetable || hasSavedChanges}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Timetable
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={downloadTimetable}
+                    disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </div>
 
-          {selectedDivision && (
-            <div className="py-4" ref={timetableRef}>
-              {isLoadingTimetable ? (
-                <div>Loading timetable...</div>
-              ) : (
+              {conflictWarnings.length > 0 && (
+                <div className="text-sm text-orange-500">
+                  {conflictWarnings.map((warning, index) => (
+                    <div key={index}>
+                      Warning: {warning.message} (Day: {warning.day}, Time: {warning.time})
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="py-4" ref={timetableRef}>
                 <TimetableDisplay 
                   timetableData={timetableData} 
                   viewType="division"
                   showTeachers={true} 
                   showRooms={true}
                 />
-              )}
-            </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="md:col-span-1 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Subjects</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {filteredSubjects.map(subject => (
-                <div
-                  key={subject.id}
-                  draggable
-                  onDragStart={() => handleDragStart(subject, 'subject')}
-                  className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
-                >
-                  {subject.name} ({subject.code})
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+      {isEditingMode && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="md:col-span-1 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Subjects</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {filteredSubjects.map(subject => (
+                  <div
+                    key={subject.id}
+                    draggable
+                    onDragStart={() => handleDragStart(subject, 'subject')}
+                    className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
+                  >
+                    {subject.name} ({subject.code})
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Teachers</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {teachers?.map(teacher => (
-                <div
-                  key={teacher.id}
-                  draggable
-                  onDragStart={() => handleDragStart(teacher, 'teacher')}
-                  className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
-                >
-                  {teacher.name} ({teacher.specialization})
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Teachers</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {teachers?.map(teacher => (
+                  <div
+                    key={teacher.id}
+                    draggable
+                    onDragStart={() => handleDragStart(teacher, 'teacher')}
+                    className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
+                  >
+                    {teacher.name} ({teacher.specialization})
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Rooms</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {rooms?.map(room => (
-                <div
-                  key={room.id}
-                  draggable
-                  onDragStart={() => handleDragStart(room, 'room')}
-                  className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
-                >
-                  {room.number} ({room.capacity})
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Rooms</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {rooms?.map(room => (
+                  <div
+                    key={room.id}
+                    draggable
+                    onDragStart={() => handleDragStart(room, 'room')}
+                    className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
+                  >
+                    {room.number} ({room.capacity})
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
 
-        <div className="md:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Timetable</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <table className="min-w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th></th>
-                    {timeSlots.map(time => (
-                      <th key={time} className="border p-2">
-                        {time}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {daysOfWeek.map(day => (
-                    <tr key={day}>
-                      <th className="border p-2">{day}</th>
+          <div className="md:col-span-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Timetable</CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th></th>
                       {timeSlots.map(time => (
-                        <td
-                          key={`${day}-${time}`}
-                          className="border p-2 relative h-24"
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, day, time)}
-                        >
-                          {timetableData[day]?.[time] && (
-                            <div className="absolute top-0 left-0 w-full h-full flex flex-col justify-center items-center">
-                              {timetableData[day][time]?.subject && (
-                                <div className="text-sm font-medium">
-                                  {timetableData[day][time].subject?.name}
-                                </div>
-                              )}
-                              {timetableData[day][time]?.teacher && (
-                                <div className="text-xs text-muted-foreground">
-                                  {timetableData[day][time].teacher?.name}
-                                </div>
-                              )}
-                              {timetableData[day][time]?.room && (
-                                <div className="text-xs text-muted-foreground">
-                                  {timetableData[day][time].room?.number}
-                                </div>
-                              )}
-                              <Button variant="ghost" size="icon" className="absolute top-1 right-1" onClick={() => clearSlot(day, time)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </td>
+                        <th key={time} className="border p-2">
+                          {time}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+                  </thead>
+                  <tbody>
+                    {daysOfWeek.map(day => (
+                      <tr key={day}>
+                        <th className="border p-2">{day}</th>
+                        {timeSlots.map(time => (
+                          <td
+                            key={`${day}-${time}`}
+                            className="border p-2 relative h-24"
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, day, time)}
+                          >
+                            {timetableData[day]?.[time] && (
+                              <div className="absolute top-0 left-0 w-full h-full flex flex-col justify-center items-center">
+                                {timetableData[day][time]?.subject && (
+                                  <div className="text-sm font-medium">
+                                    {timetableData[day][time].subject?.name}
+                                  </div>
+                                )}
+                                {timetableData[day][time]?.teacher && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {timetableData[day][time].teacher?.name}
+                                  </div>
+                                )}
+                                {timetableData[day][time]?.room && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {timetableData[day][time].room?.number}
+                                  </div>
+                                )}
+                                <Button variant="ghost" size="icon" className="absolute top-1 right-1" onClick={() => clearSlot(day, time)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

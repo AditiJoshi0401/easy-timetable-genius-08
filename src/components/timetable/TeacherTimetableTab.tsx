@@ -5,10 +5,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import TimetableDisplay from "@/components/timetable/TimetableDisplay";
-import { RoleType, getAllRoleTypes, getRoleDisplayName, getTeacherLectureCount } from "@/models/Role";
 import { supabase } from "@/integrations/supabase/client";
 import { checkForDuplicates } from "@/utils/dataValidation";
-import { Teacher } from "@/services/supabaseService";
+
+interface Teacher {
+  id: string;
+  name: string;
+  email: string;
+  specialization: string;
+  subjects: string[];
+  cabin?: string;
+  roles: string[];
+  ista: boolean;
+}
 
 interface TeacherTimetableTabProps {
   selectedTimetable: any;
@@ -20,83 +29,54 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
   onApplyFilters
 }) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [streams, setStreams] = useState<any[]>([]);
-  const [streamForFilter, setStreamForFilter] = useState("");
-  const [semesterForFilter, setSemesterForFilter] = useState("");
-  const [selectedRole, setSelectedRole] = useState<RoleType | "">("");
+  const [teacherSpecializations, setTeacherSpecializations] = useState<string[]>([]);
+  const [selectedSpecialization, setSelectedSpecialization] = useState("");
   const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [filteredTeachers, setFilteredTeachers] = useState<Teacher[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filteredTeachers, setFilteredTeachers] = useState<Teacher[]>([]);
   const [filteredTeacherData, setFilteredTeacherData] = useState<any>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchTeachers = async () => {
       try {
-        // Fetch teachers
-        const { data: teachersData, error: teachersError } = await supabase.from('teachers').select('*');
-        if (teachersError) throw teachersError;
-        
-        // Map database fields to interface fields
-        const mappedTeachers = teachersData?.map(teacher => ({
-          ...teacher,
-          isTA: teacher.ista,
-          roles: teacher.roles || [],
-        })) as Teacher[];
-        
-        setTeachers(mappedTeachers || []);
-
-        // Fetch streams
-        const { data: streamsData, error: streamsError } = await supabase.from('streams').select('*');
-        if (streamsError) throw streamsError;
-        setStreams(streamsData || []);
+        const { data, error } = await supabase.from('teachers').select('*');
+        if (error) throw error;
+        setTeachers(data as Teacher[] || []);
       } catch (error: any) {
-        console.error('Error fetching data:', error.message);
+        console.error('Error fetching teachers:', error.message);
       }
     };
 
-    fetchData();
+    fetchTeachers();
   }, []);
+
+  useEffect(() => {
+    if (teachers && teachers.length > 0) {
+      const specializations = [...new Set(teachers.map(teacher => teacher.specialization))];
+      setTeacherSpecializations(specializations);
+    }
+  }, [teachers]);
 
   useEffect(() => {
     let filtered = teachers || [];
     
-    if (streamForFilter) {
+    // Filter by specialization if selected
+    if (selectedSpecialization) {
       filtered = filtered.filter(teacher => 
-        teacher.subjects?.some((s: any) => 
-          typeof s === 'object' && s.stream === streamForFilter
-        )
+        teacher.specialization === selectedSpecialization
       );
     }
     
-    if (semesterForFilter) {
-      filtered = filtered.filter(teacher => 
-        teacher.subjects?.some((s: any) => 
-          typeof s === 'object' && s.semester === semesterForFilter
-        )
-      );
-    }
-    
-    if (selectedRole) {
-      filtered = filtered.filter(teacher => {
-        if (selectedRole === 'TA') {
-          return teacher.isTA || (teacher.roles && teacher.roles.includes('Teaching Assistant'));
-        } else if (teacher.roles && teacher.roles.length > 0) {
-          return teacher.roles.some(role => role === selectedRole);
-        } else {
-          return selectedRole === 'Teacher' && !teacher.isTA;
-        }
-      });
-    }
-    
+    // Filter by search term if provided
     if (searchTerm) {
       filtered = filtered.filter(teacher => 
         teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
-    const uniqueTeachers = checkForDuplicates(filtered, 'name', 'email');
+    const uniqueTeachers = checkForDuplicates(filtered, 'email');
     setFilteredTeachers(uniqueTeachers || []);
-  }, [teachers, streamForFilter, semesterForFilter, selectedRole, searchTerm]);
+  }, [teachers, selectedSpecialization, searchTerm]);
 
   const handleViewTeacherTimetable = () => {
     if (!selectedTeacher || !selectedTimetable) return;
@@ -126,80 +106,21 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
     });
   };
 
-  const renderTeacherOption = (teacher: Teacher) => {
-    let displayRole = '';
-    if (teacher.roles && teacher.roles.length > 0) {
-      displayRole = teacher.roles.join(', ');
-    } else {
-      displayRole = teacher.isTA ? 'Teaching Assistant' : 'Teacher';
-    }
-    
-    // Get lecture count for this teacher
-    const lectureCount = getTeacherLectureCount(teacher.id);
-    
-    return (
-      <SelectItem key={teacher.id} value={teacher.id}>
-        <div className="flex flex-col items-start">
-          <span>{teacher.name} {displayRole ? `(${displayRole})` : ''}</span>
-          <span className="text-xs text-muted-foreground">
-            Lectures assigned: {lectureCount}
-            {teacher.lectures && ` | Max: ${teacher.lectures}`}
-          </span>
-        </div>
-      </SelectItem>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label>Stream (Optional)</Label>
-            <Select value={streamForFilter} onValueChange={setStreamForFilter}>
+            <Label>Specialization</Label>
+            <Select value={selectedSpecialization} onValueChange={setSelectedSpecialization}>
               <SelectTrigger>
-                <SelectValue placeholder="All Streams" />
+                <SelectValue placeholder="All Specializations" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Streams</SelectItem>
-                {streams.map(stream => (
-                  <SelectItem key={stream.id} value={stream.id}>
-                    {stream.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Semester (Optional)</Label>
-            <Select value={semesterForFilter} onValueChange={setSemesterForFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Semesters" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Semesters</SelectItem>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
-                  <SelectItem key={s} value={s.toString()}>
-                    Semester {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>Role (Optional)</Label>
-            <Select value={selectedRole} onValueChange={setSelectedRole as any}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Roles" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Roles</SelectItem>
-                {getAllRoleTypes().map(role => (
-                  <SelectItem key={role} value={role}>
-                    {getRoleDisplayName(role)}
+                <SelectItem value="">All Specializations</SelectItem>
+                {teacherSpecializations.map((specialization, idx) => (
+                  <SelectItem key={idx} value={specialization}>
+                    {specialization}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -215,24 +136,26 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
           </div>
         </div>
         
-        <div className="grid grid-cols-1 gap-4">
-          <div>
-            <Label>Teacher</Label>
-            <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select Teacher" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredTeachers.length > 0 ? (
-                  filteredTeachers.map(renderTeacherOption)
-                ) : (
-                  <SelectItem value="no-teachers-available" disabled>
-                    No teachers available
+        <div>
+          <Label>Teacher</Label>
+          <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Teacher" />
+            </SelectTrigger>
+            <SelectContent>
+              {filteredTeachers.length > 0 ? (
+                filteredTeachers.map(teacher => (
+                  <SelectItem key={teacher.id} value={teacher.id}>
+                    {teacher.name} ({teacher.specialization})
                   </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-          </div>
+                ))
+              ) : (
+                <SelectItem value="no-teachers-available" disabled>
+                  No teachers available
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
         </div>
         
         <Button 
@@ -240,17 +163,8 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
           disabled={!selectedTeacher || !selectedTimetable}
           onClick={handleViewTeacherTimetable}
         >
-          View Teacher Timetable
+          View Teacher Schedule
         </Button>
-        
-        {selectedTeacher && (
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">Teacher Lecture Summary</h4>
-            <p className="text-sm text-muted-foreground">
-              Total lectures assigned: {getTeacherLectureCount(selectedTeacher)}
-            </p>
-          </div>
-        )}
       </div>
 
       {filteredTeacherData && (
