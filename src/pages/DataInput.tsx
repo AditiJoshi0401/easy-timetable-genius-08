@@ -872,22 +872,6 @@ const DataInput = () => {
                     className="mt-1"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="teacher-role">Role</Label>
-                  <Select 
-                    value={teacherForm.role} 
-                    onValueChange={value => handleTeacherFormChange("role", value)}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select Role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map(role => (
-                        <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               <div className="space-y-4">
