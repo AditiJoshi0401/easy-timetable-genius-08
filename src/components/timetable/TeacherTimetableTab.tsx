@@ -25,74 +25,79 @@ interface Teacher {
 }
 
 interface TeacherTimetableTabProps {
-  streams: any[];
+  teachers: Teacher[];
   selectedTimetable: any;
+  onApplyFilters: () => Promise<void>;
 }
 
 const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
-  streams,
-  selectedTimetable
+  teachers,
+  selectedTimetable,
+  onApplyFilters
 }) => {
+  const [streams, setStreams] = useState<any[]>([]);
   const [streamForFilter, setStreamForFilter] = useState("");
-  const [semesterForFilter, setSemesterForFilter] = useState("");  // Changed from yearForFilter to semesterForFilter
+  const [semesterForFilter, setSemesterForFilter] = useState("");
   const [selectedRole, setSelectedRole] = useState<RoleType | "">("");
   const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [filteredTeachers, setFilteredTeachers] = useState<Teacher[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredTeacherData, setFilteredTeacherData] = useState<any>(null);
 
   useEffect(() => {
-    const fetchTeachers = async () => {
+    const fetchStreams = async () => {
       try {
-        const { data, error } = await supabase.from('teachers').select('*');
+        const { data, error } = await supabase.from('streams').select('*');
         if (error) throw error;
-        
-        let filteredTeachers = data || [];
-        
-        if (streamForFilter) {
-          filteredTeachers = filteredTeachers.filter(teacher => 
-            teacher.subjects?.some((s: any) => 
-              typeof s === 'object' && s.stream === streamForFilter
-            )
-          );
-        }
-        
-        if (semesterForFilter) {  // Changed from yearForFilter to semesterForFilter
-          filteredTeachers = filteredTeachers.filter(teacher => 
-            teacher.subjects?.some((s: any) => 
-              typeof s === 'object' && s.semester === semesterForFilter
-            )
-          );
-        }
-        
-        if (selectedRole) {
-          filteredTeachers = filteredTeachers.filter(teacher => {
-            if (selectedRole === 'TA') {
-              return teacher.ista || (teacher.roles && teacher.roles.includes('Teaching Assistant'));
-            } else if (teacher.roles && teacher.roles.length > 0) {
-              return teacher.roles.some(role => role === selectedRole);
-            } else {
-              return selectedRole === 'Teacher' && !teacher.ista;
-            }
-          });
-        }
-        
-        if (searchTerm) {
-          filteredTeachers = filteredTeachers.filter(teacher => 
-            teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        }
-        
-        const uniqueTeachers = checkForDuplicates(filteredTeachers, 'name', 'email');
-        
-        setTeachers(uniqueTeachers || []);
+        setStreams(data || []);
       } catch (error: any) {
-        console.error('Error fetching teachers:', error.message);
+        console.error('Error fetching streams:', error.message);
       }
     };
 
-    fetchTeachers();
-  }, [streamForFilter, semesterForFilter, selectedRole, searchTerm]);  // Changed yearForFilter to semesterForFilter
+    fetchStreams();
+  }, []);
+
+  useEffect(() => {
+    let filtered = teachers || [];
+    
+    if (streamForFilter) {
+      filtered = filtered.filter(teacher => 
+        teacher.subjects?.some((s: any) => 
+          typeof s === 'object' && s.stream === streamForFilter
+        )
+      );
+    }
+    
+    if (semesterForFilter) {
+      filtered = filtered.filter(teacher => 
+        teacher.subjects?.some((s: any) => 
+          typeof s === 'object' && s.semester === semesterForFilter
+        )
+      );
+    }
+    
+    if (selectedRole) {
+      filtered = filtered.filter(teacher => {
+        if (selectedRole === 'TA') {
+          return teacher.ista || (teacher.roles && teacher.roles.includes('Teaching Assistant'));
+        } else if (teacher.roles && teacher.roles.length > 0) {
+          return teacher.roles.some(role => role === selectedRole);
+        } else {
+          return selectedRole === 'Teacher' && !teacher.ista;
+        }
+      });
+    }
+    
+    if (searchTerm) {
+      filtered = filtered.filter(teacher => 
+        teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    const uniqueTeachers = checkForDuplicates(filtered, 'name', 'email');
+    setFilteredTeachers(uniqueTeachers || []);
+  }, [teachers, streamForFilter, semesterForFilter, selectedRole, searchTerm]);
 
   const handleViewTeacherTimetable = () => {
     if (!selectedTeacher || !selectedTimetable) return;
@@ -219,8 +224,8 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
                 <SelectValue placeholder="Select Teacher" />
               </SelectTrigger>
               <SelectContent>
-                {teachers.length > 0 ? (
-                  teachers.map(renderTeacherOption)
+                {filteredTeachers.length > 0 ? (
+                  filteredTeachers.map(renderTeacherOption)
                 ) : (
                   <SelectItem value="no-teachers-available" disabled>
                     No teachers available

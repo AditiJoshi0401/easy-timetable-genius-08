@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -246,6 +247,7 @@ const TimetableEditor = () => {
         // If it doesn't exist, create a new timetable
         const newTimetable: Omit<Timetable, 'created_at' | 'updated_at'> = {
           id: timetableKey, // Using composite key as ID
+          name: timetableKey, // Add the missing name property
           division_id: selectedDivision,
           data: timetableDataToSave,
         };

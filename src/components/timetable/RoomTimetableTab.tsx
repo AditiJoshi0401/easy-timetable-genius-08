@@ -16,56 +16,50 @@ interface Room {
 }
 
 interface RoomTimetableTabProps {
+  rooms: Room[];
   selectedTimetable: any;
+  onApplyFilters: () => Promise<void>;
 }
 
 const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
-  selectedTimetable
+  rooms,
+  selectedTimetable,
+  onApplyFilters
 }) => {
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [roomTypes, setRoomTypes] = useState<string[]>([]);
   const [selectedRoomType, setSelectedRoomType] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [filteredRoomData, setFilteredRoomData] = useState<any>(null);
 
   useEffect(() => {
-    const fetchRooms = async () => {
-      try {
-        const { data, error } = await supabase.from('rooms').select('*');
-        if (error) throw error;
-        
-        let filteredRooms = data || [];
-        
-        // Filter by room type if selected
-        if (selectedRoomType) {
-          filteredRooms = filteredRooms.filter(room => 
-            room.type === selectedRoomType
-          );
-        }
-        
-        // Filter by search term if provided
-        if (searchTerm) {
-          filteredRooms = filteredRooms.filter(room => 
-            room.number.toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        }
-        
-        const uniqueRooms = checkForDuplicates(filteredRooms, 'number');
-        setRooms(uniqueRooms || []);
-        
-        // Extract unique room types for the filter dropdown
-        if (!selectedRoomType && !searchTerm) {
-          const types = [...new Set((data || []).map(room => room.type))];
-          setRoomTypes(types);
-        }
-      } catch (error: any) {
-        console.error('Error fetching rooms:', error.message);
-      }
-    };
+    if (rooms && rooms.length > 0) {
+      const types = [...new Set(rooms.map(room => room.type))];
+      setRoomTypes(types);
+    }
+  }, [rooms]);
 
-    fetchRooms();
-  }, [selectedRoomType, searchTerm]);
+  useEffect(() => {
+    let filtered = rooms || [];
+    
+    // Filter by room type if selected
+    if (selectedRoomType) {
+      filtered = filtered.filter(room => 
+        room.type === selectedRoomType
+      );
+    }
+    
+    // Filter by search term if provided
+    if (searchTerm) {
+      filtered = filtered.filter(room => 
+        room.number.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    const uniqueRooms = checkForDuplicates(filtered, 'number');
+    setFilteredRooms(uniqueRooms || []);
+  }, [rooms, selectedRoomType, searchTerm]);
 
   const handleViewRoomTimetable = () => {
     if (!selectedRoom || !selectedTimetable) return;
@@ -132,8 +126,8 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
               <SelectValue placeholder="Select Room" />
             </SelectTrigger>
             <SelectContent>
-              {rooms.length > 0 ? (
-                rooms.map(room => (
+              {filteredRooms.length > 0 ? (
+                filteredRooms.map(room => (
                   <SelectItem key={room.id} value={room.id}>
                     {room.number} ({room.type})
                   </SelectItem>
