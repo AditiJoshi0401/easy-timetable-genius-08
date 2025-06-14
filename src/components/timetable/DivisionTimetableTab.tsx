@@ -9,14 +9,14 @@ import TimetableDisplay from "@/components/timetable/TimetableDisplay";
 
 interface DivisionTimetableTabProps {
   streams: any[];
-  years: any[];
+  semesters: any[];  // Changed from years to semesters
   divisions: any[];
   stream: string;
-  year: string;
+  semester: string;  // Changed from year to semester
   division: string;
   selectedTimetable: any;
   setStream: (value: string) => void;
-  setYear: (value: string) => void;
+  setSemester: (value: string) => void;  // Changed from setYear to setSemester
   setDivision: (value: string) => void;
   onApplyFilters: () => void;
   onManageStructure: () => void;
@@ -25,14 +25,14 @@ interface DivisionTimetableTabProps {
 
 const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
   streams,
-  years,
+  semesters,  // Changed from years to semesters
   divisions,
   stream,
-  year,
+  semester,  // Changed from year to semester
   division,
   selectedTimetable,
   setStream,
-  setYear,
+  setSemester,  // Changed from setYear to setSemester
   setDivision,
   onApplyFilters,
   onManageStructure,
@@ -64,21 +64,21 @@ const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
         </div>
 
         <div className="space-y-2">
-          <Label>Year</Label>
-          <Select value={year} onValueChange={setYear} disabled={!stream || years.length === 0}>
+          <Label>Semester</Label>
+          <Select value={semester} onValueChange={setSemester} disabled={!stream || semesters.length === 0}>
             <SelectTrigger>
-              <SelectValue placeholder="Select Year" />
+              <SelectValue placeholder="Select Semester" />
             </SelectTrigger>
             <SelectContent>
-              {years.length > 0 ? (
-                years.map((year: any) => (
-                  <SelectItem key={year.id} value={year.id}>
-                    {year.name}
+              {semesters.length > 0 ? (
+                semesters.map((semester: any) => (
+                  <SelectItem key={semester.id} value={semester.id}>
+                    {semester.name}
                   </SelectItem>
                 ))
               ) : (
-                <SelectItem value="no-years-available" disabled>
-                  {stream ? "No years available for this stream" : "Select a stream first"}
+                <SelectItem value="no-semesters-available" disabled>
+                  {stream ? "No semesters available for this stream" : "Select a stream first"}
                 </SelectItem>
               )}
             </SelectContent>
@@ -87,7 +87,7 @@ const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
 
         <div className="space-y-2">
           <Label>Division</Label>
-          <Select value={division} onValueChange={setDivision} disabled={!year || divisions.length === 0}>
+          <Select value={division} onValueChange={setDivision} disabled={!semester || divisions.length === 0}>
             <SelectTrigger>
               <SelectValue placeholder="Select Division" />
             </SelectTrigger>
@@ -100,7 +100,7 @@ const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
                 ))
               ) : (
                 <SelectItem value="no-divisions-available" disabled>
-                  {year ? "No divisions available for this year" : "Select a year first"}
+                  {semester ? "No divisions available for this semester" : "Select a semester first"}
                 </SelectItem>
               )}
             </SelectContent>

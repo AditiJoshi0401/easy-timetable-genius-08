@@ -7,7 +7,7 @@ export interface Subject {
   code: string;
   credits: number;
   stream: string;  // Now stores stream code directly instead of UUID
-  year: string;
+  semester: string;  // Changed from year to semester
   lectures: number;
   tutorials: number;
   practicals: number;
@@ -35,7 +35,7 @@ export interface Stream {
   id: string;
   code: string;
   name: string;
-  years: number;
+  semesters: number;  // Changed from years to semesters
 }
 
 export interface Division {
@@ -43,7 +43,7 @@ export interface Division {
   streamId: string;  // Interface uses camelCase, but database uses lowercase streamid
   name: string;
   strength: number;
-  year: number;
+  semester: number;  // Changed from year to semester
 }
 
 export interface Role {
@@ -505,7 +505,7 @@ export const fetchDivisions = async (): Promise<Division[]> => {
     .select('*');
   if (error) throw error;
   
-  // Map streamid to streamId to match our interface
+  // Map streamid to streamId and semester to match our interface
   return data.map(division => ({
     ...division,
     streamId: division.streamid,
@@ -518,7 +518,7 @@ export const addDivision = async (division: Omit<Division, 'id'>): Promise<Divis
     name: division.name,
     streamid: division.streamId,
     strength: division.strength,
-    year: division.year,
+    semester: division.semester,
   };
   
   const { data, error } = await supabase

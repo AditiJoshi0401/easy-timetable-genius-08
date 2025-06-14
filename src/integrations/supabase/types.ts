@@ -14,25 +14,25 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
+          semester: number
           streamid: string
           strength: number
-          year: number
         }
         Insert: {
           created_at?: string | null
           id?: string
           name: string
+          semester: number
           streamid: string
           strength: number
-          year: number
         }
         Update: {
           created_at?: string | null
           id?: string
           name?: string
+          semester?: number
           streamid?: string
           strength?: number
-          year?: number
         }
         Relationships: [
           {
@@ -92,21 +92,21 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
-          years: number
+          semesters: number
         }
         Insert: {
           code: string
           created_at?: string | null
           id?: string
           name: string
-          years: number
+          semesters: number
         }
         Update: {
           code?: string
           created_at?: string | null
           id?: string
           name?: string
-          years?: number
+          semesters?: number
         }
         Relationships: []
       }
@@ -119,9 +119,9 @@ export type Database = {
           lectures: number | null
           name: string
           practicals: number | null
+          semester: string
           stream: string
           tutorials: number | null
-          year: string
         }
         Insert: {
           code: string
@@ -131,9 +131,9 @@ export type Database = {
           lectures?: number | null
           name: string
           practicals?: number | null
+          semester: string
           stream: string
           tutorials?: number | null
-          year: string
         }
         Update: {
           code?: string
@@ -143,9 +143,9 @@ export type Database = {
           lectures?: number | null
           name?: string
           practicals?: number | null
+          semester?: string
           stream?: string
           tutorials?: number | null
-          year?: string
         }
         Relationships: []
       }

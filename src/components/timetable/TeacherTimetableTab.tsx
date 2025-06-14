@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,7 +34,7 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
   selectedTimetable
 }) => {
   const [streamForFilter, setStreamForFilter] = useState("");
-  const [yearForFilter, setYearForFilter] = useState("");
+  const [semesterForFilter, setSemesterForFilter] = useState("");  // Changed from yearForFilter to semesterForFilter
   const [selectedRole, setSelectedRole] = useState<RoleType | "">("");
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -56,10 +57,10 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
           );
         }
         
-        if (yearForFilter) {
+        if (semesterForFilter) {  // Changed from yearForFilter to semesterForFilter
           filteredTeachers = filteredTeachers.filter(teacher => 
             teacher.subjects?.some((s: any) => 
-              typeof s === 'object' && s.year === yearForFilter
+              typeof s === 'object' && s.semester === semesterForFilter
             )
           );
         }
@@ -91,7 +92,7 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
     };
 
     fetchTeachers();
-  }, [streamForFilter, yearForFilter, selectedRole, searchTerm]);
+  }, [streamForFilter, semesterForFilter, selectedRole, searchTerm]);  // Changed yearForFilter to semesterForFilter
 
   const handleViewTeacherTimetable = () => {
     if (!selectedTeacher || !selectedTimetable) return;
@@ -166,16 +167,16 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
             </Select>
           </div>
           <div>
-            <Label>Year (Optional)</Label>
-            <Select value={yearForFilter} onValueChange={setYearForFilter}>
+            <Label>Semester (Optional)</Label>
+            <Select value={semesterForFilter} onValueChange={setSemesterForFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="All Years" />
+                <SelectValue placeholder="All Semesters" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Years</SelectItem>
-                {[1, 2, 3, 4, 5].map(y => (
-                  <SelectItem key={y} value={y.toString()}>
-                    Year {y}
+                <SelectItem value="">All Semesters</SelectItem>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
+                  <SelectItem key={s} value={s.toString()}>
+                    Semester {s}
                   </SelectItem>
                 ))}
               </SelectContent>

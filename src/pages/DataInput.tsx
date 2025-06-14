@@ -39,7 +39,7 @@ const DataInput = () => {
     name: "",
     code: "",
     stream: "",
-    year: "",
+    semester: "",  // Changed from year to semester
     lectures: 0,
     tutorials: 0,
     practicals: 0,
@@ -67,8 +67,8 @@ const DataInput = () => {
     capacity: 0
   });
 
-  // Available years for selected stream
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  // Available semesters for selected stream
+  const [availableSemesters, setAvailableSemesters] = useState<number[]>([]);
 
   // Streams and divisions for selects
   const { data: streams = [] } = useQuery({
@@ -129,17 +129,17 @@ const DataInput = () => {
     if (roomsData) setRooms(roomsData);
   }, [roomsData]);
 
-  // Update available years when stream is selected
+  // Update available semesters when stream is selected
   useEffect(() => {
     if (subjectForm.stream) {
       const selectedStream = streams.find(s => s.code === subjectForm.stream);
       if (selectedStream) {
-        const years = Array.from({ length: selectedStream.years }, (_, i) => i + 1);
-        setAvailableYears(years);
+        const semesters = Array.from({ length: selectedStream.semesters }, (_, i) => i + 1);
+        setAvailableSemesters(semesters);
       }
     } else {
-      setAvailableYears([]);
-      setSubjectForm(prev => ({ ...prev, year: "" }));
+      setAvailableSemesters([]);
+      setSubjectForm(prev => ({ ...prev, semester: "" }));
     }
   }, [subjectForm.stream, streams]);
 
@@ -150,11 +150,11 @@ const DataInput = () => {
         subjects.find(s => s.id === subjId)
       ).filter(Boolean);
 
-      const streamsYears = subjectDetails.map(subj => `${subj?.stream}-${subj?.year}`);
-      const uniqueStreamsYears = new Set(streamsYears);
+      const streamsSemesters = subjectDetails.map(subj => `${subj?.stream}-${subj?.semester}`);
+      const uniqueStreamsSemesters = new Set(streamsSemesters);
 
-      if (streamsYears.length !== uniqueStreamsYears.size) {
-        setTeacherWarning("Warning: This teacher is assigned to multiple subjects from the same stream and year.");
+      if (streamsSemesters.length !== uniqueStreamsSemesters.size) {
+        setTeacherWarning("Warning: This teacher is assigned to multiple subjects from the same stream and semester.");
       } else {
         setTeacherWarning("");
       }
@@ -174,7 +174,7 @@ const DataInput = () => {
       name: subject.name,
       code: subject.code,
       stream: subject.stream,
-      year: subject.year.toString(),
+      semester: subject.semester.toString(),  // Changed from year to semester
       lectures: subject.lectures,
       tutorials: subject.tutorials,
       practicals: subject.practicals,
@@ -188,7 +188,7 @@ const DataInput = () => {
       name: "",
       code: "",
       stream: "",
-      year: "",
+      semester: "",  // Changed from year to semester
       lectures: 0,
       tutorials: 0,
       practicals: 0,
@@ -197,7 +197,7 @@ const DataInput = () => {
   };
 
   const saveSubject = async () => {
-    if (!subjectForm.name || !subjectForm.code || !subjectForm.stream || !subjectForm.year) {
+    if (!subjectForm.name || !subjectForm.code || !subjectForm.stream || !subjectForm.semester) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields for the subject.",
@@ -212,7 +212,7 @@ const DataInput = () => {
           name: subjectForm.name,
           code: subjectForm.code,
           stream: subjectForm.stream,
-          year: subjectForm.year,
+          semester: subjectForm.semester,  // Changed from year to semester
           lectures: subjectForm.lectures,
           tutorials: subjectForm.tutorials,
           practicals: subjectForm.practicals,
@@ -227,7 +227,7 @@ const DataInput = () => {
           name: subjectForm.name,
           code: subjectForm.code,
           stream: subjectForm.stream,
-          year: subjectForm.year,
+          semester: subjectForm.semester,  // Changed from year to semester
           lectures: subjectForm.lectures,
           tutorials: subjectForm.tutorials,
           practicals: subjectForm.practicals,
@@ -555,7 +555,7 @@ const DataInput = () => {
         </div>
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-gray-500" />
-          <span className="text-sm text-gray-500">Academic Year 2024-25</span>
+          <span className="text-sm text-gray-500">Academic Semester 2024-25</span>
         </div>
       </div>
 
@@ -607,7 +607,7 @@ const DataInput = () => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subject</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Code</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stream</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Year</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Semester</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">L</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">T</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">P</th>
@@ -630,7 +630,7 @@ const DataInput = () => {
                           <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">
                             {streams.find(s => s.id === subject.stream)?.name || subject.stream}
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{subject.year}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{subject.semester}</td>
                           <td className="px-4 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{subject.lectures}</td>
                           <td className="px-4 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{subject.tutorials}</td>
                           <td className="px-4 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{subject.practicals}</td>
@@ -682,18 +682,18 @@ const DataInput = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="subject-year">Year *</Label>
+                  <Label htmlFor="subject-semester">Semester *</Label>
                   <Select 
-                    value={subjectForm.year} 
-                    onValueChange={value => handleSubjectFormChange("year", value)}
+                    value={subjectForm.semester} 
+                    onValueChange={value => handleSubjectFormChange("semester", value)}
                     disabled={!subjectForm.stream}
                   >
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder={subjectForm.stream ? "Select Year" : "Select Stream First"} />
+                      <SelectValue placeholder={subjectForm.stream ? "Select Semester" : "Select Stream First"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableYears.map(year => (
-                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                      {availableSemesters.map(semester => (
+                        <SelectItem key={semester} value={semester.toString()}>{semester}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -912,7 +912,7 @@ const DataInput = () => {
                             onCheckedChange={() => handleSubjectToggle(subject.id)}
                           />
                           <Label htmlFor={`subject-${subject.id}`} className="text-sm font-normal">
-                            {subject.name} ({subject.code}) - {streams.find(s => s.code === subject.stream)?.name} Year {subject.year}
+                            {subject.name} ({subject.code}) - {streams.find(s => s.code === subject.stream)?.name} Semester {subject.semester}
                           </Label>
                         </div>
                       ))
