@@ -54,7 +54,6 @@ const TimetableEditor = () => {
   const [isLoadingTimetable, setIsLoadingTimetable] = useState(false);
   const [hasSavedChanges, setHasSavedChanges] = useState(true);
   const [lastSaved, setLastSaved] = useState<string>("");
-  const [isEditingMode, setIsEditingMode] = useState(false);
 
   // Fetch queries
   const { data: streams } = useQuery({
@@ -134,7 +133,6 @@ const TimetableEditor = () => {
         description: "The timetable has been deleted successfully."
       });
       setTimetableData({});
-      setIsEditingMode(false);
       removeTimetableDraft(generateTimetableKey());
     },
     onError: (error) => {
@@ -210,7 +208,6 @@ const TimetableEditor = () => {
         });
       }
       
-      setIsEditingMode(true);
       setHasSavedChanges(true);
     } catch (error) {
       console.error("Error creating/loading timetable:", error);
@@ -223,6 +220,13 @@ const TimetableEditor = () => {
       setIsLoadingTimetable(false);
     }
   };
+
+  // Load timetable on selection change
+  useEffect(() => {
+    if (selectedStream && selectedSemester && selectedDivision) {
+      createTimetable();
+    }
+  }, [selectedStream, selectedSemester, selectedDivision]);
 
   // Save timetable data
   const saveTimetable = async () => {
@@ -288,7 +292,6 @@ const TimetableEditor = () => {
     try {
       await deleteTimetableMutation.mutateAsync(timetableKey);
       setTimetableData({});
-      setIsEditingMode(false);
       toast({
         title: "Timetable Deleted",
         description: "Timetable has been successfully deleted.",
@@ -314,11 +317,11 @@ const TimetableEditor = () => {
 
   // Auto-save draft to localStorage
   useEffect(() => {
-    if (selectedStream && selectedSemester && selectedDivision && !hasSavedChanges && isEditingMode) {
+    if (selectedStream && selectedSemester && selectedDivision && !hasSavedChanges) {
       const timetableKey = generateTimetableKey();
       saveTimetableDraft(timetableKey, timetableData);
     }
-  }, [timetableData, selectedStream, selectedSemester, selectedDivision, hasSavedChanges, isEditingMode]);
+  }, [timetableData, selectedStream, selectedSemester, selectedDivision, hasSavedChanges]);
 
   // Drag and drop handlers
   const handleDragStart = (item: any, type: 'subject' | 'teacher' | 'room') => {
@@ -363,7 +366,7 @@ const TimetableEditor = () => {
   // Conflict checking
   useEffect(() => {
     const checkConflicts = async () => {
-      if (!selectedStream || !selectedSemester || !selectedDivision || !timetableData || !isEditingMode) {
+      if (!selectedStream || !selectedSemester || !selectedDivision || !timetableData) {
         return;
       }
   
@@ -418,7 +421,7 @@ const TimetableEditor = () => {
     };
   
     checkConflicts();
-  }, [timetableData, selectedStream, selectedSemester, selectedDivision, isEditingMode]);
+  }, [timetableData, selectedStream, selectedSemester, selectedDivision]);
 
   // Download timetable
   const downloadTimetable = () => {
@@ -439,6 +442,8 @@ const TimetableEditor = () => {
     }
   };
 
+  const canEdit = selectedStream && selectedSemester && selectedDivision;
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -447,6 +452,7 @@ const TimetableEditor = () => {
         icon={<Clock className="h-6 w-6" />}
       />
       
+      {/* Selection Controls */}
       <Card>
         <CardHeader>
           <CardTitle>Timetable Settings</CardTitle>
@@ -463,7 +469,6 @@ const TimetableEditor = () => {
                   setSelectedDivision("");
                   setTimetableData({});
                   setConflictWarnings([]);
-                  setIsEditingMode(false);
                 }}
               >
                 <SelectTrigger>
@@ -488,7 +493,6 @@ const TimetableEditor = () => {
                   setSelectedDivision("");
                   setTimetableData({});
                   setConflictWarnings([]);
-                  setIsEditingMode(false);
                 }}
                 disabled={!selectedStream}
               >
@@ -511,7 +515,6 @@ const TimetableEditor = () => {
                 value={selectedDivision} 
                 onValueChange={(value) => {
                   setSelectedDivision(value);
-                  setIsEditingMode(false);
                   setTimetableData({});
                   setConflictWarnings([]);
                 }}
@@ -531,103 +534,84 @@ const TimetableEditor = () => {
             </div>
           </div>
 
-          {!isEditingMode ? (
-            <div className="flex justify-center">
-              <Button 
-                onClick={createTimetable}
-                disabled={!selectedStream || !selectedSemester || !selectedDivision || isLoadingTimetable}
-                className="w-full max-w-md"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {isLoadingTimetable ? "Loading..." : "Create Timetable"}
-              </Button>
+          {canEdit && (
+            <div className="flex justify-between items-center pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={resetTimetable}
+                  disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reset Timetable
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={deleteTimetableData}
+                  disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                >
+                  <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                  Delete Timetable
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {hasSavedChanges ? `Last saved at ${lastSaved}` : "Unsaved Changes"}
+                </span>
+                <Button 
+                  size="sm" 
+                  onClick={saveTimetable}
+                  disabled={isLoadingTimetable || hasSavedChanges}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Timetable
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={downloadTimetable}
+                  disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="flex justify-between">
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={resetTimetable}
-                    disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Reset Timetable
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={deleteTimetableData}
-                    disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2 text-destructive" />
-                    Delete Timetable
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    {hasSavedChanges ? `Last saved at ${lastSaved}` : "Unsaved Changes"}
-                  </span>
-                  <Button 
-                    size="sm" 
-                    onClick={saveTimetable}
-                    disabled={isLoadingTimetable || hasSavedChanges}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Timetable
-                  </Button>
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    onClick={downloadTimetable}
-                    disabled={isLoadingTimetable || Object.keys(timetableData).length === 0}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
-              </div>
+          )}
 
-              {conflictWarnings.length > 0 && (
-                <div className="text-sm text-orange-500">
-                  {conflictWarnings.map((warning, index) => (
-                    <div key={index}>
-                      Warning: {warning.message} (Day: {warning.day}, Time: {warning.time})
-                    </div>
-                  ))}
+          {conflictWarnings.length > 0 && (
+            <div className="text-sm text-orange-500 pt-2 border-t">
+              {conflictWarnings.map((warning, index) => (
+                <div key={index}>
+                  Warning: {warning.message} (Day: {warning.day}, Time: {warning.time})
                 </div>
-              )}
-
-              <div className="py-4" ref={timetableRef}>
-                <TimetableDisplay 
-                  timetableData={timetableData} 
-                  viewType="division"
-                  showTeachers={true} 
-                  showRooms={true}
-                />
-              </div>
-            </>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {isEditingMode && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="md:col-span-1 space-y-4">
+      {/* Main Editing Interface */}
+      {canEdit && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar with draggable items */}
+          <div className="lg:col-span-1 space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Subjects</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-2 max-h-64 overflow-y-auto">
                 {filteredSubjects.map(subject => (
                   <div
                     key={subject.id}
                     draggable
                     onDragStart={() => handleDragStart(subject, 'subject')}
-                    className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
+                    className="bg-blue-100 border border-blue-200 rounded-md p-3 cursor-grab hover:bg-blue-200 transition-colors"
                   >
-                    {subject.name} ({subject.code})
+                    <div className="font-medium text-sm">{subject.name}</div>
+                    <div className="text-xs text-muted-foreground">({subject.code})</div>
                   </div>
                 ))}
               </CardContent>
@@ -637,15 +621,16 @@ const TimetableEditor = () => {
               <CardHeader>
                 <CardTitle>Teachers</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-2 max-h-64 overflow-y-auto">
                 {teachers?.map(teacher => (
                   <div
                     key={teacher.id}
                     draggable
                     onDragStart={() => handleDragStart(teacher, 'teacher')}
-                    className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
+                    className="bg-green-100 border border-green-200 rounded-md p-3 cursor-grab hover:bg-green-200 transition-colors"
                   >
-                    {teacher.name} ({teacher.specialization})
+                    <div className="font-medium text-sm">{teacher.name}</div>
+                    <div className="text-xs text-muted-foreground">({teacher.specialization})</div>
                   </div>
                 ))}
               </CardContent>
@@ -655,80 +640,113 @@ const TimetableEditor = () => {
               <CardHeader>
                 <CardTitle>Rooms</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-2 max-h-64 overflow-y-auto">
                 {rooms?.map(room => (
                   <div
                     key={room.id}
                     draggable
                     onDragStart={() => handleDragStart(room, 'room')}
-                    className="bg-secondary rounded-md p-2 cursor-grab hover:bg-secondary/80 transition-colors"
+                    className="bg-purple-100 border border-purple-200 rounded-md p-3 cursor-grab hover:bg-purple-200 transition-colors"
                   >
-                    {room.number} ({room.capacity})
+                    <div className="font-medium text-sm">Room {room.number}</div>
+                    <div className="text-xs text-muted-foreground">Capacity: {room.capacity}</div>
                   </div>
                 ))}
               </CardContent>
             </Card>
           </div>
 
-          <div className="md:col-span-3">
+          {/* Main timetable editing area */}
+          <div className="lg:col-span-3">
             <Card>
               <CardHeader>
-                <CardTitle>Timetable</CardTitle>
+                <CardTitle>Timetable Grid</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
-                <table className="min-w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th></th>
-                      {timeSlots.map(time => (
-                        <th key={time} className="border p-2">
-                          {time}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {daysOfWeek.map(day => (
-                      <tr key={day}>
-                        <th className="border p-2">{day}</th>
+                <div className="min-w-full">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr>
+                        <th className="border border-gray-300 p-2 bg-gray-50 w-24">Time / Day</th>
                         {timeSlots.map(time => (
-                          <td
-                            key={`${day}-${time}`}
-                            className="border p-2 relative h-24"
-                            onDragOver={handleDragOver}
-                            onDrop={(e) => handleDrop(e, day, time)}
-                          >
-                            {timetableData[day]?.[time] && (
-                              <div className="absolute top-0 left-0 w-full h-full flex flex-col justify-center items-center">
-                                {timetableData[day][time]?.subject && (
-                                  <div className="text-sm font-medium">
-                                    {timetableData[day][time].subject?.name}
-                                  </div>
-                                )}
-                                {timetableData[day][time]?.teacher && (
-                                  <div className="text-xs text-muted-foreground">
-                                    {timetableData[day][time].teacher?.name}
-                                  </div>
-                                )}
-                                {timetableData[day][time]?.room && (
-                                  <div className="text-xs text-muted-foreground">
-                                    {timetableData[day][time].room?.number}
-                                  </div>
-                                )}
-                                <Button variant="ghost" size="icon" className="absolute top-1 right-1" onClick={() => clearSlot(day, time)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
-                          </td>
+                          <th key={time} className="border border-gray-300 p-2 bg-gray-50 min-w-32">
+                            {time}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {daysOfWeek.map(day => (
+                        <tr key={day}>
+                          <th className="border border-gray-300 p-2 bg-gray-50 font-medium">{day}</th>
+                          {timeSlots.map(time => (
+                            <td
+                              key={`${day}-${time}`}
+                              className="border border-gray-300 p-1 relative h-28 min-w-32"
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDrop(e, day, time)}
+                              style={{ minHeight: '120px' }}
+                            >
+                              {timetableData[day]?.[time] ? (
+                                <div className="relative w-full h-full p-2 bg-gray-50 rounded">
+                                  {timetableData[day][time]?.subject && (
+                                    <div className="text-sm font-medium text-blue-700 mb-1">
+                                      {timetableData[day][time].subject?.name}
+                                    </div>
+                                  )}
+                                  {timetableData[day][time]?.teacher && (
+                                    <div className="text-xs text-green-600 mb-1">
+                                      {timetableData[day][time].teacher?.name}
+                                    </div>
+                                  )}
+                                  {timetableData[day][time]?.room && (
+                                    <div className="text-xs text-purple-600">
+                                      Room {timetableData[day][time].room?.number}
+                                    </div>
+                                  )}
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="absolute top-1 right-1 h-6 w-6 opacity-70 hover:opacity-100" 
+                                    onClick={() => clearSlot(day, time)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs border-2 border-dashed border-gray-200 rounded">
+                                  Drop here
+                                </div>
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           </div>
+        </div>
+      )}
+
+      {/* Timetable Display for Reference */}
+      {canEdit && Object.keys(timetableData).length > 0 && (
+        <div className="py-4" ref={timetableRef}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Timetable Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TimetableDisplay 
+                timetableData={timetableData} 
+                viewType="division"
+                showTeachers={true} 
+                showRooms={true}
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
