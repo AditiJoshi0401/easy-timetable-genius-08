@@ -21,6 +21,7 @@ interface DivisionTimetableTabProps {
   onApplyFilters: () => void;
   onManageStructure: () => void;
   timetableRef: React.RefObject<HTMLDivElement>;
+  onExportTimetable?: (format: 'pdf' | 'excel' | 'json', timetable: any, type: 'division' | 'teacher' | 'room', entityName?: string) => void;
 }
 
 const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
@@ -36,7 +37,8 @@ const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
   setDivision,
   onApplyFilters,
   onManageStructure,
-  timetableRef
+  timetableRef,
+  onExportTimetable
 }) => {
   return (
     <div className="space-y-4">
@@ -112,11 +114,27 @@ const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
         <Button variant="outline" onClick={onManageStructure} size="sm">
           Manage Structure
         </Button>
-        <Button onClick={onApplyFilters} size="sm">
-          <Filter className="h-4 w-4 mr-2" />
-          Apply Filters
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onApplyFilters} size="sm">
+            <Filter className="h-4 w-4 mr-2" />
+            Apply Filters
+          </Button>
+          <Button onClick={onApplyFilters} size="sm" disabled={!stream || !semester || !division}>
+            View Timetable
+          </Button>
+        </div>
       </div>
+
+      {selectedTimetable && onExportTimetable && (
+        <div className="flex gap-2 mb-4">
+          <Button variant="outline" size="sm" onClick={() => onExportTimetable('pdf', selectedTimetable, 'division', divisions.find(d => d.id === division)?.name)}>
+            Export PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onExportTimetable('excel', selectedTimetable, 'division', divisions.find(d => d.id === division)?.name)}>
+            Export Excel
+          </Button>
+        </div>
+      )}
 
       {selectedTimetable && (
         <div className="py-4" ref={timetableRef}>

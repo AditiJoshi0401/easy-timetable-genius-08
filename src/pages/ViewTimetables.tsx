@@ -10,9 +10,12 @@ import { useQuery } from '@tanstack/react-query';
 import DivisionTimetableTab from '@/components/timetable/DivisionTimetableTab';
 import TeacherTimetableTab from '@/components/timetable/TeacherTimetableTab';
 import RoomTimetableTab from '@/components/timetable/RoomTimetableTab';
+import { exportTimetableToPDF, exportTimetableToExcel, exportTimetableToJSON, TimetableExportData } from '@/utils/timetableExport';
+import { useToast } from '@/hooks/use-toast';
 
 const ViewTimetables = () => {
   const timetableRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   
   // Division timetable state
   const [selectedStream, setSelectedStream] = useState<string>("");
@@ -127,6 +130,51 @@ const ViewTimetables = () => {
     }
   };
 
+  // Export functionality
+  const handleExportTimetable = (format: 'pdf' | 'excel' | 'json', timetable: any, type: 'division' | 'teacher' | 'room', entityName?: string) => {
+    if (!timetable) {
+      toast({
+        title: "No Timetable",
+        description: "Please select and view a timetable first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const exportData: TimetableExportData = {
+      name: timetable.name || `${type} Timetable`,
+      data: timetable.data,
+      type,
+      entityName
+    };
+
+    try {
+      switch (format) {
+        case 'pdf':
+          exportTimetableToPDF(exportData);
+          break;
+        case 'excel':
+          exportTimetableToExcel(exportData);
+          break;
+        case 'json':
+          exportTimetableToJSON(exportData);
+          break;
+      }
+      
+      toast({
+        title: "Export Successful",
+        description: `Timetable exported as ${format.toUpperCase()} successfully.`
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export timetable. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -171,6 +219,7 @@ const ViewTimetables = () => {
                 onApplyFilters={handleApplyDivisionFilters}
                 onManageStructure={() => {/* Navigate to structure management */}}
                 timetableRef={timetableRef}
+                onExportTimetable={handleExportTimetable}
               />
             </CardContent>
           </Card>

@@ -137,25 +137,30 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
         </div>
         
         <div>
-          <Label>Teacher</Label>
-          <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select Teacher" />
-            </SelectTrigger>
-            <SelectContent>
-              {filteredTeachers.length > 0 ? (
-                filteredTeachers.map(teacher => (
-                  <SelectItem key={teacher.id} value={teacher.id}>
-                    {teacher.name} ({teacher.specialization})
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="no-teachers-available" disabled>
-                  No teachers available
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+          <Label>Teachers</Label>
+          <div className="mt-2 border rounded-md p-3 space-y-2 max-h-64 overflow-y-auto">
+            {filteredTeachers.length > 0 ? (
+              filteredTeachers.map(teacher => (
+                <div key={teacher.id} className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id={`teacher-${teacher.id}`}
+                    name="selectedTeacher"
+                    value={teacher.id}
+                    checked={selectedTeacher === teacher.id}
+                    onChange={(e) => setSelectedTeacher(e.target.value)}
+                    className="form-radio text-primary"
+                  />
+                  <Label htmlFor={`teacher-${teacher.id}`} className="text-sm font-normal cursor-pointer flex-1">
+                    <div className="font-medium">{teacher.name}</div>
+                    <div className="text-muted-foreground text-xs">{teacher.specialization}</div>
+                  </Label>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No teachers available</p>
+            )}
+          </div>
         </div>
         
         <Button 

@@ -54,7 +54,10 @@ const DataInput = () => {
     email: "",
     specialization: "",
     roles: [] as string[],
-    subjects: [] as string[]
+    subjects: [] as string[],
+    maxLectures: 10,
+    maxLabs: 5,
+    maxTutorials: 8
   });
   const [teacherWarning, setTeacherWarning] = useState<string>("");
 
@@ -282,7 +285,10 @@ const DataInput = () => {
       email: teacher.email,
       specialization: teacher.specialization,
       roles: teacher.roles || [],
-      subjects: teacher.subjects || []
+      subjects: teacher.subjects || [],
+      maxLectures: teacher.maxLectures || 10,
+      maxLabs: teacher.maxLabs || 5,
+      maxTutorials: teacher.maxTutorials || 8
     });
   };
 
@@ -293,7 +299,10 @@ const DataInput = () => {
       email: "",
       specialization: "",
       roles: [],
-      subjects: []
+      subjects: [],
+      maxLectures: 10,
+      maxLabs: 5,
+      maxTutorials: 8
     });
     setTeacherWarning("");
   };
@@ -334,7 +343,10 @@ const DataInput = () => {
           specialization: teacherForm.specialization,
           roles: teacherForm.roles,
           subjects: teacherForm.subjects,
-          isTA: false
+          isTA: false,
+          maxLectures: teacherForm.maxLectures,
+          maxLabs: teacherForm.maxLabs,
+          maxTutorials: teacherForm.maxTutorials
         });
         toast({
           title: "Teacher Updated",
@@ -347,7 +359,10 @@ const DataInput = () => {
           specialization: teacherForm.specialization,
           roles: teacherForm.roles,
           subjects: teacherForm.subjects,
-          isTA: false
+          isTA: false,
+          maxLectures: teacherForm.maxLectures,
+          maxLabs: teacherForm.maxLabs,
+          maxTutorials: teacherForm.maxTutorials
         });
         toast({
           title: "Teacher Added",
@@ -788,52 +803,62 @@ const DataInput = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="border rounded-lg overflow-hidden">
-                <div className="max-h-[400px] overflow-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Specialization</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Roles</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subjects</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                      {teachers.map(teacher => (
-                        <tr 
-                          key={teacher.id} 
-                          className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
-                            selectedTeacher?.id === teacher.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
-                          }`}
-                          onClick={() => handleTeacherSelect(teacher)}
-                        >
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="font-medium text-gray-900 dark:text-gray-100">{teacher.name}</div>
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{teacher.email}</td>
-                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{teacher.specialization}</td>
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="flex flex-wrap gap-1">
-                              {teacher.roles && teacher.roles.length > 0 
-                                ? teacher.roles.map(roleName => (
-                                    <span key={roleName} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                      {roleName}
-                                    </span>
-                                  ))
-                                : <span className="text-gray-500">No roles</span>
-                              }
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 text-gray-600 dark:text-gray-400">
-                            <div className="max-w-xs truncate">
-                              {teacher.subjects?.map(subjId => subjects.find(s => s.id === subjId)?.name).filter(Boolean).join(", ") || "No subjects assigned"}
-                            </div>
-                          </td>
+                <div className="max-h-[300px] sm:max-h-[400px] overflow-auto">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[800px]">
+                      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                        <tr>
+                          <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                          <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
+                          <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Specialization</th>
+                          <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Roles</th>
+                          <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subjects</th>
+                          <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Load</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                        {teachers.map(teacher => (
+                          <tr 
+                            key={teacher.id} 
+                            className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+                              selectedTeacher?.id === teacher.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                            }`}
+                            onClick={() => handleTeacherSelect(teacher)}
+                          >
+                            <td className="px-2 sm:px-4 py-4 whitespace-nowrap">
+                              <div className="font-medium text-gray-900 dark:text-gray-100">{teacher.name}</div>
+                            </td>
+                            <td className="px-2 sm:px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400 text-sm">{teacher.email}</td>
+                            <td className="px-2 sm:px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400 text-sm">{teacher.specialization}</td>
+                            <td className="px-2 sm:px-4 py-4 whitespace-nowrap">
+                              <div className="flex flex-wrap gap-1">
+                                {teacher.roles && teacher.roles.length > 0 
+                                  ? teacher.roles.map(roleName => (
+                                      <span key={roleName} className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                        {roleName}
+                                      </span>
+                                    ))
+                                  : <span className="text-gray-500 text-xs">No roles</span>
+                                }
+                              </div>
+                            </td>
+                            <td className="px-2 sm:px-4 py-4 text-gray-600 dark:text-gray-400 text-sm">
+                              <div className="max-w-xs truncate">
+                                {teacher.subjects?.map(subjId => subjects.find(s => s.id === subjId)?.name).filter(Boolean).join(", ") || "No subjects assigned"}
+                              </div>
+                            </td>
+                            <td className="px-2 sm:px-4 py-4 text-center text-gray-600 dark:text-gray-400 text-xs">
+                              <div className="space-y-1">
+                                <div>L: {teacher.maxLectures || 10}</div>
+                                <div>T: {teacher.maxTutorials || 8}</div>
+                                <div>P: {teacher.maxLabs || 5}</div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
@@ -894,6 +919,48 @@ const DataInput = () => {
                       ))
                     )}
                   </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="max-lectures">Max Lectures per Week</Label>
+                  <Input 
+                    id="max-lectures"
+                    type="number" 
+                    min={0} 
+                    max={50}
+                    value={teacherForm.maxLectures} 
+                    onChange={e => handleTeacherFormChange("maxLectures", parseInt(e.target.value) || 0)}
+                    placeholder="e.g., 10"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="max-labs">Max Labs per Week</Label>
+                  <Input 
+                    id="max-labs"
+                    type="number" 
+                    min={0} 
+                    max={30}
+                    value={teacherForm.maxLabs} 
+                    onChange={e => handleTeacherFormChange("maxLabs", parseInt(e.target.value) || 0)}
+                    placeholder="e.g., 5"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="max-tutorials">Max Tutorials per Week</Label>
+                  <Input 
+                    id="max-tutorials"
+                    type="number" 
+                    min={0} 
+                    max={30}
+                    value={teacherForm.maxTutorials} 
+                    onChange={e => handleTeacherFormChange("maxTutorials", parseInt(e.target.value) || 0)}
+                    placeholder="e.g., 8"
+                    className="mt-1"
+                  />
                 </div>
               </div>
 

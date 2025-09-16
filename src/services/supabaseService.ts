@@ -22,6 +22,9 @@ export interface Teacher {
   isTA: boolean;  // Interface uses isTA, but database uses ista
   roles?: string[];  // Changed to array of role names instead of single role ID
   cabin?: string;
+  maxLectures?: number;
+  maxLabs?: number;
+  maxTutorials?: number;
 }
 
 export interface Room {
@@ -322,6 +325,9 @@ export const fetchTeachers = async (): Promise<Teacher[]> => {
     ...teacher,
     isTA: teacher.ista,
     roles: teacher.roles || [],
+    maxLectures: teacher.max_lectures,
+    maxLabs: teacher.max_labs,
+    maxTutorials: teacher.max_tutorials,
   })) as Teacher[];
 };
 
@@ -334,7 +340,10 @@ export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher>
     subjects: teacher.subjects,
     ista: teacher.isTA,
     roles: teacher.roles || [],
-    cabin: teacher.cabin
+    cabin: teacher.cabin,
+    max_lectures: teacher.maxLectures || 10,
+    max_labs: teacher.maxLabs || 5,
+    max_tutorials: teacher.maxTutorials || 8
   };
   
   const { data, error } = await supabase
@@ -348,6 +357,9 @@ export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher>
     ...data[0],
     isTA: data[0].ista,
     roles: data[0].roles || [],
+    maxLectures: data[0].max_lectures,
+    maxLabs: data[0].max_labs,
+    maxTutorials: data[0].max_tutorials,
   } as Teacher;
 };
 
@@ -360,6 +372,18 @@ export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Prom
   }
   if ('roles' in teacher) {
     dbTeacher.roles = teacher.roles || [];
+  }
+  if ('maxLectures' in teacher) {
+    dbTeacher.max_lectures = teacher.maxLectures;
+    delete dbTeacher.maxLectures;
+  }
+  if ('maxLabs' in teacher) {
+    dbTeacher.max_labs = teacher.maxLabs;
+    delete dbTeacher.maxLabs;
+  }
+  if ('maxTutorials' in teacher) {
+    dbTeacher.max_tutorials = teacher.maxTutorials;
+    delete dbTeacher.maxTutorials;
   }
   
   const { data, error } = await supabase
@@ -374,6 +398,9 @@ export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Prom
     ...data[0],
     isTA: data[0].ista,
     roles: data[0].roles || [],
+    maxLectures: data[0].max_lectures,
+    maxLabs: data[0].max_labs,
+    maxTutorials: data[0].max_tutorials,
   } as Teacher;
 };
 
