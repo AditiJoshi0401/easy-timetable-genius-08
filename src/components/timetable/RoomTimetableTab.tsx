@@ -127,25 +127,30 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
         </div>
         
         <div>
-          <Label>Room</Label>
-          <Select value={selectedRoom} onValueChange={setSelectedRoom}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select Room" />
-            </SelectTrigger>
-            <SelectContent>
-              {filteredRooms.length > 0 ? (
-                filteredRooms.map(room => (
-                  <SelectItem key={room.id} value={room.id}>
-                    {room.number} ({room.type})
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="no-rooms-available" disabled>
-                  No rooms available
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+          <Label>Rooms</Label>
+          <div className="mt-2 border rounded-md p-3 space-y-2 max-h-64 overflow-y-auto">
+            {filteredRooms.length > 0 ? (
+              filteredRooms.map(room => (
+                <div key={room.id} className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id={`room-${room.id}`}
+                    name="selectedRoom"
+                    value={room.id}
+                    checked={selectedRoom === room.id}
+                    onChange={(e) => setSelectedRoom(e.target.value)}
+                    className="form-radio text-primary"
+                  />
+                  <Label htmlFor={`room-${room.id}`} className="text-sm font-normal cursor-pointer flex-1">
+                    <div className="font-medium">{room.number}</div>
+                    <div className="text-muted-foreground text-xs">{room.type}</div>
+                  </Label>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No rooms available</p>
+            )}
+          </div>
         </div>
         
         <Button 
