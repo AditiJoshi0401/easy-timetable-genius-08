@@ -29,10 +29,9 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
   onApplyFilters
 }) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [teacherSpecializations, setTeacherSpecializations] = useState<string[]>([]);
-  const [selectedSpecialization, setSelectedSpecialization] = useState("");
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
   const [filteredTeachers, setFilteredTeachers] = useState<Teacher[]>([]);
   const [filteredTeacherData, setFilteredTeacherData] = useState<any>(null);
 
@@ -52,31 +51,24 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
 
   useEffect(() => {
     if (teachers && teachers.length > 0) {
-      const specializations = [...new Set(teachers.map(teacher => teacher.specialization))];
-      setTeacherSpecializations(specializations);
+      const allSubjects = [...new Set(teachers.flatMap(teacher => teacher.subjects))];
+      setSubjects(allSubjects);
     }
   }, [teachers]);
 
   useEffect(() => {
     let filtered = teachers || [];
     
-    // Filter by specialization if selected
-    if (selectedSpecialization) {
+    // Filter by subjects if selected
+    if (selectedSubjects.length > 0) {
       filtered = filtered.filter(teacher => 
-        teacher.specialization === selectedSpecialization
-      );
-    }
-    
-    // Filter by search term if provided
-    if (searchTerm) {
-      filtered = filtered.filter(teacher => 
-        teacher.name.toLowerCase().includes(searchTerm.toLowerCase())
+        teacher.subjects.some(subject => selectedSubjects.includes(subject))
       );
     }
     
     const uniqueTeachers = checkForDuplicates(filtered, 'email');
     setFilteredTeachers(uniqueTeachers || []);
-  }, [teachers, selectedSpecialization, searchTerm]);
+  }, [teachers, selectedSubjects]);
 
   const handleViewTeacherTimetable = () => {
     if (!selectedTeacher || !selectedTimetable) return;
@@ -106,70 +98,84 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
     });
   };
 
+  const handleSubjectToggle = (subject: string) => {
+    setSelectedSubjects(prev => 
+      prev.includes(subject) 
+        ? prev.filter(s => s !== subject)
+        : [...prev, subject]
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Subject Filters */}
+        <div className="space-y-4">
           <div>
-            <Label>Specialization</Label>
-            <Select value={selectedSpecialization} onValueChange={setSelectedSpecialization}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Specializations" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Specializations</SelectItem>
-                {teacherSpecializations.map((specialization, idx) => (
-                  <SelectItem key={idx} value={specialization}>
-                    {specialization}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Search by Name</Label>
-            <Input 
-              placeholder="Search teachers..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-        
-        <div>
-          <Label>Teachers</Label>
-          <div className="mt-2 border rounded-md p-3 space-y-2 max-h-64 overflow-y-auto">
-            {filteredTeachers.length > 0 ? (
-              filteredTeachers.map(teacher => (
-                <div key={teacher.id} className="flex items-center space-x-2">
+            <Label className="text-base font-semibold">Filter by Subjects</Label>
+            <div className="mt-3 space-y-2 max-h-80 overflow-y-auto">
+              {subjects.map((subject, idx) => (
+                <div key={idx} className="flex items-center space-x-2">
                   <input
-                    type="radio"
-                    id={`teacher-${teacher.id}`}
-                    name="selectedTeacher"
-                    value={teacher.id}
-                    checked={selectedTeacher === teacher.id}
-                    onChange={(e) => setSelectedTeacher(e.target.value)}
-                    className="form-radio text-primary"
+                    type="checkbox"
+                    id={`subject-${idx}`}
+                    checked={selectedSubjects.includes(subject)}
+                    onChange={() => handleSubjectToggle(subject)}
+                    className="form-checkbox text-primary"
                   />
-                  <Label htmlFor={`teacher-${teacher.id}`} className="text-sm font-normal cursor-pointer flex-1">
-                    <div className="font-medium">{teacher.name}</div>
-                    <div className="text-muted-foreground text-xs">{teacher.specialization}</div>
+                  <Label htmlFor={`subject-${idx}`} className="text-sm cursor-pointer">
+                    {subject}
                   </Label>
                 </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">No teachers available</p>
-            )}
+              ))}
+            </div>
           </div>
         </div>
-        
-        <Button 
-          className="w-full"
-          disabled={!selectedTeacher || !selectedTimetable}
-          onClick={handleViewTeacherTimetable}
-        >
-          View Teacher Schedule
-        </Button>
+
+        {/* Right: Filtered Teachers */}
+        <div className="lg:col-span-2 space-y-4">
+          <div>
+            <Label className="text-base font-semibold">
+              Teachers {selectedSubjects.length > 0 && `(${filteredTeachers.length} found)`}
+            </Label>
+            <div className="mt-3 border rounded-md p-3 space-y-2 max-h-80 overflow-y-auto">
+              {filteredTeachers.length > 0 ? (
+                filteredTeachers.map(teacher => (
+                  <div key={teacher.id} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md">
+                    <input
+                      type="radio"
+                      id={`teacher-${teacher.id}`}
+                      name="selectedTeacher"
+                      value={teacher.id}
+                      checked={selectedTeacher === teacher.id}
+                      onChange={(e) => setSelectedTeacher(e.target.value)}
+                      className="form-radio text-primary"
+                    />
+                    <Label htmlFor={`teacher-${teacher.id}`} className="text-sm cursor-pointer flex-1">
+                      <div className="font-medium">{teacher.name}</div>
+                      <div className="text-muted-foreground text-xs">{teacher.specialization}</div>
+                      <div className="text-muted-foreground text-xs">
+                        Subjects: {teacher.subjects.join(', ')}
+                      </div>
+                    </Label>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  {selectedSubjects.length > 0 ? 'No teachers found for selected subjects' : 'No teachers available'}
+                </p>
+              )}
+            </div>
+          </div>
+          
+          <Button 
+            className="w-full"
+            disabled={!selectedTeacher || !selectedTimetable}
+            onClick={handleViewTeacherTimetable}
+          >
+            View Teacher Schedule
+          </Button>
+        </div>
       </div>
 
       {filteredTeacherData && (
