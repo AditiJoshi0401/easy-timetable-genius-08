@@ -676,8 +676,13 @@ const TimetableEditor = () => {
       }
     }
 
-    // Also count in existing saved timetables
+    // Also count in existing saved timetables BUT only for the same division
     for (const tt of existingTimetables || []) {
+      // `tt.division_id` is the division this timetable belongs to. Subject limits
+      // are enforced per-division, so only include saved timetables for the
+      // currently selected `division`.
+      if (!division || tt.division_id !== division) continue;
+
       const data = tt.data || {};
       for (const dayKey in data) {
         const daySlots = data[dayKey] || {};
