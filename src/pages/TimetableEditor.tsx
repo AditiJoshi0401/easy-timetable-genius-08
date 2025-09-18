@@ -453,6 +453,32 @@ const TimetableEditor = () => {
       newTimetableData[day] = {};
     }
 
+    // Before assigning, enforce subject limits and teacher limits
+    if (!subject) {
+      toast({ title: 'Unknown Subject', description: 'Selected subject not found', variant: 'destructive' });
+      return;
+    }
+    if (!teacher) {
+      toast({ title: 'Unknown Teacher', description: 'Selected teacher not found', variant: 'destructive' });
+      return;
+    }
+
+    // Check subject type limits
+    const subjectLimit = (slotDetails.type === 'lecture') ? subject.lectures : (slotDetails.type === 'tutorial') ? subject.tutorials : subject.practicals || subject.tutorials || 0;
+    const currentSubjectCount = countSubjectTypeAssigned(subject.id, slotDetails.type);
+    if (currentSubjectCount + 1 > subjectLimit) {
+      toast({ title: 'Subject Limit Exceeded', description: `Cannot assign more ${slotDetails.type} sessions for ${subject.name}. Limit: ${subjectLimit}`, variant: 'destructive' });
+      return;
+    }
+
+    // Check teacher overall max for this session type
+    const teacherMax = slotDetails.type === 'lecture' ? (teacher.maxLectures || 0) : (slotDetails.type === 'lab' ? (teacher.maxLabs || 0) : (teacher.maxTutorials || 0));
+    const teacherAssignedCount = countTeacherTypeAssigned(teacher.id, slotDetails.type);
+    if (teacherAssignedCount + 1 > teacherMax) {
+      toast({ title: 'Teacher Limit Reached', description: `${teacher.name} has reached the maximum number of ${slotDetails.type} sessions (${teacherMax}).`, variant: 'destructive' });
+      return;
+    }
+
     if (slotDetails.type === "lab") {
       const startIndex = timeSlots.indexOf(time);
       if (startIndex === -1 || startIndex > timeSlots.length - 2) {
@@ -626,6 +652,84 @@ const TimetableEditor = () => {
     }
     
     return isTeacherAvailable(teacherId, day, time, existingTimetables);
+  };
+
+  // Count how many times a subject has been assigned for a given session type (lecture/tutorial/lab)
+  const countSubjectTypeAssigned = (subjectId: string, type: string) => {
+    let count = 0;
+
+    // Count in current timetableData
+    for (const dayKey in timetableData) {
+      const daySlots = timetableData[dayKey] || {};
+      for (const timeKey in daySlots) {
+        const slot = daySlots[timeKey];
+        if (!slot || !slot.subject) continue;
+        const slotSubjectId = typeof slot.subject === 'string' ? slot.subject : slot.subject?.id;
+        if (slotSubjectId !== subjectId) continue;
+
+        if (type === 'lab') {
+          // Count only the start slot for lab (not isPartOfLab)
+          if (slot.type === 'lab' && !slot.isPartOfLab) count++;
+        } else {
+          if (slot.type === type) count++;
+        }
+      }
+    }
+
+    // Also count in existing saved timetables
+    for (const tt of existingTimetables || []) {
+      const data = tt.data || {};
+      for (const dayKey in data) {
+        const daySlots = data[dayKey] || {};
+        for (const timeKey in daySlots) {
+          const slot = daySlots[timeKey];
+          if (!slot || !slot.subject) continue;
+          const slotSubjectId = typeof slot.subject === 'string' ? slot.subject : slot.subject?.id;
+          if (slotSubjectId !== subjectId) continue;
+
+          if (type === 'lab') {
+            if (slot.type === 'lab' && !slot.isPartOfLab) count++;
+          } else {
+            if (slot.type === type) count++;
+          }
+        }
+      }
+    }
+
+    return count;
+  };
+
+  // Count how many sessions of a given type a teacher is assigned to (current + existing timetables)
+  const countTeacherTypeAssigned = (teacherId: string, type: string) => {
+    let count = 0;
+
+    const countInData = (data: any) => {
+      for (const dayKey in data) {
+        const daySlots = data[dayKey] || {};
+        for (const timeKey in daySlots) {
+          const slot = daySlots[timeKey];
+          if (!slot || !slot.teacher) continue;
+          const slotTeacherId = typeof slot.teacher === 'string' ? slot.teacher : slot.teacher?.id;
+          if (slotTeacherId !== teacherId) continue;
+
+          if (type === 'lab') {
+            if (slot.type === 'lab' && !slot.isPartOfLab) count++;
+          } else {
+            if (slot.type === type) count++;
+          }
+        }
+      }
+    };
+
+    // current timetable
+    countInData(timetableData);
+
+    // existing timetables
+    for (const tt of existingTimetables || []) {
+      countInData(tt.data || {});
+    }
+
+    return count;
   };
 
   const getStreamName = (streamId: string) => {
