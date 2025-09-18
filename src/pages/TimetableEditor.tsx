@@ -35,6 +35,7 @@ const TimetableEditor = () => {
     subject: "",
     teacher: "",
     room: "",
+    rooms: [],
     type: "lecture"
   });
   const [assignedTeachers, setAssignedTeachers] = useState<any>({});
@@ -202,6 +203,13 @@ const TimetableEditor = () => {
     setAssignedTeachers(subjectTeacherMap);
   }, [teachers]);
 
+  // Debugging: log slotDetails changes when the dialog is open
+  useEffect(() => {
+    if (slotDetailsOpen) {
+      console.debug('SlotDetails changed:', slotDetails);
+    }
+  }, [slotDetailsOpen, slotDetails.type, slotDetails.rooms, slotDetails.room, slotDetails.subject, slotDetails.teacher]);
+
   const handleNavigateToStreamsManager = () => {
     navigate("/streams-manager");
   };
@@ -359,6 +367,7 @@ const TimetableEditor = () => {
         subject: draggingItem.id,
         teacher: defaultTeacher,
         room: "",
+        rooms: [],
         type: "lecture"
       });
       setSlotDetailsOpen(true);
@@ -369,26 +378,45 @@ const TimetableEditor = () => {
   };
 
   const checkRoomAvailability = (roomId: string, day: string, startTime: string, type: string) => {
+    const startIndex = timeSlots.indexOf(startTime);
     if (type === "lab") {
-      const startIndex = timeSlots.indexOf(startTime);
       if (startIndex === -1 || startIndex > timeSlots.length - 2) {
         return false;
       }
-      
+
       for (let i = 0; i < 2; i++) {
         const timeSlot = timeSlots[startIndex + i];
         const slot = timetableData[day]?.[timeSlot];
-        if (slot && slot.room.id === roomId) {
-          return false;
+
+        if (!slot) continue;
+
+        // slot.rooms may be an array for existing labs
+        if (slot.rooms && Array.isArray(slot.rooms)) {
+          if (slot.rooms.some(r => r && r.id === roomId)) return false;
         }
+
+        // legacy single room field
+        if (slot.room && slot.room.id === roomId) return false;
       }
     } else {
       const slot = timetableData[day]?.[startTime];
-      if (slot && slot.room.id === roomId) {
-        return false;
+      if (slot) {
+        if (slot.rooms && Array.isArray(slot.rooms)) {
+          if (slot.rooms.some(r => r && r.id === roomId)) return false;
+        }
+        if (slot.room && slot.room.id === roomId) return false;
       }
     }
-    
+
+    // For labs, ensure room is available in existing timetables for both consecutive slots
+    if (type === 'lab') {
+      for (let i = 0; i < 2; i++) {
+        const ts = timeSlots[startIndex + i];
+        if (!isRoomAvailable(roomId, day, ts, existingTimetables)) return false;
+      }
+      return true;
+    }
+
     return isRoomAvailable(roomId, day, startTime, existingTimetables);
   };
 
@@ -402,7 +430,7 @@ const TimetableEditor = () => {
   };
 
   const addSubjectToTimetable = () => {
-    if (!selectedSlot || !slotDetails.subject || !slotDetails.teacher || !slotDetails.room) {
+    if (!selectedSlot || !slotDetails.subject || !slotDetails.teacher) {
       toast({
         title: "Missing Information",
         description: "Please select subject, teacher, and room.",
@@ -418,7 +446,11 @@ const TimetableEditor = () => {
 
     const subject = subjects.find(s => s.id === slotDetails.subject);
     const teacher = teachers.find(t => t.id === slotDetails.teacher);
-    const room = rooms.find(r => r.id === slotDetails.room);
+
+    // Resolve selected rooms (for lab) or single room
+    const selectedRooms = (slotDetails.rooms && slotDetails.rooms.length > 0)
+      ? slotDetails.rooms.map((roomId: string) => rooms.find(r => r.id === roomId)).filter(Boolean)
+      : (slotDetails.room ? [rooms.find(r => r.id === slotDetails.room)].filter(Boolean) : []);
 
     const newTimetableData = { ...timetableData };
 
@@ -436,13 +468,34 @@ const TimetableEditor = () => {
         });
         return;
       }
+      // Validate that at least one room is selected
+      if (!selectedRooms || selectedRooms.length === 0) {
+        toast({
+          title: "Missing Rooms",
+          description: "Please select at least one lab room for lab sessions.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Ensure all selected rooms are available for the entire lab duration
+      for (const r of selectedRooms) {
+        if (!checkRoomAvailability(r.id, day, time, "lab")) {
+          toast({
+            title: "Room Unavailable",
+            description: `Room ${r.number} is not available for the selected lab duration.`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
 
       for (let i = 0; i < 2; i++) {
         const timeSlot = timeSlots[startIndex + i];
         newTimetableData[day][timeSlot] = {
           subject: subject,
           teacher: teacher,
-          room: room,
+          rooms: selectedRooms,
           type: slotDetails.type,
           isPartOfLab: i > 0
         };
@@ -453,10 +506,31 @@ const TimetableEditor = () => {
         description: `Added ${subject?.name} lab to ${day} starting at ${time}`
       });
     } else {
+
+      // Non-lab: ensure a single room was selected and is available
+      const singleRoom = selectedRooms[0] || null;
+      if (!singleRoom) {
+        toast({
+          title: "Missing Room",
+          description: "Please select a room for this session.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!checkRoomAvailability(singleRoom.id, day, time, "lecture")) {
+        toast({
+          title: "Room Unavailable",
+          description: `Room ${singleRoom.number} is not available at ${time}.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
       newTimetableData[day][time] = {
         subject: subject,
         teacher: teacher,
-        room: room,
+        room: singleRoom,
         type: slotDetails.type
       };
 
@@ -963,7 +1037,12 @@ const TimetableEditor = () => {
                                     </div>
                                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                                       <Building className="h-3 w-3" />
-                                      <span>{cellData.room?.number || 'No Room'}</span>
+                                      <span>
+                                        {cellData.rooms && Array.isArray(cellData.rooms) && cellData.rooms.length > 0 ?
+                                          cellData.rooms.map((r:any) => r?.number || 'N/A').join(', ') :
+                                          (cellData.room?.number || 'No Room')
+                                        }
+                                      </span>
                                     </div>
                                     <div className="chip chip-primary text-[10px] py-0.5 px-1.5 mt-1">
                                       {cellData.type}
@@ -1137,7 +1216,12 @@ const TimetableEditor = () => {
                   <Label>Session Type</Label>
                   <Select 
                     value={slotDetails.type} 
-                    onValueChange={value => setSlotDetails({ ...slotDetails, type: value, room: "" })}
+                    onValueChange={value => setSlotDetails(prev => ({
+                      ...prev,
+                      type: value,
+                      room: value === 'lab' ? '' : '',
+                      rooms: value === 'lab' ? [] : []
+                    }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select Type" />
@@ -1152,39 +1236,56 @@ const TimetableEditor = () => {
                 
                 <div className="space-y-2">
                   <Label>Room</Label>
-                  <Select 
-                    value={slotDetails.room} 
-                    onValueChange={value => setSlotDetails({ ...slotDetails, room: value })}
-                    disabled={!selectedSlot}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Room" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {!selectedSlot ? (
-                        <SelectItem value="no-slot-selected-1" disabled>
-                          No time slot selected
-                        </SelectItem>
-                      ) : isLoadingRooms ? (
-                        <SelectItem value="loading-rooms-1" disabled>Loading rooms...</SelectItem>
-                      ) : (
-                        (() => {
-                          const availableRooms = getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type);
-                          return availableRooms.length > 0 ? (
-                            availableRooms.map(room => (
-                              <SelectItem key={room.id} value={room.id}>
-                                {room.number} (Capacity: {room.capacity})
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="no-rooms-available-1" disabled>
-                              No available rooms for this time and type
-                            </SelectItem>
-                          );
-                        })()
+                  {!selectedSlot ? (
+                    <p className="text-sm text-muted-foreground">No time slot selected</p>
+                  ) : isLoadingRooms ? (
+                    <p className="text-sm">Loading rooms...</p>
+                  ) : slotDetails.type === 'lab' ? (
+                    <div className="space-y-2 max-h-48 overflow-y-auto p-2 border rounded">
+                      {getAvailableRooms(selectedSlot.day, selectedSlot.time, 'lab').map(room => (
+                        <label key={room.id} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={slotDetails.rooms.includes(room.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSlotDetails(prev => ({
+                                ...prev,
+                                rooms: checked ? [...prev.rooms, room.id] : prev.rooms.filter((id: string) => id !== room.id)
+                              }));
+                            }}
+                          />
+                          <span>{room.number} (Capacity: {room.capacity})</span>
+                        </label>
+                      ))}
+                      {getAvailableRooms(selectedSlot.day, selectedSlot.time, 'lab').length === 0 && (
+                        <p className="text-sm">No available lab rooms for this time</p>
                       )}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  ) : (
+                    <Select 
+                      value={slotDetails.room} 
+                      onValueChange={value => setSlotDetails({ ...slotDetails, room: value })}
+                      disabled={!selectedSlot}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Room" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).length > 0 ? (
+                          getAvailableRooms(selectedSlot.day, selectedSlot.time, slotDetails.type).map(room => (
+                            <SelectItem key={room.id} value={room.id}>
+                              {room.number} (Capacity: {room.capacity})
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-rooms-available-1" disabled>
+                            No available rooms for this time and type
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
               
@@ -1192,7 +1293,10 @@ const TimetableEditor = () => {
                 <Button variant="outline" onClick={() => setSlotDetailsOpen(false)}>Cancel</Button>
                 <Button 
                   onClick={addSubjectToTimetable}
-                  disabled={!slotDetails.subject || !slotDetails.teacher || !slotDetails.room}
+                  disabled={
+                    !slotDetails.subject || !slotDetails.teacher || 
+                    (slotDetails.type === 'lab' ? slotDetails.rooms.length === 0 : !slotDetails.room)
+                  }
                 >
                   Add to Timetable
                 </Button>

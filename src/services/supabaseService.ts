@@ -269,9 +269,15 @@ export const isRoomAvailable = (
     if (!timetableData || !timetableData[day] || !timetableData[day][time]) continue;
     
     const slot = timetableData[day][time];
-    if (slot && slot.room && slot.room.id === roomId) {
-      return false;
+    if (!slot) continue;
+
+    // If timetable slot uses multiple rooms (labs)
+    if (slot.rooms && Array.isArray(slot.rooms)) {
+      if (slot.rooms.some((r: any) => r && r.id === roomId)) return false;
     }
+
+    // Legacy single room field
+    if (slot.room && slot.room.id === roomId) return false;
   }
   return true;
 };
