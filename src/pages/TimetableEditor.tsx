@@ -48,7 +48,7 @@ const TimetableEditor = () => {
   const [autoSaveInterval, setAutoSaveInterval] = useState<number | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const timeSlots = [
     "9:30 - 10:30", 
     "10:30 - 11:30", 
@@ -210,14 +210,17 @@ const TimetableEditor = () => {
 
   const initializeTimetable = () => {
     const newTimetable: any = {};
-    
+
     days.forEach(day => {
       newTimetable[day] = {};
       timeSlots.forEach(slot => {
         newTimetable[day][slot] = null;
       });
     });
-    
+
+    // Debugging log to verify initialization
+    console.log("Initialized Timetable:", newTimetable);
+
     return newTimetable;
   };
 
@@ -341,13 +344,13 @@ const TimetableEditor = () => {
   
   const handleDrop = (e: React.DragEvent, day: string, time: string) => {
     e.preventDefault();
-    
+
     if (draggingItem && draggingItem.itemType === 'subject') {
       setSelectedSlot({ day, time });
-      
+
       const subjectTeachers = assignedTeachers[draggingItem.id] || [];
       const defaultTeacher = subjectTeachers.length > 0 ? subjectTeachers[0] : "";
-      
+
       setSlotDetails({
         subject: draggingItem.id,
         teacher: defaultTeacher,
@@ -356,6 +359,9 @@ const TimetableEditor = () => {
       });
       setSlotDetailsOpen(true);
     }
+
+    // Debugging log for Saturday
+    console.log(`Drop event: Day=${day}, Time=${time}, DraggingItem=${JSON.stringify(draggingItem)}`);
   };
 
   const checkRoomAvailability = (roomId: string, day: string, startTime: string, type: string) => {
@@ -400,15 +406,22 @@ const TimetableEditor = () => {
       });
       return;
     }
-    
+
     const { day, time } = selectedSlot;
-    
+
+    // Debugging log to verify updates for Saturday
+    console.log(`Adding subject to timetable: Day=${day}, Time=${time}, SlotDetails=${JSON.stringify(slotDetails)}`);
+
     const subject = subjects.find(s => s.id === slotDetails.subject);
     const teacher = teachers.find(t => t.id === slotDetails.teacher);
     const room = rooms.find(r => r.id === slotDetails.room);
-    
+
     const newTimetableData = { ...timetableData };
-    
+
+    if (!newTimetableData[day]) {
+      newTimetableData[day] = {};
+    }
+
     if (slotDetails.type === "lab") {
       const startIndex = timeSlots.indexOf(time);
       if (startIndex === -1 || startIndex > timeSlots.length - 2) {
@@ -419,7 +432,7 @@ const TimetableEditor = () => {
         });
         return;
       }
-      
+
       for (let i = 0; i < 2; i++) {
         const timeSlot = timeSlots[startIndex + i];
         newTimetableData[day][timeSlot] = {
@@ -430,7 +443,7 @@ const TimetableEditor = () => {
           isPartOfLab: i > 0
         };
       }
-      
+
       toast({
         title: "Lab Added",
         description: `Added ${subject?.name} lab to ${day} starting at ${time}`
@@ -442,13 +455,13 @@ const TimetableEditor = () => {
         room: room,
         type: slotDetails.type
       };
-      
+
       toast({
         title: "Subject Added",
         description: `Added ${subject?.name} to ${day} ${time}`
       });
     }
-    
+
     setTimetableData(newTimetableData);
     manualSaveDraft();
     setSlotDetailsOpen(false);
@@ -886,7 +899,7 @@ const TimetableEditor = () => {
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
             <div className="xl:col-span-3 overflow-auto">
               <div className="bg-card rounded-lg border shadow-subtle overflow-hidden">
-                <div className="grid grid-cols-[100px_repeat(5,1fr)] border-b">
+                <div className="grid grid-cols-[100px_repeat(6,1fr)] border-b">
                   <div className="p-3 font-medium text-sm bg-muted/30 border-r">Time / Day</div>
                   {days.map((day) => (
                     <div key={day} className="p-3 font-medium text-sm border-r last:border-r-0 text-center">
@@ -896,7 +909,7 @@ const TimetableEditor = () => {
                 </div>
                 
                 {timeSlots.map((time) => (
-                  <div key={time} className="grid grid-cols-[100px_repeat(5,1fr)] border-b last:border-b-0">
+                  <div key={time} className="grid grid-cols-[100px_repeat(6,1fr)] border-b last:border-b-0">
                     <div className="p-3 text-xs font-medium bg-muted/30 border-r flex items-center">
                       {time}
                     </div>

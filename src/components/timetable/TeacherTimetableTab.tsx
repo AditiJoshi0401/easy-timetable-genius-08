@@ -21,7 +21,7 @@ interface Teacher {
 
 interface TeacherTimetableTabProps {
   selectedTimetable: any;
-  onApplyFilters: (teacherId: string) => Promise<void>;
+  onApplyFilters: (teacherId: string) => Promise<any | null>;
 }
 
 const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({

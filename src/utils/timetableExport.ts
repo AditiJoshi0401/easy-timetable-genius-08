@@ -16,7 +16,7 @@ export interface TimetableExportData {
   entityName?: string;
 }
 
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const timeSlots = [
   '09:00-10:00',
   '10:00-11:00', 

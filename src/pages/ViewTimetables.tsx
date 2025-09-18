@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -107,7 +106,7 @@ const ViewTimetables = () => {
       const direct = await fetchTimetable(id);
       if (direct) {
         setSelectedTeacherTimetable(direct);
-        return;
+        return direct;
       }
 
       // If no direct timetable exists, search all stored timetables for any slot that references this teacher
@@ -143,12 +142,14 @@ const ViewTimetables = () => {
 
       if (found) {
         setSelectedTeacherTimetable(found);
+        return found;
       } else {
         setSelectedTeacherTimetable(null);
         // Inform the user the teacher timetable wasn't found in stored timetables
         // (this is expected if timetables haven't been generated/saved for divisions containing this teacher)
         // Use toast via window console as a fallback (parent has access to toast in this component though)
         console.warn(`No timetable found for teacher id ${id}`);
+        return null;
       }
     } catch (error) {
       console.error('Error searching for teacher timetable:', error);
@@ -160,16 +161,18 @@ const ViewTimetables = () => {
   const handleApplyRoomFilters = async () => {
     if (!selectedRoom) {
       setSelectedRoomTimetable(null);
-      return;
+      return null;
     }
 
     try {
       const timetableKey = `${selectedRoom}`;
       const timetable = await fetchTimetable(timetableKey);
       setSelectedRoomTimetable(timetable);
+      return timetable;
     } catch (error) {
       console.error('Error fetching timetable:', error);
       setSelectedRoomTimetable(null);
+      return null;
     }
   };
 
@@ -217,6 +220,8 @@ const ViewTimetables = () => {
       });
     }
   };
+
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
   return (
     <div className="space-y-6">

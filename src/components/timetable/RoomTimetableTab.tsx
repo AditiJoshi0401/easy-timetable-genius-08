@@ -11,7 +11,7 @@ import { Room } from "@/services/supabaseService";
 
 interface RoomTimetableTabProps {
   selectedTimetable: any;
-  onApplyFilters: () => Promise<void>;
+  onApplyFilters: () => Promise<any | null>;
 }
 
 const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
@@ -153,12 +153,12 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
           </div>
         </div>
         
-        <Button 
+        <Button
           className="w-full"
           disabled={!selectedRoom || !selectedTimetable}
-          onClick={() => {
+          onClick={async () => {
             handleViewRoomTimetable();
-            onApplyFilters();
+            await onApplyFilters();
           }}
         >
           View Room Schedule
