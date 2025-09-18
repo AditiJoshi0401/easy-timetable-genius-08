@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Download, Calendar, User, MapPin } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { fetchStreams, fetchDivisions, fetchSubjects, fetchTeachers, fetchRooms, 
-         fetchTimetable, Stream, Division, Subject, Teacher, Room } from '@/services/supabaseService';
+         fetchTimetable, fetchAllTimetables, Stream, Division, Subject, Teacher, Room } from '@/services/supabaseService';
 import { useQuery } from '@tanstack/react-query';
 import DivisionTimetableTab from '@/components/timetable/DivisionTimetableTab';
 import TeacherTimetableTab from '@/components/timetable/TeacherTimetableTab';
@@ -94,19 +94,64 @@ const ViewTimetables = () => {
     }
   };
 
-  // Handle applying filters for teacher timetable
-  const handleApplyTeacherFilters = async () => {
-    if (!selectedTeacher) {
+  // Handle applying filters for teacher timetable (accepts teacherId)
+  const handleApplyTeacherFilters = async (teacherId?: string) => {
+    const id = teacherId || selectedTeacher;
+    if (!id) {
       setSelectedTeacherTimetable(null);
       return;
     }
 
     try {
-      const timetableKey = `${selectedTeacher}`;
-      const timetable = await fetchTimetable(timetableKey);
-      setSelectedTeacherTimetable(timetable);
+      // First try direct lookup by teacher id (in case a timetable was saved under teacher id)
+      const direct = await fetchTimetable(id);
+      if (direct) {
+        setSelectedTeacherTimetable(direct);
+        return;
+      }
+
+      // If no direct timetable exists, search all stored timetables for any slot that references this teacher
+      const allTimetables = await fetchAllTimetables();
+
+      let found: any = null;
+      for (const tt of allTimetables || []) {
+        const data = tt.data || {};
+        let contains = false;
+
+        for (const day in data) {
+          if (contains) break;
+          const daySlots = data[day] || {};
+          for (const time in daySlots) {
+            const slot = daySlots[time];
+            if (!slot || !slot.teacher) continue;
+            if (typeof slot.teacher === 'string' && slot.teacher === id) {
+              contains = true;
+              break;
+            }
+            if (typeof slot.teacher === 'object' && slot.teacher.id === id) {
+              contains = true;
+              break;
+            }
+          }
+        }
+
+        if (contains) {
+          found = tt;
+          break;
+        }
+      }
+
+      if (found) {
+        setSelectedTeacherTimetable(found);
+      } else {
+        setSelectedTeacherTimetable(null);
+        // Inform the user the teacher timetable wasn't found in stored timetables
+        // (this is expected if timetables haven't been generated/saved for divisions containing this teacher)
+        // Use toast via window console as a fallback (parent has access to toast in this component though)
+        console.warn(`No timetable found for teacher id ${id}`);
+      }
     } catch (error) {
-      console.error('Error fetching timetable:', error);
+      console.error('Error searching for teacher timetable:', error);
       setSelectedTeacherTimetable(null);
     }
   };

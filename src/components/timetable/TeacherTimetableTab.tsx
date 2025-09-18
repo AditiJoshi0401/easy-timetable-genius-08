@@ -21,7 +21,7 @@ interface Teacher {
 
 interface TeacherTimetableTabProps {
   selectedTimetable: any;
-  onApplyFilters: () => Promise<void>;
+  onApplyFilters: (teacherId: string) => Promise<void>;
 }
 
 const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
@@ -30,6 +30,7 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
 }) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
+  const [subjectOptions, setSubjectOptions] = useState<string[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [filteredTeachers, setFilteredTeachers] = useState<Teacher[]>([]);
@@ -58,12 +59,12 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
 
   useEffect(() => {
     if (teachers && teachers.length > 0 && subjects && subjects.length > 0) {
-      const allSubjectIds = [...new Set(teachers.flatMap(teacher => teacher.subjects))];
+      const allSubjectIds = [...new Set(teachers.flatMap(teacher => teacher.subjects || []))];
       const subjectNames = allSubjectIds.map(subjectId => {
-        const subject = subjects.find(s => s.id === subjectId);
+        const subject = subjects.find((s: any) => s.id === subjectId);
         return subject ? `${subject.name} (${subject.code})` : subjectId;
       });
-      setSubjects(subjectNames);
+      setSubjectOptions(subjectNames);
     }
   }, [teachers, subjects]);
 
@@ -128,8 +129,8 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
         <div className="space-y-4">
           <div>
             <Label className="text-base font-semibold">Filter by Subjects</Label>
-            <div className="mt-3 space-y-2 max-h-80 overflow-y-auto">
-              {subjects.map((subject, idx) => (
+              <div className="mt-3 space-y-2 max-h-80 overflow-y-auto">
+              {subjectOptions.map((subject, idx) => (
                 <div key={idx} className="flex items-center space-x-2">
                   <input
                     type="checkbox"
@@ -186,12 +187,12 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
             </div>
           </div>
           
-          <Button 
+          <Button
             className="w-full"
             disabled={!selectedTeacher || !selectedTimetable}
-            onClick={() => {
+            onClick={async () => {
               handleViewTeacherTimetable();
-              onApplyFilters();
+              await onApplyFilters(selectedTeacher);
             }}
           >
             View Teacher Schedule
