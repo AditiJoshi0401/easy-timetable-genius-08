@@ -1,69 +1,70 @@
-# Welcome to your Lovable project
+Timetable Genius
 
-## Project info
+A lightweight web app for creating, editing and viewing school timetables quickly and collaboratively.
 
-**URL**: https://lovable.dev/projects/759cf667-d7f1-4c6f-a41d-c2edc29f2f1c
+## Features
 
-## How can I edit this code?
+- Create and edit timetables for divisions, teachers, and rooms
+- Import/export timetables (CSV / printable formats)
+- Role-based access control (admin, staff, viewer)
+- Responsive UI with desktop + mobile layouts
+- Supabase integration for auth and persistence
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- Frontend: React + TypeScript + Vite
+- Styling: Tailwind CSS
+- Backend / DB: Supabase (Postgres)
+- Utilities: Vite, Bun (lockfile present)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/759cf667-d7f1-4c6f-a41d-c2edc29f2f1c) and start prompting.
+## Quickstart (Development)
 
-Changes made via Lovable will be committed automatically to this repo.
+1. Install dependencies
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```pwsh
+pnpm install
 ```
 
-**Edit a file directly in GitHub**
+2. Create a `.env` file in the project root and set the Supabase variables (example names used in code):
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```env
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
 
-**Use GitHub Codespaces**
+3. Run the dev server
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```pwsh
+pnpm dev
+```
 
-## What technologies are used for this project?
+4. Open `http://localhost:5173` in your browser.
 
-This project is built with .
+## Database Migrations
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Migration SQL files are stored under `supabase/migrations`. Use the Supabase CLI to apply them:
 
-## How can I deploy this project?
+```pwsh
+supabase db push
+```
 
-Simply open [Lovable](https://lovable.dev/projects/759cf667-d7f1-4c6f-a41d-c2edc29f2f1c) and click on Share -> Publish.
+## Scripts
 
-## I want to use a custom domain - is that possible?
+- `pnpm dev` — start local dev server
+- `pnpm build` — build production bundle
+- `pnpm preview` — preview production build
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+## Contributing
+
+- Open an issue or PR with a clear description and related changes.
+- Follow existing code style (TypeScript + Tailwind patterns).
+
+## Notes & Next Steps
+
+- Add screenshots or a demo link to this README for clarity.
+- Consider adding automated tests and CI workflows.
+- Add deployment instructions (Vercel / Netlify / Supabase Hosting).
+
+---
+
+If you want, I can add badges, screenshots, deployment instructions, or generate a short demo GIF — tell me which and I'll update the README.

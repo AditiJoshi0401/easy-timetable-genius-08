@@ -23,7 +23,7 @@ const TimetableEditor = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [stream, setStream] = useState("");
-  const [year, setYear] = useState("");
+  const [semester, setSemester] = useState("");
   const [division, setDivision] = useState("");
   const [showTimetable, setShowTimetable] = useState(false);
   const [timetableData, setTimetableData] = useState<any>({});
@@ -38,7 +38,7 @@ const TimetableEditor = () => {
     type: "lecture"
   });
   const [assignedTeachers, setAssignedTeachers] = useState<any>({});
-  const [years, setYears] = useState<any[]>([]);
+  const [semesters, setSemesters] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [noStreamsDataExists, setNoStreamsDataExists] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -113,8 +113,8 @@ const TimetableEditor = () => {
   }, [loadAvailableDrafts]);
 
   useEffect(() => {
-    if (showTimetable && stream && year && division) {
-      const timetableKey = `${stream}_${year}_${division}`;
+    if (showTimetable && stream && semester && division) {
+      const timetableKey = `${stream}_${semester}_${division}`;
       
       const interval = window.setInterval(() => {
         if (Object.keys(timetableData).length > 0) {
@@ -132,11 +132,11 @@ const TimetableEditor = () => {
         }
       };
     }
-  }, [showTimetable, stream, year, division, timetableData]);
+  }, [showTimetable, stream, semester, division, timetableData]);
 
   const manualSaveDraft = useCallback(() => {
-    if (showTimetable && stream && year && division) {
-      const timetableKey = `${stream}_${year}_${division}`;
+    if (showTimetable && stream && semester && division) {
+      const timetableKey = `${stream}_${semester}_${division}`;
       saveTimetableDraft(timetableKey, timetableData);
       setLastSaved(new Date().toLocaleTimeString());
       toast({
@@ -144,7 +144,7 @@ const TimetableEditor = () => {
         description: "Your work has been saved locally"
       });
     }
-  }, [showTimetable, stream, year, division, timetableData, toast]);
+  }, [showTimetable, stream, semester, division, timetableData, toast]);
 
   useEffect(() => {
     if (streams && streams.length > 0) {
@@ -163,28 +163,29 @@ const TimetableEditor = () => {
           id: (i + 1).toString(),
           name: `Semester ${i + 1}`
         }));
-        setYears(semestersArray);
-        setYear("");
+        setSemesters(semestersArray);
+        setSemester("");
         setDivision("");
       } else {
-        setYears([]);
+        setSemesters([]);
       }
     } else {
-      setYears([]);
+      setSemesters([]);
     }
   }, [stream, streams]);
 
   useEffect(() => {
-    if (stream && year) {
+    if (stream && semester) {
       const filteredDivisions = allDivisions.filter(d => 
-        d.streamId === stream && d.semester.toString() === year
+        d.streamId === stream && 
+        (d.semester === parseInt(semester) || d.semester.toString() === semester)
       );
       setDivisions(filteredDivisions);
       setDivision("");
     } else {
       setDivisions([]);
     }
-  }, [stream, year, allDivisions]);
+  }, [stream, semester, allDivisions]);
 
   useEffect(() => {
     const subjectTeacherMap: Record<string, string[]> = {};
@@ -221,16 +222,16 @@ const TimetableEditor = () => {
   };
 
   const handleGenerateTimetable = () => {
-    if (!stream || !year || !division) {
+    if (!stream || !semester || !division) {
       toast({
         title: "Missing Information",
-        description: "Please select stream, year, and division.",
+        description: "Please select stream, semester, and division.",
         variant: "destructive"
       });
       return;
     }
     
-    const timetableKey = `${stream}_${year}_${division}`;
+    const timetableKey = `${stream}_${semester}_${division}`;
     
     const draft = getTimetableDraft(timetableKey);
     if (draft) {
@@ -253,7 +254,7 @@ const TimetableEditor = () => {
           
           toast({
             title: "Timetable Loaded",
-            description: `Loaded timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}.`,
+            description: `Loaded timetable for ${getStreamName(stream)} ${getsemesterName(semester)} ${getDivisionName(division)}.`,
           });
         } else {
           setTimetableData(initializeTimetable());
@@ -261,7 +262,7 @@ const TimetableEditor = () => {
           
           toast({
             title: "New Timetable Created",
-            description: `Created a new timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}. Start adding subjects!`,
+            description: `Created a new timetable for ${getStreamName(stream)} ${getsemesterName(semester)} ${getDivisionName(division)}. Start adding subjects!`,
           });
         }
       })
@@ -272,26 +273,26 @@ const TimetableEditor = () => {
         
         toast({
           title: "New Timetable Created",
-          description: `Created a new timetable for ${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)}. Start adding subjects!`,
+          description: `Created a new timetable for ${getStreamName(stream)} ${getsemesterName(semester)} ${getDivisionName(division)}. Start adding subjects!`,
         });
       });
   };
 
   const saveTimetable = async () => {
     try {
-      if (!stream || !year || !division) {
+      if (!stream || !semester || !division) {
         toast({
           title: "Missing Information",
-          description: "Stream, year, and division information is missing.",
+          description: "Stream, semester, and division information is missing.",
           variant: "destructive"
         });
         return;
       }
 
-      const timetableKey = `${stream}_${year}_${division}`;
+      const timetableKey = `${stream}_${semester}_${division}`;
       const timetableMetadata = {
         id: timetableKey,
-        name: `${getStreamName(stream)} ${getYearName(year)} ${getDivisionName(division)} Timetable`,
+        name: `${getStreamName(stream)} ${getsemesterName(semester)} ${getDivisionName(division)} Timetable`,
         division_id: division,
         data: timetableData,
       };
@@ -497,9 +498,24 @@ const TimetableEditor = () => {
   };
 
   const filteredSubjects = subjects.filter((subject) => {
-    if (!stream || !year) return true;
-    return subject.stream === streams.find(s => s.id === stream)?.code && subject.semester === year;
-  });
+      if (!stream || !semester) return true;
+
+      // Check if subject has valid stream and semester information
+      if (!subject.stream || !subject.semester) return false;
+
+      // Ensure both are treated as numbers for comparison
+      const subjectSemester = typeof subject.semester === 'string' ? 
+        parseInt(subject.semester) : subject.semester;
+      const selectedSemester = parseInt(semester);
+
+      // The subjects table stores stream as a code (see service types). The UI `stream` value
+      // is the stream `id`. Resolve the selected stream's code and compare against it.
+      const selectedStreamObj = streams.find(s => s.id === stream);
+      const selectedStreamCode = selectedStreamObj?.code ?? selectedStreamObj?.id ?? stream;
+
+      // Ensure both stream (by code) and semester match
+      return subject.stream === selectedStreamCode && subjectSemester === selectedSemester;
+    });
 
   const getTeachersForSubject = (subjectId: string) => {
     return teachers.filter(teacher => 
@@ -531,8 +547,8 @@ const TimetableEditor = () => {
     return streamObj ? streamObj.name : streamId;
   };
 
-  const getYearName = (yearId: string) => {
-    return `Year ${yearId}`;
+  const getsemesterName = (semesterId: string) => {
+    return `Semester ${semesterId}`;
   };
 
   const getDivisionName = (divisionId: string) => {
@@ -552,10 +568,10 @@ const TimetableEditor = () => {
 
     const exportData = {
       stream,
-      year,
+      semester,
       division,
       streamName: getStreamName(stream),
-      yearName: getYearName(year),
+      semesterName: getsemesterName(semester),
       divisionName: getDivisionName(division),
       timetableData
     };
@@ -563,7 +579,7 @@ const TimetableEditor = () => {
     const dataStr = JSON.stringify(exportData, null, 2);
     const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
     
-    const exportFileDefaultName = `timetable_${getStreamName(stream)}_${getYearName(year)}_${getDivisionName(division)}.json`;
+    const exportFileDefaultName = `timetable_${getStreamName(stream)}_${getsemesterName(semester)}_${getDivisionName(division)}.json`;
     
     const linkElement = document.createElement("a");
     linkElement.setAttribute("href", dataUri);
@@ -593,7 +609,7 @@ const TimetableEditor = () => {
 
       const parsed = JSON.parse(importData);
       
-      if (!parsed.timetableData || !parsed.stream || !parsed.year || !parsed.division) {
+      if (!parsed.timetableData || !parsed.stream || !parsed.semester || !parsed.division) {
         toast({
           title: "Invalid Format",
           description: "The imported data is not in the correct format.",
@@ -603,7 +619,7 @@ const TimetableEditor = () => {
       }
 
       setStream(parsed.stream);
-      setYear(parsed.year);
+      setSemester(parsed.semester);
       setDivision(parsed.division);
       setTimetableData(parsed.timetableData);
       setShowTimetable(true);
@@ -647,10 +663,10 @@ const TimetableEditor = () => {
   const loadDraft = (key: string) => {
     const keyParts = key.split('_');
     if (keyParts.length === 3) {
-      const [streamId, yearId, divisionId] = keyParts;
+      const [streamId, semesterId, divisionId] = keyParts;
       
       setStream(streamId);
-      setYear(yearId);
+      setSemester(semesterId);
       setDivision(divisionId);
       
       const draft = getTimetableDraft(key);
@@ -711,7 +727,7 @@ const TimetableEditor = () => {
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
               Before creating timetables, you need to set up your academic structure by defining
-              streams, years, and divisions.
+              streams, semesters, and divisions.
             </p>
             <Button onClick={handleNavigateToStreamsManager}>
               Set Up Streams & Divisions
@@ -735,7 +751,7 @@ const TimetableEditor = () => {
           <CardHeader>
             <CardTitle>Start New Timetable</CardTitle>
             <CardDescription>
-              Select the stream, year, and division to create a new timetable
+              Select the stream, semester, and division to create a new timetable
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -761,32 +777,34 @@ const TimetableEditor = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
               <div className="space-y-2">
-                <Label>Year</Label>
-                <Select value={year} onValueChange={setYear} disabled={!stream || years.length === 0}>
+                <Label>Semester</Label>
+                <Select 
+                  value={semester} 
+                  onValueChange={setSemester} 
+                  disabled={!stream || semesters.length === 0}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select Year" />
+                    <SelectValue placeholder="Select Semester" />
                   </SelectTrigger>
                   <SelectContent>
-                    {years.length > 0 ? (
-                      years.map((year: any) => (
-                        <SelectItem key={year.id} value={year.id}>
-                          {year.name}
+                    {semesters.length > 0 ? (
+                      semesters.map((sem: any) => (
+                        <SelectItem key={sem.id} value={sem.id}>
+                          {sem.name}
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="no-years-available-1" disabled>
-                        {stream ? "No years available for this stream" : "Select a stream first"}
+                      <SelectItem value="no-semesters-available" disabled>
+                        {stream ? "No semesters available for this stream" : "Select a stream first"}
                       </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
               </div>
-              
               <div className="space-y-2">
                 <Label>Division</Label>
-                <Select value={division} onValueChange={setDivision} disabled={!year || divisions.length === 0}>
+                <Select value={division} onValueChange={setDivision} disabled={!semester || divisions.length === 0}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Division" />
                   </SelectTrigger>
@@ -799,7 +817,7 @@ const TimetableEditor = () => {
                       ))
                     ) : (
                       <SelectItem value="no-divisions-available-1" disabled>
-                        {year ? "No divisions available for this year" : "Select a year first"}
+                        {semester ? "No divisions available for this semester" : "Select a semester first"}
                       </SelectItem>
                     )}
                   </SelectContent>
@@ -823,7 +841,7 @@ const TimetableEditor = () => {
                   </Button>
                 )}
               </div>
-              <Button onClick={handleGenerateTimetable} className="gap-2" disabled={!stream || !year || !division}>
+              <Button onClick={handleGenerateTimetable} className="gap-2" disabled={!stream || !semester || !division}>
                 <Plus className="h-4 w-4" /> 
                 Create Timetable
               </Button>
@@ -835,7 +853,7 @@ const TimetableEditor = () => {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-medium">
-                {getStreamName(stream)} {getYearName(year)} {getDivisionName(division)} Timetable
+                {getStreamName(stream)} {getsemesterName(semester)} {getDivisionName(division)} Timetable
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {isEditing ? 'Editing mode' : 'View mode'} • 
@@ -961,19 +979,15 @@ const TimetableEditor = () => {
               <div className="xl:col-span-1">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Drag & Drop</CardTitle>
+                    <CardTitle className="text-base">Subjects</CardTitle>
                     <CardDescription>
-                      Drag items to the timetable
+                      Drag Subjects to the timetable
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Tabs defaultValue="subjects">
-                      <TabsList className="w-full grid grid-cols-3">
-                        <TabsTrigger value="subjects" className="text-xs">Subjects</TabsTrigger>
-                        <TabsTrigger value="teachers" className="text-xs">Teachers</TabsTrigger>
-                        <TabsTrigger value="rooms" className="text-xs">Rooms</TabsTrigger>
-                      </TabsList>
-                      
+
+
                       <TabsContent value="subjects" className="mt-4">
                         <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                           {isLoadingSubjects ? (
@@ -1001,73 +1015,7 @@ const TimetableEditor = () => {
                               <p className="text-sm text-muted-foreground">
                                 {subjects.length === 0 ? 
                                   "No subjects available. Please add subjects in Data Management." :
-                                  "No subjects available for the selected stream and year."}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="teachers" className="mt-4">
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                          {isLoadingTeachers ? (
-                            <div className="flex justify-center py-4">
-                              <p className="text-muted-foreground">Loading teachers...</p>
-                            </div>
-                          ) : teachers.length > 0 ? (
-                            teachers.map((teacher) => (
-                              <div
-                                key={teacher.id}
-                                className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors"
-                                draggable
-                                onDragStart={() => handleDragStart(teacher, 'teacher')}
-                                onDragEnd={handleDragEnd}
-                              >
-                                <div className="font-medium text-sm">{teacher.isTA ? "TA " : ""}{teacher.name}</div>
-                                <div className="text-xs text-muted-foreground">{teacher.specialization}</div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-6">
-                              <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
-                                <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                No teachers available. Please add teachers in Data Management.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="rooms" className="mt-4">
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                          {isLoadingRooms ? (
-                            <div className="flex justify-center py-4">
-                              <p className="text-muted-foreground">Loading rooms...</p>
-                            </div>
-                          ) : rooms.length > 0 ? (
-                            rooms.map((room) => (
-                              <div
-                                key={room.id}
-                                className="p-2 border rounded-md cursor-grab hover:bg-muted/50 transition-colors"
-                                draggable
-                                onDragStart={() => handleDragStart(room, 'room')}
-                                onDragEnd={handleDragEnd}
-                              >
-                                <div className="font-medium text-sm">{room.number}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {room.type.charAt(0).toUpperCase() + room.type.slice(1)}
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-6">
-                              <div className="h-10 w-10 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-2">
-                                <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                No rooms available. Please add rooms in Data Management.
+                                  "No subjects available for the selected stream and semester."}
                               </p>
                             </div>
                           )}
@@ -1112,7 +1060,7 @@ const TimetableEditor = () => {
                         <SelectItem value="no-subjects-available-2" disabled>
                           {subjects.length === 0 ? 
                             "No subjects available. Please add subjects in Data Management." :
-                            "No subjects available for the selected stream and year."}
+                            "No subjects available for the selected stream and semester."}
                         </SelectItem>
                       )}
                     </SelectContent>
@@ -1282,15 +1230,15 @@ const TimetableEditor = () => {
                   Object.entries(availableDrafts).map(([key, draft]) => {
                     const keyParts = key.split('_');
                     if (keyParts.length === 3) {
-                      const [streamId, yearId, divisionId] = keyParts;
+                      const [streamId, semesterId, divisionId] = keyParts;
                       const streamName = getStreamName(streamId);
-                      const yearName = getYearName(yearId);
+                      const semesterName = getsemesterName(semesterId);
                       const divisionName = getDivisionName(divisionId);
                       
                       return (
                         <Card key={key} className="mb-4">
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-base">{streamName} {yearName} {divisionName}</CardTitle>
+                            <CardTitle className="text-base">{streamName} {semesterName} {divisionName}</CardTitle>
                             <CardDescription>
                               Last saved: {new Date(draft.lastUpdated).toLocaleString()}
                             </CardDescription>

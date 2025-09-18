@@ -809,11 +809,11 @@ const StreamsManager = () => {
             <div className="grid gap-4">
               {roles.map((role) => (
                 <Card key={role.id} className="hover:shadow-sm transition-shadow">
-                  <CardContent className="p-4 flex justify-between items-center">
-                    <div>
-                      <h3 className="font-medium">{role.name}</h3>
+                  <CardContent className="p-4 flex items-start justify-between">
+                    <div className="text-left">
+                      <h3 className="font-medium text-left">{role.name}</h3>
                       {role.description && (
-                        <div className="text-sm text-muted-foreground mt-1">
+                        <div className="text-sm text-muted-foreground mt-1 text-left">
                           {role.description}
                         </div>
                       )}
