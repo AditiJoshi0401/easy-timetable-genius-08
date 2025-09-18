@@ -220,13 +220,8 @@ const TimetableEditor = () => {
     days.forEach(day => {
       newTimetable[day] = {};
       timeSlots.forEach(slot => {
-        // Initialize with empty cell structure
-        newTimetable[day][slot] = {
-          subject: null,
-          teacher: null,
-          room: null,
-          type: null
-        };
+        // Initialize as null so the UI shows an empty layout (click to add)
+        newTimetable[day][slot] = null;
       });
     });
 
@@ -1019,7 +1014,7 @@ const TimetableEditor = () => {
                                 <>
                                   <div className="flex justify-between items-start">
                                     <span className="text-xs font-medium">
-                                      {cellData.subject.name}
+                                      {cellData.subject?.name || 'No Subject'}
                                     </span>
                                     {isEditing && (
                                       <button 
@@ -1033,7 +1028,7 @@ const TimetableEditor = () => {
                                   <div className="mt-1 space-y-1">
                                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                                       <Users className="h-3 w-3" />
-                                      <span>{cellData.teacher.isTA ? "TA " : ""}{cellData.teacher.name}</span>
+                                      <span>{cellData.teacher ? `${cellData.teacher.isTA ? 'TA ' : ''}${cellData.teacher.name}` : 'No Teacher'}</span>
                                     </div>
                                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                                       <Building className="h-3 w-3" />
