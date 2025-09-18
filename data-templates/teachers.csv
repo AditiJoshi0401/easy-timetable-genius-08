@@ -1,0 +1,2 @@
+id,name,email,specialization,subjects,isTA,roles,cabin,maxLectures,maxLabs,maxTutorials
+,Dr. Alice Smith,alice@example.com,Computer Science,CS101;CS102,false,HOD;CS_DEPT,101,12,6,8
