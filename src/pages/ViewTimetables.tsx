@@ -74,9 +74,7 @@ const ViewTimetables = () => {
   // Generate timetable key for division timetables
   const generateTimetableKey = () => {
     if (!selectedStream || !selectedSemester || !selectedDivision) return "";
-    const streamCode = streams?.find(s => s.id === selectedStream)?.code || "";
-    const divisionName = divisions?.find(d => d.id === selectedDivision)?.name || "";
-    return `${streamCode}-SEM${selectedSemester}-${divisionName}`;
+    return `${selectedStream}_${selectedSemester}_${selectedDivision}`;
   };
 
   // Handle applying filters for division timetable
