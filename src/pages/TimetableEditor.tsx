@@ -500,8 +500,8 @@ const TimetableEditor = () => {
   const filteredSubjects = subjects.filter((subject) => {
       if (!stream || !semester) return true;
 
-      // Check if subject has valid stream and semester information
-      if (!subject.stream || !subject.semester) return false;
+      // Check if subject has valid streams and semester information
+      if (!subject.streams || subject.streams.length === 0 || !subject.semester) return false;
 
       // Ensure both are treated as numbers for comparison
       const subjectSemester = typeof subject.semester === 'string' ? 
@@ -513,8 +513,8 @@ const TimetableEditor = () => {
       const selectedStreamObj = streams.find(s => s.id === stream);
       const selectedStreamCode = selectedStreamObj?.code ?? selectedStreamObj?.id ?? stream;
 
-      // Ensure both stream (by code) and semester match
-      return subject.stream === selectedStreamCode && subjectSemester === selectedSemester;
+      // Ensure subject is in the selected stream and semester match
+      return subject.streams.some(streamCode => streamCode === selectedStreamCode) && subjectSemester === selectedSemester;
     });
 
   const getTeachersForSubject = (subjectId: string) => {

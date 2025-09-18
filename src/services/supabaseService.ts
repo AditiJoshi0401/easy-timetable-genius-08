@@ -6,7 +6,7 @@ export interface Subject {
   name: string;
   code: string;
   credits: number;
-  stream: string;  // Now stores stream code directly instead of UUID
+  streams: string[];  // Now supports multiple stream codes
   semester: string;  // Changed from year to semester
   lectures: number;
   tutorials: number;

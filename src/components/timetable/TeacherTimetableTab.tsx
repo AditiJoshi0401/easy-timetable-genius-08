@@ -29,32 +29,43 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
   onApplyFilters
 }) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [subjects, setSubjects] = useState<string[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState("");
   const [filteredTeachers, setFilteredTeachers] = useState<Teacher[]>([]);
   const [filteredTeacherData, setFilteredTeacherData] = useState<any>(null);
 
   useEffect(() => {
-    const fetchTeachers = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase.from('teachers').select('*');
-        if (error) throw error;
-        setTeachers(data as Teacher[] || []);
+        const [teachersData, subjectsData] = await Promise.all([
+          supabase.from('teachers').select('*'),
+          supabase.from('subjects').select('*')
+        ]);
+        
+        if (teachersData.error) throw teachersData.error;
+        if (subjectsData.error) throw subjectsData.error;
+        
+        setTeachers(teachersData.data as Teacher[] || []);
+        setSubjects(subjectsData.data || []);
       } catch (error: any) {
-        console.error('Error fetching teachers:', error.message);
+        console.error('Error fetching data:', error.message);
       }
     };
 
-    fetchTeachers();
+    fetchData();
   }, []);
 
   useEffect(() => {
-    if (teachers && teachers.length > 0) {
-      const allSubjects = [...new Set(teachers.flatMap(teacher => teacher.subjects))];
-      setSubjects(allSubjects);
+    if (teachers && teachers.length > 0 && subjects && subjects.length > 0) {
+      const allSubjectIds = [...new Set(teachers.flatMap(teacher => teacher.subjects))];
+      const subjectNames = allSubjectIds.map(subjectId => {
+        const subject = subjects.find(s => s.id === subjectId);
+        return subject ? `${subject.name} (${subject.code})` : subjectId;
+      });
+      setSubjects(subjectNames);
     }
-  }, [teachers]);
+  }, [teachers, subjects]);
 
   useEffect(() => {
     let filtered = teachers || [];
@@ -62,13 +73,17 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
     // Filter by subjects if selected
     if (selectedSubjects.length > 0) {
       filtered = filtered.filter(teacher => 
-        teacher.subjects.some(subject => selectedSubjects.includes(subject))
+        teacher.subjects.some(subjectId => {
+          const subject = subjects.find((s: any) => s.id === subjectId);
+          const subjectName = subject ? `${subject.name} (${subject.code})` : subjectId;
+          return selectedSubjects.includes(subjectName);
+        })
       );
     }
     
     const uniqueTeachers = checkForDuplicates(filtered, 'email');
     setFilteredTeachers(uniqueTeachers || []);
-  }, [teachers, selectedSubjects]);
+  }, [teachers, selectedSubjects, subjects]);
 
   const handleViewTeacherTimetable = () => {
     if (!selectedTeacher || !selectedTimetable) return;
@@ -155,7 +170,10 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
                       <div className="font-medium">{teacher.name}</div>
                       <div className="text-muted-foreground text-xs">{teacher.specialization}</div>
                       <div className="text-muted-foreground text-xs">
-                        Subjects: {teacher.subjects.join(', ')}
+                        Subjects: {teacher.subjects.map(subjectId => {
+                          const subject = subjects.find((s: any) => s.id === subjectId);
+                          return subject ? `${subject.name} (${subject.code})` : subjectId;
+                        }).join(', ')}
                       </div>
                     </Label>
                   </div>
@@ -171,7 +189,10 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
           <Button 
             className="w-full"
             disabled={!selectedTeacher || !selectedTimetable}
-            onClick={handleViewTeacherTimetable}
+            onClick={() => {
+              handleViewTeacherTimetable();
+              onApplyFilters();
+            }}
           >
             View Teacher Schedule
           </Button>

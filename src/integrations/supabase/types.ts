@@ -125,7 +125,7 @@ export type Database = {
           name: string
           practicals: number | null
           semester: string
-          stream: string
+          streams: string[]
           tutorials: number | null
         }
         Insert: {
@@ -137,7 +137,7 @@ export type Database = {
           name: string
           practicals?: number | null
           semester: string
-          stream: string
+          streams?: string[]
           tutorials?: number | null
         }
         Update: {
@@ -149,7 +149,7 @@ export type Database = {
           name?: string
           practicals?: number | null
           semester?: string
-          stream?: string
+          streams?: string[]
           tutorials?: number | null
         }
         Relationships: []

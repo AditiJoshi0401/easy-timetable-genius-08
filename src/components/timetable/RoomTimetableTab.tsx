@@ -156,7 +156,10 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
         <Button 
           className="w-full"
           disabled={!selectedRoom || !selectedTimetable}
-          onClick={handleViewRoomTimetable}
+          onClick={() => {
+            handleViewRoomTimetable();
+            onApplyFilters();
+          }}
         >
           View Room Schedule
         </Button>

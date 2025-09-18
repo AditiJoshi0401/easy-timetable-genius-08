@@ -38,7 +38,7 @@ const DataInput = () => {
   const [subjectForm, setSubjectForm] = useState({
     name: "",
     code: "",
-    stream: "",
+    streams: [] as string[],
     semester: "",  // Changed from year to semester
     lectures: 0,
     tutorials: 0,
@@ -132,19 +132,20 @@ const DataInput = () => {
     if (roomsData) setRooms(roomsData);
   }, [roomsData]);
 
-  // Update available semesters when stream is selected
+  // Update available semesters when streams are selected
   useEffect(() => {
-    if (subjectForm.stream) {
-      const selectedStream = streams.find(s => s.code === subjectForm.stream);
-      if (selectedStream) {
-        const semesters = Array.from({ length: selectedStream.semesters }, (_, i) => i + 1);
+    if (subjectForm.streams.length > 0) {
+      const selectedStreams = streams.filter(s => subjectForm.streams.includes(s.code));
+      if (selectedStreams.length > 0) {
+        const maxSemesters = Math.max(...selectedStreams.map(s => s.semesters));
+        const semesters = Array.from({ length: maxSemesters }, (_, i) => i + 1);
         setAvailableSemesters(semesters);
       }
     } else {
       setAvailableSemesters([]);
       setSubjectForm(prev => ({ ...prev, semester: "" }));
     }
-  }, [subjectForm.stream, streams]);
+  }, [subjectForm.streams, streams]);
 
   // Check for teacher warning when subjects change
   useEffect(() => {
@@ -153,7 +154,14 @@ const DataInput = () => {
         subjects.find(s => s.id === subjId)
       ).filter(Boolean);
 
-      const streamsSemesters = subjectDetails.map(subj => `${subj?.stream}-${subj?.semester}`);
+      const streamsSemesters: string[] = [];
+      subjectDetails.forEach(subj => {
+        if (subj?.streams) {
+          subj.streams.forEach(stream => {
+            streamsSemesters.push(`${stream}-${subj.semester}`);
+          });
+        }
+      });
       const uniqueStreamsSemesters = new Set(streamsSemesters);
 
       if (streamsSemesters.length !== uniqueStreamsSemesters.size) {
@@ -176,7 +184,7 @@ const DataInput = () => {
     setSubjectForm({
       name: subject.name,
       code: subject.code,
-      stream: subject.stream,
+      streams: subject.streams || [],
       semester: subject.semester.toString(),  // Changed from year to semester
       lectures: subject.lectures,
       tutorials: subject.tutorials,
@@ -190,7 +198,7 @@ const DataInput = () => {
     setSubjectForm({
       name: "",
       code: "",
-      stream: "",
+      streams: [] as string[],
       semester: "",  // Changed from year to semester
       lectures: 0,
       tutorials: 0,
@@ -200,7 +208,7 @@ const DataInput = () => {
   };
 
   const saveSubject = async () => {
-    if (!subjectForm.name || !subjectForm.code || !subjectForm.stream || !subjectForm.semester) {
+    if (!subjectForm.name || !subjectForm.code || subjectForm.streams.length === 0 || !subjectForm.semester) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields for the subject.",
@@ -214,7 +222,7 @@ const DataInput = () => {
         await updateSubject(selectedSubject.id, {
           name: subjectForm.name,
           code: subjectForm.code,
-          stream: subjectForm.stream,
+          streams: subjectForm.streams,
           semester: subjectForm.semester,  // Changed from year to semester
           lectures: subjectForm.lectures,
           tutorials: subjectForm.tutorials,
@@ -229,7 +237,7 @@ const DataInput = () => {
         await addSubject({
           name: subjectForm.name,
           code: subjectForm.code,
-          stream: subjectForm.stream,
+          streams: subjectForm.streams,
           semester: subjectForm.semester,  // Changed from year to semester
           lectures: subjectForm.lectures,
           tutorials: subjectForm.tutorials,
@@ -642,9 +650,11 @@ const DataInput = () => {
                             <div className="font-medium text-gray-900 dark:text-gray-100">{subject.name}</div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{subject.code}</td>
-                          <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">
-                            {streams.find(s => s.id === subject.stream)?.name || subject.stream}
-                          </td>
+                           <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                             {subject.streams.map(streamCode => 
+                               streams.find(s => s.code === streamCode)?.name || streamCode
+                             ).join(', ')}
+                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400">{subject.semester}</td>
                           <td className="px-4 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{subject.lectures}</td>
                           <td className="px-4 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{subject.tutorials}</td>
@@ -661,16 +671,6 @@ const DataInput = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <Label htmlFor="subject-name">Subject Name *</Label>
-                  <Input 
-                    id="subject-name"
-                    value={subjectForm.name} 
-                    onChange={e => handleSubjectFormChange("name", e.target.value)}
-                    placeholder="Enter subject name"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
                   <Label htmlFor="subject-code">Subject Code *</Label>
                   <Input 
                     id="subject-code"
@@ -681,30 +681,65 @@ const DataInput = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="subject-stream">Stream *</Label>
+                  <Label htmlFor="subject-name">Subject Name *</Label>
+                  <Input 
+                    id="subject-name"
+                    value={subjectForm.name} 
+                    onChange={e => handleSubjectFormChange("name", e.target.value)}
+                    placeholder="Enter subject name"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="subject-streams">Streams *</Label>
                   <Select 
-                    value={subjectForm.stream} 
-                    onValueChange={value => handleSubjectFormChange("stream", value)}
+                    value={subjectForm.streams.length === 1 ? subjectForm.streams[0] : ""} 
+                    onValueChange={value => {
+                      const currentStreams = [...subjectForm.streams];
+                      if (currentStreams.includes(value)) {
+                        // Remove if already selected
+                        handleSubjectFormChange("streams", currentStreams.filter(s => s !== value));
+                      } else {
+                        // Add to selection
+                        handleSubjectFormChange("streams", [...currentStreams, value]);
+                      }
+                    }}
                   >
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select Stream" />
+                      <SelectValue placeholder={subjectForm.streams.length > 0 ? `${subjectForm.streams.length} selected` : "Select Streams"} />
                     </SelectTrigger>
                     <SelectContent>
                       {streams.map(stream => (
-                        <SelectItem key={stream.id} value={stream.code}>{stream.name}</SelectItem>
+                        <SelectItem key={stream.id} value={stream.code}>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="checkbox" 
+                              checked={subjectForm.streams.includes(stream.code)}
+                              readOnly
+                            />
+                            {stream.name}
+                          </div>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {subjectForm.streams.length > 0 && (
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      Selected: {subjectForm.streams.map(streamCode => 
+                        streams.find(s => s.code === streamCode)?.name || streamCode
+                      ).join(', ')}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="subject-semester">Semester *</Label>
                   <Select 
                     value={subjectForm.semester} 
                     onValueChange={value => handleSubjectFormChange("semester", value)}
-                    disabled={!subjectForm.stream}
+                    disabled={subjectForm.streams.length === 0}
                   >
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder={subjectForm.stream ? "Select Semester" : "Select Stream First"} />
+                      <SelectValue placeholder={subjectForm.streams.length > 0 ? "Select Semester" : "Select Streams First"} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableSemesters.map(semester => (
@@ -979,7 +1014,9 @@ const DataInput = () => {
                             onCheckedChange={() => handleSubjectToggle(subject.id)}
                           />
                           <Label htmlFor={`subject-${subject.id}`} className="text-sm font-normal">
-                            {subject.name} ({subject.code}) - {streams.find(s => s.code === subject.stream)?.name} Semester {subject.semester}
+                            {subject.name} ({subject.code}) - {subject.streams.map(streamCode => 
+                              streams.find(s => s.code === streamCode)?.name || streamCode
+                            ).join(', ')} Semester {subject.semester}
                           </Label>
                         </div>
                       ))
