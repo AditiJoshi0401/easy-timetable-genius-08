@@ -127,9 +127,21 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
             if (viewType === "teacher" && slot.teacher) {
               const slotTeacherId = typeof slot.teacher === 'string' ? slot.teacher : slot.teacher?.id;
               match = slotTeacherId === filterId || slotTeacherId === teacherId;
-            } else if (viewType === "room" && slot.room) {
-              const slotRoomId = typeof slot.room === 'string' ? slot.room : slot.room?.id;
-              match = slotRoomId === filterId || slotRoomId === roomId;
+            } else if (viewType === "room") {
+              // A room view should match if slot.room matches or if slot.rooms contains the room
+              let slotRoomId = null;
+              if (slot.room) slotRoomId = typeof slot.room === 'string' ? slot.room : slot.room?.id;
+              let contains = false;
+              if (slot.rooms && Array.isArray(slot.rooms)) {
+                for (const r of slot.rooms) {
+                  if (!r) continue;
+                  const rId = typeof r === 'string' ? r : r.id || '';
+                  const rNumber = typeof r === 'object' && r.number ? String(r.number) : '';
+                  if (rId === filterId || rId === roomId || rNumber === filterId || rNumber === roomId) { contains = true; break; }
+                }
+              }
+
+              match = (slotRoomId === filterId || slotRoomId === roomId) || contains;
             } else if (viewType === "subject" && slot.subject) {
               const subjectId = typeof slot.subject === 'string' ? slot.subject : slot.subject?.id;
               match = subjectId === filterId;
@@ -246,7 +258,12 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
                             )}
                           </div>
                         )}
-                        {showRooms && slot.room && (
+                        {showRooms && (slot.rooms && Array.isArray(slot.rooms)) && (
+                          <div className="text-xs text-muted-foreground">
+                            Room(s): {slot.rooms.map((r: any) => typeof r === 'string' ? r : r?.number || r?.id).join(', ')}
+                          </div>
+                        )}
+                        {showRooms && !slot.rooms && slot.room && (
                           <div className="text-xs text-muted-foreground">
                             Room: {typeof slot.room === 'string'
                               ? slot.room

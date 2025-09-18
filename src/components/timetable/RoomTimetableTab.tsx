@@ -11,7 +11,7 @@ import { Room } from "@/services/supabaseService";
 
 interface RoomTimetableTabProps {
   selectedTimetable: any;
-  onApplyFilters: () => Promise<any | null>;
+  onApplyFilters: (roomId?: string) => Promise<any | null>;
 }
 
 const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
@@ -68,11 +68,12 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
     setFilteredRooms(uniqueRooms || []);
   }, [rooms, selectedRoomType, searchTerm]);
 
-  const handleViewRoomTimetable = () => {
-    if (!selectedRoom || !selectedTimetable) return;
-    
+  const handleViewRoomTimetable = (timetableParam?: any) => {
+    const timetableToUse = timetableParam || selectedTimetable;
+    if (!selectedRoom || !timetableToUse) return;
+
     // Filter the timetable data for the selected room
-    const roomData = { ...selectedTimetable.data };
+    const roomData = { ...timetableToUse.data };
     
     // Process each day in the timetable
     for (const day in roomData) {
@@ -80,11 +81,34 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
       for (const timeSlot in roomData[day]) {
         const slot = roomData[day][timeSlot];
         
-        // If the slot doesn't have the selected room, remove it
-        if (!slot || 
-            !slot.room || 
-            (typeof slot.room === 'string' && slot.room !== selectedRoom) ||
-            (typeof slot.room === 'object' && slot.room.id !== selectedRoom)) {
+        // If the slot doesn't reference the selected room (supports slot.rooms array and legacy slot.room), remove it
+        let containsRoom = false;
+        if (!slot) {
+          containsRoom = false;
+        } else {
+          // Check slot.rooms array (new multi-room lab support)
+          if (slot.rooms && Array.isArray(slot.rooms)) {
+            for (const r of slot.rooms) {
+              if (!r) continue;
+              const rId = typeof r === 'string' ? r : r.id || String(r.id || r.number || '');
+              const rNumber = typeof r === 'object' ? (r.number ? String(r.number) : '') : '';
+              if (rId === selectedRoom || rNumber === selectedRoom) { containsRoom = true; break; }
+            }
+          }
+
+          // Check legacy single room field
+          if (!containsRoom && slot.room) {
+            if (typeof slot.room === 'string') {
+              if (slot.room === selectedRoom) containsRoom = true;
+            } else if (typeof slot.room === 'object') {
+              const rId = slot.room.id ? String(slot.room.id) : '';
+              const rNumber = slot.room.number ? String(slot.room.number) : '';
+              if (rId === selectedRoom || rNumber === selectedRoom) containsRoom = true;
+            }
+          }
+        }
+
+        if (!containsRoom) {
           delete roomData[day][timeSlot];
         }
       }
@@ -136,8 +160,8 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
                     type="radio"
                     id={`room-${room.id}`}
                     name="selectedRoom"
-                    value={room.id}
-                    checked={selectedRoom === room.id}
+                    value={String(room.id)}
+                    checked={selectedRoom === String(room.id)}
                     onChange={(e) => setSelectedRoom(e.target.value)}
                     className="form-radio text-primary"
                   />
@@ -155,11 +179,18 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
         
         <Button
           className="w-full"
-          disabled={!selectedRoom || !selectedTimetable}
+            disabled={!selectedRoom}
           onClick={async () => {
-            handleViewRoomTimetable();
-            await onApplyFilters();
-          }}
+              console.debug('View Room clicked', { selectedRoom, selectedTimetable });
+              const fetched = await onApplyFilters(selectedRoom);
+              // If parent returned a timetable, use it for filtering so the view is populated
+              if (fetched) {
+                handleViewRoomTimetable(fetched);
+              } else {
+                // fallback to existing selectedTimetable if available
+                handleViewRoomTimetable();
+              }
+            }}
         >
           View Room Schedule
         </Button>

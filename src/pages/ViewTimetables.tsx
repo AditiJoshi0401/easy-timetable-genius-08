@@ -157,20 +157,72 @@ const ViewTimetables = () => {
     }
   };
 
-  // Handle applying filters for room timetable
-  const handleApplyRoomFilters = async () => {
-    if (!selectedRoom) {
+  // Handle applying filters for room timetable (accepts optional roomId)
+  const handleApplyRoomFilters = async (roomId?: string) => {
+    const id = roomId || selectedRoom;
+    if (!id) {
       setSelectedRoomTimetable(null);
       return null;
     }
 
     try {
-      const timetableKey = `${selectedRoom}`;
-      const timetable = await fetchTimetable(timetableKey);
-      setSelectedRoomTimetable(timetable);
-      return timetable;
+      // Try direct lookup first
+      const direct = await fetchTimetable(id);
+      if (direct) {
+        setSelectedRoomTimetable(direct);
+        setSelectedRoom(id);
+        return direct;
+      }
+
+      // If not found directly, search all timetables for any slot that references this room
+      const allTimetables = await fetchAllTimetables();
+
+      let found: any = null;
+      for (const tt of allTimetables || []) {
+        const data = tt.data || {};
+        let contains = false;
+
+        for (const day in data) {
+          if (contains) break;
+          const daySlots = data[day] || {};
+          for (const time in daySlots) {
+            const slot = daySlots[time];
+            if (!slot) continue;
+            // slot.rooms may be an array of room objects or ids
+            if (Array.isArray(slot.rooms)) {
+              for (const r of slot.rooms) {
+                if (!r) continue;
+                if (typeof r === 'string' && r === id) { contains = true; break; }
+                if (typeof r === 'object' && r.id === id) { contains = true; break; }
+              }
+            }
+            // legacy single room field
+            if (!contains && slot.room) {
+              const r = slot.room;
+              if (typeof r === 'string' && r === id) { contains = true; }
+              if (typeof r === 'object' && r.id === id) { contains = true; }
+            }
+            if (contains) break;
+          }
+        }
+
+        if (contains) {
+          found = tt;
+          break;
+        }
+      }
+
+      if (found) {
+        setSelectedRoomTimetable(found);
+        setSelectedRoom(id);
+        return found;
+      } else {
+        setSelectedRoomTimetable(null);
+        console.warn(`No timetable found for room id ${id}`);
+        return null;
+      }
     } catch (error) {
-      console.error('Error fetching timetable:', error);
+      console.error('Error searching for room timetable:', error);
       setSelectedRoomTimetable(null);
       return null;
     }
