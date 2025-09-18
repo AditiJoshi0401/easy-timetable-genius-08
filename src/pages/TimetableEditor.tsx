@@ -77,20 +77,18 @@ const TimetableEditor = () => {
 
   const { data: streams = [], isLoading: streamsLoading } = useQuery({
     queryKey: ['streams'],
-    queryFn: fetchStreams,
-    meta: {
-      onSuccess: (data) => {
-        if (!data || data.length === 0) {
-          setNoStreamsDataExists(true);
-        } else {
-          setNoStreamsDataExists(false);
-        }
-      },
-      onError: () => {
+    queryFn: fetchStreams
+  });
+
+  useEffect(() => {
+    if (!streamsLoading) {
+      if (!streams || streams.length === 0) {
         setNoStreamsDataExists(true);
+      } else {
+        setNoStreamsDataExists(false);
       }
     }
-  });
+  }, [streams, streamsLoading]);
 
   const { data: allDivisions = [] } = useQuery({
     queryKey: ['divisions'],
@@ -214,7 +212,13 @@ const TimetableEditor = () => {
     days.forEach(day => {
       newTimetable[day] = {};
       timeSlots.forEach(slot => {
-        newTimetable[day][slot] = null;
+        // Initialize with empty cell structure
+        newTimetable[day][slot] = {
+          subject: null,
+          teacher: null,
+          room: null,
+          type: null
+        };
       });
     });
 
@@ -959,7 +963,7 @@ const TimetableEditor = () => {
                                     </div>
                                     <div className="text-xs text-muted-foreground flex items-center gap-1">
                                       <Building className="h-3 w-3" />
-                                      <span>{cellData.room.number}</span>
+                                      <span>{cellData.room?.number || 'No Room'}</span>
                                     </div>
                                     <div className="chip chip-primary text-[10px] py-0.5 px-1.5 mt-1">
                                       {cellData.type}
