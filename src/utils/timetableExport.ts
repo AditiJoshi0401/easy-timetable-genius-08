@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { getSubjectColor } from '@/utils/subjectColors';
 
 // Extend jsPDF to include autoTable
 declare module 'jspdf' {
@@ -26,65 +27,142 @@ const timeSlots = [
   '15:30-16:30'
 ];
 
-export const exportTimetableToPDF = (timetableData: TimetableExportData): void => {
-  const doc = new jsPDF('landscape');
-  
-  // Title
+export const exportTimetableToPDF = async (timetableData: TimetableExportData, domElement?: HTMLElement | null): Promise<void> => {
+  // If a DOM element is provided, prefer rendering the exact UI and converting to PDF via html2canvas
+  if (domElement) {
+    try {
+      const html2canvas = await import('html2canvas');
+      const canvas = await html2canvas.default(domElement, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape' });
+
+      // Fit image to PDF width while preserving aspect
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeightAvailable = pdf.internal.pageSize.getHeight() - 20; // leave top margin
+
+      const img = new Image();
+      img.src = imgData;
+      await new Promise((res) => (img.onload = res));
+
+      // Source canvas pixel dimensions
+      const srcW = canvas.width;
+      const srcH = canvas.height;
+
+      // Destination width in PDF points
+      const dstW = pdfWidth;
+      const dstHTotal = (srcH * dstW) / srcW;
+
+      if (dstHTotal <= pdfHeightAvailable) {
+        // Fits on one page
+        pdf.addImage(imgData, 'PNG', 0, 10, dstW, dstHTotal);
+      } else {
+        // Need to split into multiple pages vertically.
+        // Compute height in source pixels that maps to one PDF page
+        const pxPerPdfPoint = srcW / dstW; // source pixels per PDF point horizontally
+        const pagePxHeight = Math.floor(pdfHeightAvailable * pxPerPdfPoint);
+
+        let offsetY = 0;
+        let page = 0;
+        while (offsetY < srcH) {
+          // Create a temp canvas for the page slice
+          const tmpCanvas = document.createElement('canvas');
+          tmpCanvas.width = srcW;
+          tmpCanvas.height = Math.min(pagePxHeight, srcH - offsetY);
+          const ctx = tmpCanvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+            ctx.drawImage(canvas, 0, offsetY, srcW, tmpCanvas.height, 0, 0, srcW, tmpCanvas.height);
+          }
+          const pageImg = tmpCanvas.toDataURL('image/png');
+          const pageDstH = (tmpCanvas.height * dstW) / srcW;
+          if (page > 0) pdf.addPage();
+          pdf.addImage(pageImg, 'PNG', 0, 10, dstW, pageDstH);
+          offsetY += tmpCanvas.height;
+          page++;
+        }
+      }
+
+      const fileName = `${timetableData.name.replace(/\s+/g, '_')}_${timetableData.type}${timetableData.entityName ? `_${timetableData.entityName.replace(/\s+/g, '_')}` : ''}.pdf`;
+      pdf.save(fileName);
+      return;
+    } catch (err) {
+      console.warn('html2canvas PDF export failed or not available, falling back to table PDF export', err);
+      // fallthrough to autoTable fallback
+    }
+  }
+
+  // Fallback: construct a simple autoTable-based PDF (no DOM capture)
+  const doc = new jsPDF({ orientation: 'landscape' });
   doc.setFontSize(16);
   doc.text(`${timetableData.name}${timetableData.entityName ? ` - ${timetableData.entityName}` : ''}`, 14, 20);
-  
-  // Prepare table data
-  const tableData = [];
-  
-  // Header row
-  const headers = ['Time', ...daysOfWeek];
-  
-  // Data rows
-  for (const timeSlot of timeSlots) {
-    const row = [timeSlot];
-    
-    for (const day of daysOfWeek) {
-      const slot = timetableData.data?.[day]?.[timeSlot];
-      if (slot) {
-        let cellContent = '';
-        if (slot.subject) {
-          cellContent += typeof slot.subject === 'object' ? slot.subject.name : slot.subject;
-        }
-        if (slot.teacher && timetableData.type !== 'teacher') {
-          cellContent += `\n${typeof slot.teacher === 'object' ? slot.teacher.name : slot.teacher}`;
-        }
-        if (slot.room && timetableData.type !== 'room') {
-          cellContent += `\n${typeof slot.room === 'object' ? slot.room.number : slot.room}`;
-        }
-        row.push(cellContent.trim());
-      } else {
-        row.push('');
+
+  const OFFICIAL_DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dataDays = OFFICIAL_DAYS_ORDER.filter(day => timetableData.data && timetableData.data[day]);
+
+  const allPeriodsSet = new Set<string>();
+  if (timetableData.data) {
+    for (const d of Object.keys(timetableData.data)) {
+      const daySlots = timetableData.data[d] || {};
+      Object.keys(daySlots).forEach(p => allPeriodsSet.add(p));
+    }
+  }
+
+  const OFFICIAL_TIME_SLOTS_ORDER = [
+    '9:30 - 10:30', '10:30 - 11:30', '11:30 - 12:30', '12:30 - 1:30', '1:30 - 2:30', '2:30 - 3:30', '3:30 - 4:30', '4:30 - 5:30'
+  ];
+
+  const allPeriods = Array.from(allPeriodsSet);
+  const periods = allPeriods.sort((a, b) => {
+    const ia = OFFICIAL_TIME_SLOTS_ORDER.indexOf(a);
+    const ib = OFFICIAL_TIME_SLOTS_ORDER.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  const head = ['Period', ...dataDays];
+  const body: any[] = [];
+
+  for (const period of periods) {
+    const row: any[] = [period];
+    for (const day of dataDays) {
+      const slot = timetableData.data?.[day]?.[period] || null;
+      if (!slot) row.push('');
+      else {
+        const parts: string[] = [];
+        if (slot.subject) parts.push(typeof slot.subject === 'object' ? slot.subject.name : slot.subject);
+        if (slot.teacher) parts.push(typeof slot.teacher === 'object' ? slot.teacher.name : slot.teacher);
+        if (slot.rooms && Array.isArray(slot.rooms)) parts.push('Rooms: ' + slot.rooms.map((r: any) => typeof r === 'string' ? r : r.number || r.id).join(', '));
+        else if (slot.room) parts.push('Room: ' + (typeof slot.room === 'object' ? slot.room.number || slot.room.id : slot.room));
+        if (slot.type) parts.push('Type: ' + slot.type);
+        row.push(parts.join('\n'));
       }
     }
-    
-    tableData.push(row);
+    body.push(row);
   }
-  
-  // Generate table
-  doc.autoTable({
-    head: [headers],
-    body: tableData,
+
+  (doc as any).autoTable({
+    head: [head],
+    body,
     startY: 30,
-    styles: {
-      fontSize: 9,
-      cellPadding: 3,
-    },
-    headStyles: {
-      fillColor: [41, 128, 185],
-      textColor: 255,
-    },
-    columnStyles: {
-      0: { cellWidth: 25 }
-    },
-    margin: { top: 30 }
+    styles: { fontSize: 9, cellPadding: 4, textColor: [0, 0, 0] },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+    didParseCell: function (data: any) {
+      if (data.section === 'body' && data.column.index > 0 && data.cell.raw) {
+        const rawText = String(data.cell.raw);
+        const firstLine = rawText.split('\n')[0];
+        const color = getSubjectColor(firstLine) || '#FFFFFF';
+        const hex = color.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        data.cell.styles.fillColor = [r, g, b];
+        data.cell.styles.textColor = [0, 0, 0];
+      }
+    }
   });
-  
-  // Save the PDF
   const fileName = `${timetableData.name.replace(/\s+/g, '_')}_${timetableData.type}${timetableData.entityName ? `_${timetableData.entityName.replace(/\s+/g, '_')}` : ''}.pdf`;
   doc.save(fileName);
 };

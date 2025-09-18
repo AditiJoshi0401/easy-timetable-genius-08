@@ -17,27 +17,7 @@ interface TimetableDisplayProps {
   rooms?: any[];
 }
 
-// Define a set of pleasing background colors for subjects
-const SUBJECT_COLORS = [
-  "#F2FCE2", // Soft Green
-  "#FEF7CD", // Soft Yellow
-  "#FEC6A1", // Soft Orange
-  "#E5DEFF", // Soft Purple
-  "#FFDEE2", // Soft Pink
-  "#FDE1D3", // Soft Peach
-  "#D3E4FD", // Soft Blue
-  "#F1F0FB", // Soft Gray
-  "#E0F2F1", // Soft Teal
-  "#EDE7F6", // Soft Lavender
-  "#FFF3E0", // Soft Amber
-  "#E8F5E9", // Mint Green
-  "#F3E5F5", // Pale Purple
-  "#E1F5FE", // Light Blue
-  "#FFF8E1", // Light Yellow
-];
-
-// Map to store subject-to-color associations
-const subjectColorMap = new Map();
+import { getSubjectColor } from '@/utils/subjectColors';
 
 // Define the official day and time slot order
 const OFFICIAL_DAYS_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -163,20 +143,7 @@ const TimetableDisplay: React.FC<TimetableDisplayProps> = ({
 
   const filteredData = getFilteredData();
 
-  // Get a color for a subject - consistently maps subjects to colors
-  const getSubjectColor = (subject: any) => {
-    const subjectId = typeof subject === 'string' ? subject : subject?.id || subject?.name;
-    
-    if (!subjectId) return "#FFFFFF"; // Default white for unknown subjects
-    
-    if (!subjectColorMap.has(subjectId)) {
-      // Assign a new color from the palette
-      const colorIndex = subjectColorMap.size % SUBJECT_COLORS.length;
-      subjectColorMap.set(subjectId, SUBJECT_COLORS[colorIndex]);
-    }
-    
-    return subjectColorMap.get(subjectId);
-  };
+  // Uses shared getSubjectColor utility for consistent palette across UI and exports
 
   // Function to get ordered timetable data for export
   const getOrderedTimetableData = () => {

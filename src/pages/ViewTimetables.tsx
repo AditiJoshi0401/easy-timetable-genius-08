@@ -228,8 +228,8 @@ const ViewTimetables = () => {
     }
   };
 
-  // Export functionality
-  const handleExportTimetable = (format: 'pdf' | 'excel' | 'json', timetable: any, type: 'division' | 'teacher' | 'room', entityName?: string) => {
+  // Export functionality. If domElement is provided, pass it to PDF exporter for exact UI capture
+  const handleExportTimetable = async (format: 'pdf' | 'excel' | 'json', timetable: any, type: 'division' | 'teacher' | 'room', entityName?: string, domElement?: HTMLElement | null) => {
     if (!timetable) {
       toast({
         title: "No Timetable",
@@ -249,7 +249,7 @@ const ViewTimetables = () => {
     try {
       switch (format) {
         case 'pdf':
-          exportTimetableToPDF(exportData);
+          await exportTimetableToPDF(exportData, domElement || timetableRef.current);
           break;
         case 'excel':
           exportTimetableToExcel(exportData);

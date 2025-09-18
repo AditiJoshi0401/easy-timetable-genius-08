@@ -21,7 +21,7 @@ interface DivisionTimetableTabProps {
   onApplyFilters: () => void;
   onManageStructure: () => void;
   timetableRef: React.RefObject<HTMLDivElement>;
-  onExportTimetable?: (format: 'pdf' | 'excel' | 'json', timetable: any, type: 'division' | 'teacher' | 'room', entityName?: string) => void;
+  onExportTimetable?: (format: 'pdf' | 'excel' | 'json', timetable: any, type: 'division' | 'teacher' | 'room', entityName?: string, domElement?: HTMLElement | null) => void;
 }
 
 const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
@@ -127,7 +127,7 @@ const DivisionTimetableTab: React.FC<DivisionTimetableTabProps> = ({
 
       {selectedTimetable && onExportTimetable && (
         <div className="flex gap-2 mb-4">
-          <Button variant="outline" size="sm" onClick={() => onExportTimetable('pdf', selectedTimetable, 'division', divisions.find(d => d.id === division)?.name)}>
+          <Button variant="outline" size="sm" onClick={() => onExportTimetable('pdf', selectedTimetable, 'division', divisions.find(d => d.id === division)?.name, timetableRef?.current)}>
             Export PDF
           </Button>
           <Button variant="outline" size="sm" onClick={() => onExportTimetable('excel', selectedTimetable, 'division', divisions.find(d => d.id === division)?.name)}>
