@@ -1,7 +1,14 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { getSubjectColor } from '@/utils/subjectColors';
+import { getSubjectColor, isColorDark } from '@/utils/subjectColors';
+// Helper to generate export file name
+function generateExportFileName(type: 'PDF' | 'Excel' | 'JSON', details: string) {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const dateStr = `${pad(now.getDate())}_${pad(now.getMonth() + 1)}_${now.getFullYear()}`;
+  return `${dateStr}_TimeTable_${details}.${type === 'PDF' ? 'pdf' : type === 'Excel' ? 'xlsx' : 'json'}`;
+}
 
 // Extend jsPDF to include autoTable
 declare module 'jspdf' {
@@ -32,58 +39,15 @@ export const exportTimetableToPDF = async (timetableData: TimetableExportData, d
   if (domElement) {
     try {
       const html2canvas = await import('html2canvas');
-      const canvas = await html2canvas.default(domElement, { scale: 2 });
+      // Use a high scale for better quality and capture full element
+      const canvas = await html2canvas.default(domElement, { scale: 2, useCORS: true, scrollY: -window.scrollY });
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'landscape' });
-
-      // Fit image to PDF width while preserving aspect
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeightAvailable = pdf.internal.pageSize.getHeight() - 20; // leave top margin
-
-      const img = new Image();
-      img.src = imgData;
-      await new Promise((res) => (img.onload = res));
-
-      // Source canvas pixel dimensions
-      const srcW = canvas.width;
-      const srcH = canvas.height;
-
-      // Destination width in PDF points
-      const dstW = pdfWidth;
-      const dstHTotal = (srcH * dstW) / srcW;
-
-      if (dstHTotal <= pdfHeightAvailable) {
-        // Fits on one page
-        pdf.addImage(imgData, 'PNG', 0, 10, dstW, dstHTotal);
-      } else {
-        // Need to split into multiple pages vertically.
-        // Compute height in source pixels that maps to one PDF page
-        const pxPerPdfPoint = srcW / dstW; // source pixels per PDF point horizontally
-        const pagePxHeight = Math.floor(pdfHeightAvailable * pxPerPdfPoint);
-
-        let offsetY = 0;
-        let page = 0;
-        while (offsetY < srcH) {
-          // Create a temp canvas for the page slice
-          const tmpCanvas = document.createElement('canvas');
-          tmpCanvas.width = srcW;
-          tmpCanvas.height = Math.min(pagePxHeight, srcH - offsetY);
-          const ctx = tmpCanvas.getContext('2d');
-          if (ctx) {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
-            ctx.drawImage(canvas, 0, offsetY, srcW, tmpCanvas.height, 0, 0, srcW, tmpCanvas.height);
-          }
-          const pageImg = tmpCanvas.toDataURL('image/png');
-          const pageDstH = (tmpCanvas.height * dstW) / srcW;
-          if (page > 0) pdf.addPage();
-          pdf.addImage(pageImg, 'PNG', 0, 10, dstW, pageDstH);
-          offsetY += tmpCanvas.height;
-          page++;
-        }
-      }
-
-      const fileName = `${timetableData.name.replace(/\s+/g, '_')}_${timetableData.type}${timetableData.entityName ? `_${timetableData.entityName.replace(/\s+/g, '_')}` : ''}.pdf`;
+      // Set PDF size to match image size (in px)
+      const pdfWidth = canvas.width;
+      const pdfHeight = canvas.height;
+      const pdf = new jsPDF({ orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait', unit: 'px', format: [pdfWidth, pdfHeight] });
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const fileName = generateExportFileName('PDF', timetableData.entityName || timetableData.name);
       pdf.save(fileName);
       return;
     } catch (err) {
@@ -159,7 +123,7 @@ export const exportTimetableToPDF = async (timetableData: TimetableExportData, d
         const g = parseInt(hex.substring(2, 4), 16);
         const b = parseInt(hex.substring(4, 6), 16);
         data.cell.styles.fillColor = [r, g, b];
-        data.cell.styles.textColor = [0, 0, 0];
+        data.cell.styles.textColor = isColorDark(color) ? 255 : 0;
       }
     }
   });
@@ -167,7 +131,7 @@ export const exportTimetableToPDF = async (timetableData: TimetableExportData, d
   doc.save(fileName);
 };
 
-export const exportTimetableToExcel = (timetableData: TimetableExportData): void => {
+export const exportTimetableToExcel = (timetableData: TimetableExportData, fileNameDetails: string = ""): void => {
   // Create workbook
   const wb = XLSX.utils.book_new();
 
@@ -281,25 +245,20 @@ export const exportTimetableToExcel = (timetableData: TimetableExportData): void
     }
   }
 
-  // Data cell styling and fills based on subject color
+  // Data cell styling and fills based on subject color, with font color contrast
   for (let R = range.s.r + 1; R <= range.e.r; ++R) {
     for (let C = range.s.c; C <= range.e.c; ++C) {
       const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
       const cell = ws[cell_ref];
       if (!cell) continue;
-
-      // Wrap text and center
       cell.s = cell.s || {};
       cell.s.alignment = { wrapText: true, vertical: 'center', horizontal: 'center' };
-
-      // If this is a subject cell (non-empty and not the period column), try to pick color
       if (C > 0 && cell.v && typeof cell.v === 'string' && cell.v.trim() !== '') {
-        // Try to extract the subject name from first line
         const firstLine = (cell.v as string).split('\n')[0];
         const color = getSubjectColor(firstLine) || '#FFFFFF';
         const rgb = color.replace('#', '').toUpperCase();
-        // Excel expects ARGB
         cell.s.fill = { fgColor: { rgb: `FF${rgb}` } };
+        cell.s.font = { color: { rgb: isColorDark(color) ? 'FFFFFFFF' : 'FF000000' }, bold: true };
       }
     }
   }
@@ -309,8 +268,7 @@ export const exportTimetableToExcel = (timetableData: TimetableExportData): void
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
   // File name
-  const fileName = `${timetableData.name.replace(/\s+/g, '_')}_${timetableData.type}${timetableData.entityName ? `_${timetableData.entityName.replace(/\s+/g, '_')}` : ''}.xlsx`;
-  // Write file
+  const fileName = generateExportFileName('Excel', fileNameDetails || timetableData.entityName || timetableData.name);
   XLSX.writeFile(wb, fileName);
 };
 

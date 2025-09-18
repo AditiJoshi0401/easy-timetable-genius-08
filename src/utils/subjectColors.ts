@@ -1,3 +1,11 @@
+// Returns true if the color is dark (for white text), false if light (for black text)
+export function isColorDark(hex: string): boolean {
+  hex = hex.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 < 128;
+}
 const SUBJECT_COLORS = [
   "#F2FCE2",
   "#FEF7CD",

@@ -57,7 +57,8 @@ const DataInput = () => {
     subjects: [] as string[],
     maxLectures: 10,
     maxLabs: 5,
-    maxTutorials: 8
+    maxTutorials: 8,
+    isTA: false
   });
   const [teacherWarning, setTeacherWarning] = useState<string>("");
 
@@ -296,7 +297,8 @@ const DataInput = () => {
       subjects: teacher.subjects || [],
       maxLectures: teacher.maxLectures || 10,
       maxLabs: teacher.maxLabs || 5,
-      maxTutorials: teacher.maxTutorials || 8
+      maxTutorials: teacher.maxTutorials || 8,
+      isTA: teacher.isTA || false
     });
   };
 
@@ -310,18 +312,33 @@ const DataInput = () => {
       subjects: [],
       maxLectures: 10,
       maxLabs: 5,
-      maxTutorials: 8
+      maxTutorials: 8,
+      isTA: false
     });
     setTeacherWarning("");
   };
 
   const handleRoleToggle = (roleName: string) => {
-    setTeacherForm(prev => ({
-      ...prev,
-      roles: prev.roles.includes(roleName)
-        ? prev.roles.filter(r => r !== roleName)
-        : [...prev.roles, roleName]
-    }));
+    setTeacherForm(prev => {
+      let newRoles;
+      let isTA = prev.isTA;
+      if (prev.roles.includes(roleName)) {
+        newRoles = prev.roles.filter(r => r !== roleName);
+        if (roleName === "TA") {
+          isTA = false;
+        }
+      } else {
+        newRoles = [...prev.roles, roleName];
+        if (roleName === "TA") {
+          isTA = true;
+        }
+      }
+      return {
+        ...prev,
+        roles: newRoles,
+        isTA
+      };
+    });
   };
 
   const handleSubjectToggle = (subjectId: string) => {
@@ -351,7 +368,7 @@ const DataInput = () => {
           specialization: teacherForm.specialization,
           roles: teacherForm.roles,
           subjects: teacherForm.subjects,
-          isTA: false,
+          isTA: teacherForm.isTA,
           maxLectures: teacherForm.maxLectures,
           maxLabs: teacherForm.maxLabs,
           maxTutorials: teacherForm.maxTutorials
@@ -367,7 +384,7 @@ const DataInput = () => {
           specialization: teacherForm.specialization,
           roles: teacherForm.roles,
           subjects: teacherForm.subjects,
-          isTA: false,
+          isTA: teacherForm.isTA,
           maxLectures: teacherForm.maxLectures,
           maxLabs: teacherForm.maxLabs,
           maxTutorials: teacherForm.maxTutorials

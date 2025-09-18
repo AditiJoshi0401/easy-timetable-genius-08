@@ -194,13 +194,6 @@ const Index = () => {
           </CardFooter>
         </Card>
       </div>
-
-      <div className="mt-8 text-center">
-        <Button onClick={() => navigate('/dashboard')} className="gap-2">
-          Go to Dashboard
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </div>
     </div>
   );
 };
