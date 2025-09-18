@@ -86,11 +86,12 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
     setFilteredTeachers(uniqueTeachers || []);
   }, [teachers, selectedSubjects, subjects]);
 
-  const handleViewTeacherTimetable = () => {
-    if (!selectedTeacher || !selectedTimetable) return;
-    
+  const handleViewTeacherTimetable = (timetableParam?: any) => {
+    const timetableToUse = timetableParam || selectedTimetable;
+    if (!selectedTeacher || !timetableToUse) return;
+
     // Filter the timetable data for the selected teacher
-    const teacherData = { ...selectedTimetable.data };
+    const teacherData = { ...timetableToUse.data };
     
     // Process each day in the timetable
     for (const day in teacherData) {
@@ -109,7 +110,7 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
     }
     
     setFilteredTeacherData({
-      ...selectedTimetable,
+      ...timetableToUse,
       data: teacherData
     });
   };
@@ -189,10 +190,14 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
           
           <Button
             className="w-full"
-            disabled={!selectedTeacher || !selectedTimetable}
+            disabled={!selectedTeacher}
             onClick={async () => {
-              handleViewTeacherTimetable();
-              await onApplyFilters(selectedTeacher);
+              const fetched = await onApplyFilters(selectedTeacher);
+              if (fetched) {
+                handleViewTeacherTimetable(fetched);
+              } else {
+                handleViewTeacherTimetable();
+              }
             }}
           >
             View Teacher Schedule
