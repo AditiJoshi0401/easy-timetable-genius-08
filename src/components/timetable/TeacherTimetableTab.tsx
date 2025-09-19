@@ -22,11 +22,13 @@ interface Teacher {
 interface TeacherTimetableTabProps {
   selectedTimetable: any;
   onApplyFilters: (teacherId: string) => Promise<any | null>;
+  onExportTimetable?: (format: 'pdf' | 'excel' | 'json', timetable: any, type: 'division' | 'teacher' | 'room', entityName?: string, domElement?: HTMLElement | null) => void;
 }
 
 const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
   selectedTimetable,
-  onApplyFilters
+  onApplyFilters,
+  onExportTimetable
 }) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -202,6 +204,17 @@ const TeacherTimetableTab: React.FC<TeacherTimetableTabProps> = ({
           >
             View Teacher Schedule
           </Button>
+          
+          {filteredTeacherData && onExportTimetable && (
+            <div className="flex gap-2 mt-4">
+              <Button variant="outline" size="sm" onClick={() => onExportTimetable('pdf', filteredTeacherData, 'teacher', teachers.find(t => t.id === selectedTeacher)?.name, null)}>
+                Export PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => onExportTimetable('excel', filteredTeacherData, 'teacher', teachers.find(t => t.id === selectedTeacher)?.name)}>
+                Export Excel
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

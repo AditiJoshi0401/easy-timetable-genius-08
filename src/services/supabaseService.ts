@@ -142,12 +142,58 @@ export const importSubjectsData = (): Promise<void> => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           try {
-            const subjects = JSON.parse(e.target?.result as string);
-            // Handle import logic here
+            const rawData = e.target?.result as string;
+            const subjects = JSON.parse(rawData);
+            
+            // Validate the data structure
+            if (!Array.isArray(subjects)) {
+              throw new Error('Data must be an array');
+            }
+            
+            if (subjects.length === 0) {
+              throw new Error('No subjects found in the file');
+            }
+            
+            // Clean the data - remove fields that might cause issues
+            const cleanedSubjects = subjects.map(subject => {
+              const cleaned = { ...subject };
+              
+              // Remove auto-generated fields that Supabase handles
+              delete cleaned.id;
+              delete cleaned.created_at;
+              
+              // Ensure required fields exist
+              if (!cleaned.name) {
+                throw new Error('Subject name is required');
+              }
+              if (!cleaned.code) {
+                throw new Error('Subject code is required');
+              }
+              
+              // Ensure arrays are properly formatted
+              if (!cleaned.streams) cleaned.streams = [];
+              if (!Array.isArray(cleaned.streams)) cleaned.streams = [cleaned.streams];
+              
+              return cleaned;
+            });
+            
+            // Insert all subjects
+            const { data, error } = await supabase
+              .from('subjects')
+              .insert(cleanedSubjects)
+              .select();
+
+            if (error) {
+              console.error('Database error:', error);
+              throw new Error(`Database error: ${error.message}`);
+            }
+            
+            console.log('Successfully imported subjects:', data);
             resolve();
           } catch (error) {
+            console.error('Import error:', error);
             reject(error);
           }
         };
@@ -292,12 +338,57 @@ export const importRoomsData = (): Promise<void> => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           try {
-            const rooms = JSON.parse(e.target?.result as string);
-            // Handle import logic here
+            const rawData = e.target?.result as string;
+            const rooms = JSON.parse(rawData);
+            
+            // Validate the data structure
+            if (!Array.isArray(rooms)) {
+              throw new Error('Data must be an array');
+            }
+            
+            if (rooms.length === 0) {
+              throw new Error('No rooms found in the file');
+            }
+            
+            // Clean the data - remove fields that might cause issues
+            const cleanedRooms = rooms.map(room => {
+              const cleaned = { ...room };
+              
+              // Remove auto-generated fields that Supabase handles
+              delete cleaned.id;
+              delete cleaned.created_at;
+              
+              // Ensure required fields exist
+              if (!cleaned.number) {
+                throw new Error('Room number is required');
+              }
+              if (!cleaned.type) {
+                cleaned.type = 'classroom'; // Default type
+              }
+              if (!cleaned.capacity) {
+                cleaned.capacity = 0; // Default capacity
+              }
+              
+              return cleaned;
+            });
+            
+            // Insert all rooms
+            const { data, error } = await supabase
+              .from('rooms')
+              .insert(cleanedRooms)
+              .select();
+
+            if (error) {
+              console.error('Database error:', error);
+              throw new Error(`Database error: ${error.message}`);
+            }
+            
+            console.log('Successfully imported rooms:', data);
             resolve();
           } catch (error) {
+            console.error('Import error:', error);
             reject(error);
           }
         };

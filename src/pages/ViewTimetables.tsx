@@ -334,6 +334,7 @@ const ViewTimetables = () => {
               <TeacherTimetableTab
                 selectedTimetable={selectedTeacherTimetable}
                 onApplyFilters={handleApplyTeacherFilters}
+                onExportTimetable={handleExportTimetable}
               />
             </CardContent>
           </Card>
@@ -348,6 +349,7 @@ const ViewTimetables = () => {
               <RoomTimetableTab
                 selectedTimetable={selectedRoomTimetable}
                 onApplyFilters={handleApplyRoomFilters}
+                onExportTimetable={handleExportTimetable}
               />
             </CardContent>
           </Card>

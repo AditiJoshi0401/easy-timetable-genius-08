@@ -12,11 +12,13 @@ import { Room } from "@/services/supabaseService";
 interface RoomTimetableTabProps {
   selectedTimetable: any;
   onApplyFilters: (roomId?: string) => Promise<any | null>;
+  onExportTimetable?: (format: 'pdf' | 'excel' | 'json', timetable: any, type: 'division' | 'teacher' | 'room', entityName?: string, domElement?: HTMLElement | null) => void;
 }
 
 const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
   selectedTimetable,
-  onApplyFilters
+  onApplyFilters,
+  onExportTimetable
 }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomTypes, setRoomTypes] = useState<string[]>([]);
@@ -194,6 +196,17 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
         >
           View Room Schedule
         </Button>
+        
+        {filteredRoomData && onExportTimetable && (
+          <div className="flex gap-2 mt-4">
+            <Button variant="outline" size="sm" onClick={() => onExportTimetable('pdf', filteredRoomData, 'room', filteredRooms.find(r => r.id === selectedRoom)?.number, null)}>
+              Export PDF
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onExportTimetable('excel', filteredRoomData, 'room', filteredRooms.find(r => r.id === selectedRoom)?.number)}>
+              Export Excel
+            </Button>
+          </div>
+        )}
       </div>
 
       {filteredRoomData && (

@@ -61,6 +61,58 @@ export const exportTimetableToPDF = async (timetableData: TimetableExportData, d
   doc.setFontSize(16);
   doc.text(`${timetableData.name}${timetableData.entityName ? ` - ${timetableData.entityName}` : ''}`, 14, 20);
 
+  // Add workload summary for teacher timetables
+  let startY = 30;
+  if (timetableData.type === 'teacher') {
+    // Calculate workload
+    const workload = { lectures: 0, tutorials: 0, practicals: 0 };
+    
+    const OFFICIAL_DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dataDays = OFFICIAL_DAYS_ORDER.filter(day => timetableData.data && timetableData.data[day]);
+    
+    const allPeriodsSet = new Set<string>();
+    if (timetableData.data) {
+      for (const d of Object.keys(timetableData.data)) {
+        const daySlots = timetableData.data[d] || {};
+        Object.keys(daySlots).forEach(p => allPeriodsSet.add(p));
+      }
+    }
+    
+    const allPeriods = Array.from(allPeriodsSet);
+    
+    for (const day of dataDays) {
+      for (const period of allPeriods) {
+        const slot = timetableData.data?.[day]?.[period];
+        if (slot) {
+          if (slot.type === 'lecture' || slot.type === 'Lecture') workload.lectures++;
+          else if (slot.type === 'tutorial' || slot.type === 'Tutorial') workload.tutorials++;
+          else if (slot.type === 'practical' || slot.type === 'Practical' || slot.type === 'lab' || slot.type === 'Lab') workload.practicals++;
+          else workload.lectures++; // Default to lecture if type not specified
+        }
+      }
+    }
+    
+    // Add workload table
+    doc.setFontSize(12);
+    doc.text('Weekly Workload Summary:', 14, startY);
+    
+    (doc as any).autoTable({
+      head: [['Type', 'Count']],
+      body: [
+        ['Lectures', workload.lectures],
+        ['Tutorials', workload.tutorials], 
+        ['Practicals', workload.practicals],
+        ['Total', workload.lectures + workload.tutorials + workload.practicals]
+      ],
+      startY: startY + 5,
+      styles: { fontSize: 10, cellPadding: 3 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      margin: { left: 14 }
+    });
+    
+    startY += 50; // Adjust starting position for main timetable
+  }
+
   const OFFICIAL_DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const dataDays = OFFICIAL_DAYS_ORDER.filter(day => timetableData.data && timetableData.data[day]);
 
@@ -110,7 +162,7 @@ export const exportTimetableToPDF = async (timetableData: TimetableExportData, d
   (doc as any).autoTable({
     head: [head],
     body,
-    startY: 30,
+    startY,
     styles: { fontSize: 9, cellPadding: 4, textColor: [0, 0, 0] },
     headStyles: { fillColor: [41, 128, 185], textColor: 255 },
     didParseCell: function (data: any) {
@@ -187,6 +239,31 @@ export const exportTimetableToExcel = (timetableData: TimetableExportData, fileN
 
   // Build AOA (array of arrays) with header
   const aoa: any[] = [];
+  
+  // Add workload row for teacher timetables
+  if (timetableData.type === 'teacher') {
+    // Calculate workload
+    const workload = { lectures: 0, tutorials: 0, practicals: 0 };
+    
+    for (const day of dataDays) {
+      for (const period of periods) {
+        const slot = timetableData.data?.[day]?.[period];
+        if (slot) {
+          if (slot.type === 'lecture' || slot.type === 'Lecture') workload.lectures++;
+          else if (slot.type === 'tutorial' || slot.type === 'Tutorial') workload.tutorials++;
+          else if (slot.type === 'practical' || slot.type === 'Practical' || slot.type === 'lab' || slot.type === 'Lab') workload.practicals++;
+          else workload.lectures++; // Default to lecture if type not specified
+        }
+      }
+    }
+    
+    // Add workload header and data
+    aoa.push(['Workload Summary', '', '', '', '', '']);
+    aoa.push(['Lectures', 'Tutorials', 'Practicals', 'Total', '', '']);
+    aoa.push([workload.lectures, workload.tutorials, workload.practicals, workload.lectures + workload.tutorials + workload.practicals, '', '']);
+    aoa.push(['', '', '', '', '', '']); // Empty row separator
+  }
+  
   const header = ['Period', ...dataDays];
   aoa.push(header);
 
@@ -232,8 +309,9 @@ export const exportTimetableToExcel = (timetableData: TimetableExportData, fileN
   ws['!cols'] = [{ wch: 18 }, ...dataDays.map(() => ({ wch: 30 }))];
 
   // Header styling
+  const headerRowIndex = timetableData.type === 'teacher' ? 4 : 0; // Adjust for workload rows
   for (let C = range.s.c; C <= range.e.c; ++C) {
-    const cell_address = { c: C, r: 0 };
+    const cell_address = { c: C, r: headerRowIndex };
     const cell_ref = XLSX.utils.encode_cell(cell_address);
     const cell = ws[cell_ref];
     if (cell) {
@@ -245,8 +323,23 @@ export const exportTimetableToExcel = (timetableData: TimetableExportData, fileN
     }
   }
 
+  // Workload section styling for teacher timetables
+  if (timetableData.type === 'teacher') {
+    // Style workload header
+    for (let C = 0; C < 4; ++C) {
+      const cell_ref = XLSX.utils.encode_cell({ c: C, r: 1 });
+      const cell = ws[cell_ref];
+      if (cell) {
+        cell.s = cell.s || {};
+        cell.s.font = { bold: true };
+        cell.s.fill = { fgColor: { rgb: 'FFE0E0E0' } };
+        cell.s.alignment = { horizontal: 'center', vertical: 'center' };
+      }
+    }
+  }
+
   // Data cell styling and fills based on subject color, with font color contrast
-  for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+  for (let R = headerRowIndex + 1; R <= range.e.r; ++R) {
     for (let C = range.s.c; C <= range.e.c; ++C) {
       const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
       const cell = ws[cell_ref];
