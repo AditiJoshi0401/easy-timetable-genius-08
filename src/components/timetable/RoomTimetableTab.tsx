@@ -74,6 +74,10 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
     const timetableToUse = timetableParam || selectedTimetable;
     if (!selectedRoom || !timetableToUse) return;
 
+    // Get the selected room object to access both id and number
+    const selectedRoomObj = filteredRooms.find(r => String(r.id) === selectedRoom);
+    if (!selectedRoomObj) return;
+
     // Filter the timetable data for the selected room
     const roomData = { ...timetableToUse.data };
     
@@ -83,7 +87,7 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
       for (const timeSlot in roomData[day]) {
         const slot = roomData[day][timeSlot];
         
-        // If the slot doesn't reference the selected room (supports slot.rooms array and legacy slot.room), remove it
+        // If the slot doesn't reference the selected room, remove it
         let containsRoom = false;
         if (!slot) {
           containsRoom = false;
@@ -92,20 +96,30 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
           if (slot.rooms && Array.isArray(slot.rooms)) {
             for (const r of slot.rooms) {
               if (!r) continue;
-              const rId = typeof r === 'string' ? r : r.id || String(r.id || r.number || '');
-              const rNumber = typeof r === 'object' ? (r.number ? String(r.number) : '') : '';
-              if (rId === selectedRoom || rNumber === selectedRoom) { containsRoom = true; break; }
+              const rId = typeof r === 'string' ? r : (r.id ? String(r.id) : '');
+              const rNumber = typeof r === 'object' ? (r.number ? String(r.number) : '') : String(r);
+              if (rId === selectedRoom || rId === selectedRoomObj.number || 
+                  rNumber === selectedRoom || rNumber === selectedRoomObj.number ||
+                  String(r) === selectedRoomObj.number) { 
+                containsRoom = true; 
+                break; 
+              }
             }
           }
 
           // Check legacy single room field
           if (!containsRoom && slot.room) {
             if (typeof slot.room === 'string') {
-              if (slot.room === selectedRoom) containsRoom = true;
+              if (slot.room === selectedRoom || slot.room === selectedRoomObj.number) {
+                containsRoom = true;
+              }
             } else if (typeof slot.room === 'object') {
               const rId = slot.room.id ? String(slot.room.id) : '';
               const rNumber = slot.room.number ? String(slot.room.number) : '';
-              if (rId === selectedRoom || rNumber === selectedRoom) containsRoom = true;
+              if (rId === selectedRoom || rId === selectedRoomObj.number || 
+                  rNumber === selectedRoom || rNumber === selectedRoomObj.number) {
+                containsRoom = true;
+              }
             }
           }
         }
@@ -117,7 +131,7 @@ const RoomTimetableTab: React.FC<RoomTimetableTabProps> = ({
     }
     
     setFilteredRoomData({
-      ...selectedTimetable,
+      ...timetableToUse,
       data: roomData
     });
   };
