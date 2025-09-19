@@ -180,12 +180,86 @@ export const importTeachersData = (): Promise<void> => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           try {
-            const teachers = JSON.parse(e.target?.result as string);
-            // Handle import logic here
+            const rawData = e.target?.result as string;
+            console.log('Raw file content:', rawData.substring(0, 500)); // First 500 chars for debugging
+            
+            const teachers = JSON.parse(rawData);
+            console.log('Parsed teachers data:', teachers);
+            console.log('Number of teachers to import:', teachers.length);
+            
+            // Validate the data structure
+            if (!Array.isArray(teachers)) {
+              throw new Error('Data must be an array');
+            }
+            
+            if (teachers.length === 0) {
+              throw new Error('No teachers found in the file');
+            }
+            
+            // Check first item structure
+            const firstTeacher = teachers[0];
+            console.log('First teacher structure:', Object.keys(firstTeacher));
+            
+            // Clean the data - remove fields that might cause issues
+            const cleanedTeachers = teachers.map(teacher => {
+              const cleaned = { ...teacher };
+              
+              // Remove auto-generated fields that Supabase handles
+              delete cleaned.id;
+              delete cleaned.created_at;
+              
+              // Ensure required fields exist
+              if (!cleaned.name) {
+                throw new Error('Teacher name is required');
+              }
+              if (!cleaned.email) {
+                throw new Error('Teacher email is required');
+              }
+              
+              return cleaned;
+            });
+            
+            console.log('Cleaned teacher data:', cleanedTeachers[0]);
+            
+            // Try inserting one record first for testing
+            console.log('Attempting to insert first teacher...');
+            const { data: testData, error: testError } = await supabase
+              .from('teachers') // Make sure this matches your table name exactly
+              .insert([cleanedTeachers[0]])
+              .select();
+
+            if (testError) {
+              console.error('Test insert failed:', testError);
+              reject(new Error(`Database error: ${testError.message}`));
+              return;
+            }
+
+            console.log('Test insert successful:', testData);
+            
+            // If test works, insert the rest
+            if (cleanedTeachers.length > 1) {
+              console.log('Inserting remaining teachers...');
+              const { data, error } = await supabase
+                .from('teachers')
+                .insert(cleanedTeachers.slice(1))
+                .select();
+
+              if (error) {
+                console.error('Batch insert failed:', error);
+                reject(new Error(`Batch insert error: ${error.message}`));
+                return;
+              }
+              
+              console.log('Batch insert successful:', data);
+            }
+
+            console.log('All teachers imported successfully');
             resolve();
+            
           } catch (error) {
+            console.error('Import error:', error);
             reject(error);
           }
         };
@@ -337,6 +411,7 @@ export const fetchTeachers = async (): Promise<Teacher[]> => {
   })) as Teacher[];
 };
 
+// Teachers - Fixed to handle explicit zero values
 export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher> => {
   // Convert isTA to ista and roles array for database
   const dbTeacher = {
@@ -347,9 +422,10 @@ export const addTeacher = async (teacher: Omit<Teacher, 'id'>): Promise<Teacher>
     ista: teacher.isTA,
     roles: teacher.roles || [],
     cabin: teacher.cabin,
-    max_lectures: teacher.maxLectures || 10,
-    max_labs: teacher.maxLabs || 5,
-    max_tutorials: teacher.maxTutorials || 8
+    // Explicitly handle zero values - don't use || operator
+    max_lectures: teacher.maxLectures ?? 0,
+    max_labs: teacher.maxLabs ?? 0,
+    max_tutorials: teacher.maxTutorials ?? 0
   };
   
   const { data, error } = await supabase
@@ -379,6 +455,7 @@ export const updateTeacher = async (id: string, teacher: Partial<Teacher>): Prom
   if ('roles' in teacher) {
     dbTeacher.roles = teacher.roles || [];
   }
+  // Handle explicit zero values for updates
   if ('maxLectures' in teacher) {
     dbTeacher.max_lectures = teacher.maxLectures;
     delete dbTeacher.maxLectures;

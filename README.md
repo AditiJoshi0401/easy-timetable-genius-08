@@ -58,13 +58,3 @@ supabase db push
 
 - Open an issue or PR with a clear description and related changes.
 - Follow existing code style (TypeScript + Tailwind patterns).
-
-## Notes & Next Steps
-
-- Add screenshots or a demo link to this README for clarity.
-- Consider adding automated tests and CI workflows.
-- Add deployment instructions (Vercel / Netlify / Supabase Hosting).
-
----
-
-If you want, I can add badges, screenshots, deployment instructions, or generate a short demo GIF — tell me which and I'll update the README.

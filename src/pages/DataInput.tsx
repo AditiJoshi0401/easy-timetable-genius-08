@@ -55,9 +55,9 @@ const DataInput = () => {
     specialization: "",
     roles: [] as string[],
     subjects: [] as string[],
-    maxLectures: 10,
-    maxLabs: 5,
-    maxTutorials: 8,
+    maxLectures: undefined as number | undefined,  // Changed from 10
+    maxLabs: undefined as number | undefined,      // Changed from 5  
+    maxTutorials: undefined as number | undefined, // Changed from 8
     isTA: false
   });
   const [teacherWarning, setTeacherWarning] = useState<string>("");
@@ -284,7 +284,14 @@ const DataInput = () => {
 
   // Teacher handlers
   const handleTeacherFormChange = (field: string, value: any) => {
-    setTeacherForm(prev => ({ ...prev, [field]: value }));
+    // Handle number inputs specially
+    if (field === 'maxLectures' || field === 'maxLabs' || field === 'maxTutorials') {
+      // Convert empty string to undefined, otherwise parse the number
+      const numValue = value === '' ? undefined : parseInt(value);
+      setTeacherForm(prev => ({ ...prev, [field]: numValue }));
+    } else {
+      setTeacherForm(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleTeacherSelect = (teacher: Teacher) => {
@@ -295,9 +302,10 @@ const DataInput = () => {
       specialization: teacher.specialization,
       roles: teacher.roles || [],
       subjects: teacher.subjects || [],
-      maxLectures: teacher.maxLectures || 10,
-      maxLabs: teacher.maxLabs || 5,
-      maxTutorials: teacher.maxTutorials || 8,
+      // Don't use || operator with fallback values - it will override 0
+      maxLectures: teacher.maxLectures !== undefined ? teacher.maxLectures : undefined,
+      maxLabs: teacher.maxLabs !== undefined ? teacher.maxLabs : undefined,
+      maxTutorials: teacher.maxTutorials !== undefined ? teacher.maxTutorials : undefined,
       isTA: teacher.isTA || false
     });
   };
@@ -310,9 +318,9 @@ const DataInput = () => {
       specialization: "",
       roles: [],
       subjects: [],
-      maxLectures: 10,
-      maxLabs: 5,
-      maxTutorials: 8,
+      maxLectures: undefined,  // Changed from 10
+      maxLabs: undefined,      // Changed from 5
+      maxTutorials: undefined, // Changed from 8
       isTA: false
     });
     setTeacherWarning("");
@@ -901,9 +909,9 @@ const DataInput = () => {
                             </td>
                             <td className="px-2 sm:px-4 py-4 text-center text-gray-600 dark:text-gray-400 text-xs">
                               <div className="space-y-1">
-                                <div>L: {teacher.maxLectures || 10}</div>
-                                <div>T: {teacher.maxTutorials || 8}</div>
-                                <div>P: {teacher.maxLabs || 5}</div>
+                                <div>L: {teacher.maxLectures ?? 0}</div>
+                                <div>T: {teacher.maxTutorials ?? 0}</div>
+                                <div>P: {teacher.maxLabs ?? 0}</div>
                               </div>
                             </td>
                           </tr>
@@ -977,42 +985,42 @@ const DataInput = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="max-lectures">Max Lectures per Week</Label>
-                  <Input 
-                    id="max-lectures"
-                    type="number" 
-                    min={0} 
-                    max={50}
-                    value={teacherForm.maxLectures} 
-                    onChange={e => handleTeacherFormChange("maxLectures", parseInt(e.target.value) || 0)}
-                    placeholder="e.g., 10"
-                    className="mt-1"
-                  />
+                    <Input 
+                      id="max-lectures"
+                      type="number" 
+                      min={0} 
+                      max={50}
+                      value={teacherForm.maxLectures ?? ''} // Use ?? instead of || 
+                      onChange={e => handleTeacherFormChange("maxLectures", e.target.value)}
+                      placeholder="e.g., 10"
+                      className="mt-1"
+                    />
                 </div>
                 <div>
                   <Label htmlFor="max-labs">Max Labs per Week</Label>
-                  <Input 
-                    id="max-labs"
-                    type="number" 
-                    min={0} 
-                    max={30}
-                    value={teacherForm.maxLabs} 
-                    onChange={e => handleTeacherFormChange("maxLabs", parseInt(e.target.value) || 0)}
-                    placeholder="e.g., 5"
-                    className="mt-1"
-                  />
+                    <Input 
+                      id="max-labs"
+                      type="number" 
+                      min={0} 
+                      max={30}
+                      value={teacherForm.maxLabs ?? ''} // Use ?? instead of ||
+                      onChange={e => handleTeacherFormChange("maxLabs", e.target.value)}
+                      placeholder="e.g., 5"
+                      className="mt-1"
+                    />
                 </div>
                 <div>
                   <Label htmlFor="max-tutorials">Max Tutorials per Week</Label>
-                  <Input 
-                    id="max-tutorials"
-                    type="number" 
-                    min={0} 
-                    max={30}
-                    value={teacherForm.maxTutorials} 
-                    onChange={e => handleTeacherFormChange("maxTutorials", parseInt(e.target.value) || 0)}
-                    placeholder="e.g., 8"
-                    className="mt-1"
-                  />
+                    <Input 
+                      id="max-tutorials"
+                      type="number" 
+                      min={0}   
+                      max={30}
+                      value={teacherForm.maxTutorials ?? ''} // Use ?? instead of ||
+                      onChange={e => handleTeacherFormChange("maxTutorials", e.target.value)}
+                      placeholder="e.g., 8"
+                      className="mt-1"
+                    />
                 </div>
               </div>
 
